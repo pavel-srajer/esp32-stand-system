@@ -358,6 +358,9 @@ static int levelAround(const uint8_t* L, float px, float py, int r) {
 }
 
 // posun (dx, dy) maximalizující překryv srážek: B ≈ A posunuté o (dx, dy)
+static inline bool bitAt(const uint8_t* m, int i) { return (m[i >> 3] >> (i & 7)) & 1; }
+
+// A = bitová maska starého snímku, B = intenzity nového snímku
 static bool findShift(const uint8_t* A, const uint8_t* B, int& bdx, int& bdy) {
   const int S = 4, M = RADAR_N / S;  // hrubě na blocích 4×4
   static uint8_t a[M * M], b[M * M];
@@ -368,7 +371,7 @@ static bool findShift(const uint8_t* A, const uint8_t* B, int& bdx, int& bdy) {
       for (int y = 0; y < S; y++)
         for (int x = 0; x < S; x++) {
           int i = (by * S + y) * RADAR_N + bx * S + x;
-          na += A[i] > 0;
+          na += bitAt(A, i);
           nb += B[i] > 0;
         }
       a[by * M + bx] = na >= 4;
@@ -401,8 +404,8 @@ static bool findShift(const uint8_t* A, const uint8_t* B, int& bdx, int& bdy) {
       int sc = 0;
       for (int y = max(0, dy); y < min(RADAR_N, RADAR_N + dy); y++) {
         const uint8_t* rb = B + y * RADAR_N;
-        const uint8_t* ra = A + (y - dy) * RADAR_N - dx;
-        for (int x = max(0, dx); x < min(RADAR_N, RADAR_N + dx); x++) sc += (ra[x] > 0) & (rb[x] > 0);
+        int ia = (y - dy) * RADAR_N - dx;
+        for (int x = max(0, dx); x < min(RADAR_N, RADAR_N + dx); x++) sc += bitAt(A, ia + x) & (rb[x] > 0);
       }
       if (sc > fbest) {
         fbest = sc;
@@ -413,10 +416,36 @@ static bool findShift(const uint8_t* A, const uint8_t* B, int& bdx, int& bdy) {
   return true;
 }
 
+// odstraní šum: pixel bez aspoň 2 sousedů se srážkami se vynuluje (na místě, s 2 řádkovými buffery)
+static void denoise(uint8_t* F) {
+  uint8_t prev[RADAR_N], cur[RADAR_N];
+  memset(prev, 0, RADAR_N);
+  memcpy(cur, F, RADAR_N);
+  for (int y = 0; y < RADAR_N; y++) {
+    const uint8_t* next = y + 1 < RADAR_N ? F + (y + 1) * RADAR_N : nullptr;  // ještě neupravený řádek
+    for (int x = 0; x < RADAR_N; x++) {
+      if (!cur[x]) {
+        F[y * RADAR_N + x] = 0;
+        continue;
+      }
+      int nb = 0;
+      for (int xx = max(0, x - 1); xx <= min(RADAR_N - 1, x + 1); xx++) {
+        nb += prev[xx] > 0;
+        nb += next && next[xx] > 0;
+        if (xx != x) nb += cur[xx] > 0;
+      }
+      F[y * RADAR_N + x] = nb >= 2 ? cur[x] : 0;
+    }
+    memcpy(prev, cur, RADAR_N);
+    if (next) memcpy(cur, next, RADAR_N);
+  }
+}
+
 void radarAnalyze(float tempC) {
   RadarInfo info;
-  uint8_t* L = (uint8_t*)malloc(RADAR_N * RADAR_N);  // nejnovější snímek (intenzity)
-  uint8_t* O = (uint8_t*)malloc(RADAR_N * RADAR_N);  // nejstarší snímek
+  // jeden obraz intenzit (14 kB) + bitová maska starého snímku (1,8 kB)
+  uint8_t* L = (uint8_t*)malloc(RADAR_N * RADAR_N);
+  uint8_t* O = (uint8_t*)calloc(RADAR_N * RADAR_N / 8, 1);
   if (!L || !O) {
     free(L);
     free(O);
@@ -427,8 +456,11 @@ void radarAnalyze(float tempC) {
   float R = sRadius;
   time_t t0 = n ? sFrames[0].t : 0, t1 = n ? sFrames[n - 1].t : 0;
   if (n) {
-    rleToLevels(sFrames[n - 1], L);
-    rleToLevels(sFrames[0], O);
+    rleToLevels(sFrames[0], L);  // nejstarší -> maska
+    denoise(L);
+    for (int i = 0; i < RADAR_N * RADAR_N; i++)
+      if (L[i]) O[i >> 3] |= 1 << (i & 7);
+    rleToLevels(sFrames[n - 1], L);  // nejnovější
   }
   unlock();
   if (!n) {
@@ -436,28 +468,7 @@ void radarAnalyze(float tempC) {
     free(O);
     return;
   }
-
-  // šum: pixel bez aspoň 2 sousedů se srážkami nepočítat
-  uint8_t* keep = (uint8_t*)malloc(RADAR_N * RADAR_N);
-  for (int pass = 0; pass < 2 && keep; pass++) {
-    uint8_t* F = pass ? O : L;
-    for (int y = 0; y < RADAR_N; y++)
-      for (int x = 0; x < RADAR_N; x++) {
-        int i = y * RADAR_N + x, nb = 0;
-        if (!F[i]) {
-          keep[i] = 0;
-          continue;
-        }
-        for (int yy = -1; yy <= 1; yy++)
-          for (int xx = -1; xx <= 1; xx++) {
-            int X = x + xx, Y = y + yy;
-            if ((xx || yy) && X >= 0 && Y >= 0 && X < RADAR_N && Y < RADAR_N && F[Y * RADAR_N + X]) nb++;
-          }
-        keep[i] = nb >= 2 ? F[i] : 0;
-      }
-    memcpy(F, keep, RADAR_N * RADAR_N);
-  }
-  free(keep);
+  denoise(L);
 
   const float kmPx = 2 * R / RADAR_N;
   const float c = RADAR_N / 2.0f - 0.5f;  // střed = domov

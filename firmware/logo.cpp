@@ -6,7 +6,7 @@
 #include <LovyanGFX.hpp>
 
 static const char* LOGO_URL = "https://raw.githubusercontent.com/Jxck-S/airline-logos/main/flightaware_logos/%s.png";
-static const int CACHE = 6;
+static const int CACHE = 3;
 
 struct Entry {
   char icao[4];

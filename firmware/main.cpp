@@ -216,24 +216,24 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
     return false;
   }
 
+  // Letadla se čtou po jednom (pole "ac" může mít přes 100 položek – najednou by to
+  // zabralo desítky kB RAM, které chybí pro TLS).
   BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http));
+  body.setTimeout(10000);
   JsonDocument filter;
-  JsonObject f = filter["ac"].add<JsonObject>();
   for (const char* k : {"hex", "flight", "r", "t", "alt_baro", "gs", "track", "baro_rate", "lat", "lon"})
-    f[k] = true;
-
-  JsonDocument doc;
-  DeserializationError err =
-      deserializeJson(doc, body, DeserializationOption::Filter(filter));
-  http.end();
-  if (err) {
-    Serial.printf("[ADSB] JSON: %s\n", err.c_str());
-    snprintf(out.err, sizeof out.err, "JSON %s", err.c_str());
+    filter[k] = true;
+  out.count = 0;
+  if (!body.find("\"ac\"") || !body.find("[")) {
+    http.end();
+    strlcpy(out.err, "ADS-B: chybí seznam", sizeof out.err);
     return false;
   }
-
-  out.count = 0;
-  for (JsonObject a : doc["ac"].as<JsonArray>()) {
+  JsonDocument doc;
+  do {
+    DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
+    if (err) break;  // prázdné pole nebo konec dat
+    JsonObject a = doc.as<JsonObject>();
     if (!a["lat"].is<float>() || !a["lon"].is<float>()) continue;
     Plane pl{};
     pl.lat = a["lat"];
@@ -255,7 +255,8 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
     pl.track = a["track"] | NAN;
     pl.vrate = a["baro_rate"] | 0;
     insertPlane(out, pl);
-  }
+  } while (body.findUntil(",", "]"));
+  http.end();
   out.ok = true;
   out.err[0] = 0;
   Serial.printf("[ADSB] %d letadel do %.0f km (%s)\n", out.count, rangeKm, url);
@@ -1564,7 +1565,7 @@ void loop() {
     ESP.restart();  // nikdo nic nenastavuje -> zkus znovu uloženou WiFi
   }
 
-  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs) ? 66 : 250;
+  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs) ? 100 : 250;
   if (now - lastDraw < frame) {
     delay(5);
     return;
