@@ -32,6 +32,7 @@
 #include "logo.h"
 #include "namedays.h"
 #include "mapdata.h"
+#include "i18n.h"
 
 // ===================================================================
 //  Konstanty
@@ -141,15 +142,23 @@ static void distBearing(float lat, float lon, float& distKm, float& brg) {
 }
 
 static const char* compass8(float deg) {
-  static const char* d[] = {"S", "SV", "V", "JV", "J", "JZ", "Z", "SZ"};
-  int i = (int)floorf(fmodf(deg + 22.5f + 360.0f, 360.0f) / 45.0f) & 7;
-  return d[i];
+  return trCompass((int)floorf(fmodf(deg + 22.5f + 360.0f, 360.0f) / 45.0f));
 }
 
 static const char* planesWord(int n) {
-  if (n == 1) return "letadlo";
-  if (n >= 2 && n <= 4) return "letadla";
-  return "letadel";
+  switch (gCfg.lang) {
+    case LANG_EN: return "aircraft";
+    case LANG_DE: return n == 1 ? "Flugzeug" : "Flugzeuge";
+    case LANG_IT: return n == 1 ? "aereo" : "aerei";
+    default: return n == 1 ? "letadlo" : (n >= 2 && n <= 4) ? "letadla" : "letadel";
+  }
+}
+
+// "verze v0.7.2" ve zvoleném jazyce
+static const char* versionText() {
+  static char b[32];
+  snprintf(b, sizeof b, "%s %s", tr("verze", "version", "Version", "versione"), FW_VERSION);
+  return b;
 }
 
 // číslo s desetinnou čárkou
@@ -227,7 +236,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   out.count = 0;
   if (!body.find("\"ac\"") || !body.find("[")) {
     http.end();
-    strlcpy(out.err, "ADS-B: chybí seznam", sizeof out.err);
+    strlcpy(out.err, tr("ADS-B: chybí seznam", "ADS-B: no list", "ADS-B: keine Liste", "ADS-B: nessun elenco"), sizeof out.err);
     return false;
   }
   JsonDocument doc;
@@ -621,8 +630,8 @@ static void drawPlaneIcon(int x, int y, float track, uint16_t col, float s = 7) 
 }
 
 static void altText(char* buf, size_t n, int32_t alt) {
-  if (alt == ALT_GROUND) strlcpy(buf, "na zemi", n);
-  else if (alt == ALT_UNKNOWN) strlcpy(buf, "výška ?", n);
+  if (alt == ALT_GROUND) strlcpy(buf, tr("na zemi", "on ground", "am Boden", "a terra"), n);
+  else if (alt == ALT_UNKNOWN) strlcpy(buf, tr("výška ?", "altitude ?", "Höhe ?", "quota ?"), n);
   else snprintf(buf, n, "%ld m", lroundf(alt * 0.3048f / 10) * 10L);
 }
 
@@ -727,7 +736,7 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
   spr.setTextDatum(textdatum_t::top_center);
   spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(0, 220, 100));
-  spr.drawString("S", CX, CY - R + 2);  // sever
+  spr.drawString(trCompass(0), CX, CY - R + 2);  // sever
   spr.fillCircle(CX, CY, 2, rgb(255, 255, 255));  // domov
 
   // letadla (od nejvzdálenějšího, aby nejbližší bylo navrchu)
@@ -770,7 +779,7 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
   } else if (!pd.ok) {
     spr.setTextColor(rgb(255, 120, 0));
     spr.setTextDatum(textdatum_t::top_center);
-    spr.drawString(pd.err[0] ? pd.err : "načítám…", CX, 196);
+    spr.drawString(pd.err[0] ? pd.err : tr("načítám…", "loading…", "lädt…", "caricamento…"), CX, 196);
   }
 }
 
@@ -782,7 +791,7 @@ static void drawDetail(const PlaneData& pd) {
   int n = 0;
   while (n < pd.count && pd.p[n].distKm <= range) n++;
   if (n == 0) {
-    drawCenteredMsg(pd.ok ? "žádné letadlo" : "načítám…", pd.ok ? "v dosahu radaru" : pd.err);
+    drawCenteredMsg(pd.ok ? tr("žádné letadlo", "no aircraft", "kein Flugzeug", "nessun aereo") : tr("načítám…", "loading…", "lädt…", "caricamento…"), pd.ok ? tr("v dosahu radaru", "in radar range", "im Radarbereich", "nel raggio radar") : pd.err);
     return;
   }
   if (gDetailIdx >= n) gDetailIdx = 0;
@@ -858,7 +867,7 @@ static void drawDetail(const PlaneData& pd) {
 // ---------------- Obrazovka 3: počasí ----------------
 static void drawWeather(const Weather& w) {
   if (!w.ok) {
-    drawCenteredMsg("ČHMI", w.err[0] ? w.err : (timeValid() ? "načítám…" : "čekám na čas (NTP)…"));
+    drawCenteredMsg("ČHMI", w.err[0] ? w.err : (timeValid() ? tr("načítám…", "loading…", "lädt…", "caricamento…") : tr("čekám na čas (NTP)…", "waiting for time (NTP)…", "warte auf Zeit (NTP)…", "attesa ora (NTP)…")));
     return;
   }
   char b[48], t[16];
@@ -895,7 +904,7 @@ static void drawWeather(const Weather& w) {
   spr.setFont(&fontCZ_16);
   int y = 110;
   if (!isnan(w.h)) {
-    snprintf(b, sizeof b, "vlhkost %.0f %%", w.h);
+    snprintf(b, sizeof b, tr("vlhkost %.0f %%", "humidity %.0f %%", "Feuchte %.0f %%", "umidità %.0f %%"), w.h);
     spr.setTextColor(rgb(120, 200, 255));
     spr.drawString(b, CX, y);
     y += 22;
@@ -904,7 +913,7 @@ static void drawWeather(const Weather& w) {
     float p = w.p;
     float tt = isnan(w.t) ? 10 : w.t;
     p = w.p * powf(1 - 0.0065f * gCfg.elev / (tt + 0.0065f * gCfg.elev + 273.15f), -5.257f);
-    snprintf(b, sizeof b, "tlak %.0f hPa", p);
+    snprintf(b, sizeof b, tr("tlak %.0f hPa", "pressure %.0f hPa", "Druck %.0f hPa", "pressione %.0f hPa"), p);
     spr.setTextColor(rgb(200, 200, 200));
     spr.drawString(b, CX, y);
     y += 22;
@@ -914,9 +923,9 @@ static void drawWeather(const Weather& w) {
     if (!isnan(w.fmax)) {
       char g[12];
       fmtDec(g, sizeof g, w.fmax, 0);
-      snprintf(b, sizeof b, "vítr %s (%s) m/s", t, g);
+      snprintf(b, sizeof b, tr("vítr %s (%s) m/s", "wind %s (%s) m/s", "Wind %s (%s) m/s", "vento %s (%s) m/s"), t, g);
     } else {
-      snprintf(b, sizeof b, "vítr %s m/s", t);
+      snprintf(b, sizeof b, tr("vítr %s m/s", "wind %s m/s", "Wind %s m/s", "vento %s m/s"), t);
     }
     if (!isnan(w.d) && w.f > 0.2f) {
       size_t l = strlen(b);
@@ -928,7 +937,7 @@ static void drawWeather(const Weather& w) {
   }
   if (!isnan(w.rain)) {
     fmtDec(t, sizeof t, w.rain, 1);
-    snprintf(b, sizeof b, "srážky dnes %s mm", t);
+    snprintf(b, sizeof b, tr("srážky dnes %s mm", "rain today %s mm", "Regen heute %s mm", "pioggia oggi %s mm"), t);
     spr.setTextColor(rgb(100, 150, 255));
     spr.drawString(b, CX, y);
   }
@@ -936,7 +945,7 @@ static void drawWeather(const Weather& w) {
   if (w.obs) {
     struct tm lt;
     localtime_r(&w.obs, &lt);
-    snprintf(b, sizeof b, "měřeno %02d:%02d", lt.tm_hour, lt.tm_min);
+    snprintf(b, sizeof b, tr("měřeno %02d:%02d", "measured %02d:%02d", "gemessen %02d:%02d", "misurato %02d:%02d"), lt.tm_hour, lt.tm_min);
     spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(120, 120, 120));
     spr.drawString(b, CX, 208);
@@ -959,15 +968,22 @@ static const char* czHoliday(const struct tm& lt) {
   int m = lt.tm_mon + 1, d = lt.tm_mday;
   struct H {
     uint8_t m, d;
-    const char* n;
+    const char* n[4];  // cs, en, de, it
   };
-  static const H FIXED[] = {{1, 1, "Den obnovy státu, Nový rok"}, {5, 1, "Svátek práce"}, {5, 8, "Den vítězství"},
-                            {7, 5, "Den slovanských věrozvěstů"}, {7, 6, "Den upálení Jana Husa"},
-                            {9, 28, "Den české státnosti"},   {10, 28, "Den vzniku Československa"},
-                            {11, 17, "Den boje za svobodu"},  {12, 24, "Štědrý den"},
-                            {12, 25, "1. svátek vánoční"},    {12, 26, "2. svátek vánoční"}};
+  static const H FIXED[] = {
+      {1, 1, {"Den obnovy státu, Nový rok", "New Year's Day", "Neujahr", "Capodanno"}},
+      {5, 1, {"Svátek práce", "Labour Day", "Tag der Arbeit", "Festa del lavoro"}},
+      {5, 8, {"Den vítězství", "Liberation Day", "Tag der Befreiung", "Festa della liberazione"}},
+      {7, 5, {"Den slovanských věrozvěstů", "Saints Cyril and Methodius", "Kyrill und Method", "Santi Cirillo e Metodio"}},
+      {7, 6, {"Den upálení Jana Husa", "Jan Hus Day", "Jan-Hus-Tag", "Giorno di Jan Hus"}},
+      {9, 28, {"Den české státnosti", "Czech Statehood Day", "Tag der Staatlichkeit", "Festa dello Stato ceco"}},
+      {10, 28, {"Den vzniku Československa", "Independence Day", "Unabhängigkeitstag", "Festa dell'indipendenza"}},
+      {11, 17, {"Den boje za svobodu", "Freedom and Democracy Day", "Tag des Freiheitskampfes", "Giorno della libertà"}},
+      {12, 24, {"Štědrý den", "Christmas Eve", "Heiligabend", "Vigilia di Natale"}},
+      {12, 25, {"1. svátek vánoční", "Christmas Day", "1. Weihnachtstag", "Natale"}},
+      {12, 26, {"2. svátek vánoční", "St. Stephen's Day", "2. Weihnachtstag", "Santo Stefano"}}};
   for (auto& h : FIXED)
-    if (h.m == m && h.d == d) return h.n;
+    if (h.m == m && h.d == d) return tr(h.n[0], h.n[1], h.n[2], h.n[3]);
   int em, ed;
   easterSunday(lt.tm_year + 1900, em, ed);
   struct tm e = {};
@@ -979,17 +995,24 @@ static const char* czHoliday(const struct tm& lt) {
     struct tm x = e;
     x.tm_mday += off;
     mktime(&x);
-    if (x.tm_mon == lt.tm_mon && x.tm_mday == d) return off < 0 ? "Velký pátek" : "Velikonoční pondělí";
+    if (x.tm_mon == lt.tm_mon && x.tm_mday == d) return off < 0 ? tr("Velký pátek", "Good Friday", "Karfreitag", "Venerdì santo")
+                                                                    : tr("Velikonoční pondělí", "Easter Monday", "Ostermontag", "Pasquetta");
   }
   return nullptr;
 }
 
 static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc) {
   if (!timeValid()) {
-    drawCenteredMsg("čekám na čas…");
+    drawCenteredMsg(tr("čekám na čas…", "waiting for time…", "warte auf Zeit…", "attesa ora…"));
     return;
   }
-  static const char* DNY[] = {"neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"};
+  static const char* const DNY[LANG_COUNT][7] = {
+      {"neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"},
+      {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
+      {"Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"},
+      {"domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"}};
+  static const char* const MON_EN[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  int L = constrain(gCfg.lang, 0, LANG_COUNT - 1);
   time_t now = time(nullptr);
   struct tm lt;
   localtime_r(&now, &lt);
@@ -1007,11 +1030,14 @@ static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc)
 
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(180, 180, 180));
-  snprintf(b, sizeof b, "%s %d. %d.", DNY[lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
+  if (L == LANG_EN) snprintf(b, sizeof b, "%s %d %s", DNY[L][lt.tm_wday], lt.tm_mday, MON_EN[lt.tm_mon]);
+  else if (L == LANG_IT) snprintf(b, sizeof b, "%s %d/%d", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
+  else if (L == LANG_DE) snprintf(b, sizeof b, "%s %d.%d.", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
+  else snprintf(b, sizeof b, "%s %d. %d.", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
   spr.drawString(b, CX, CY + 18);
 
   // kdo má svátek + případný státní svátek
-  const char* name = NAMEDAY[lt.tm_mon][lt.tm_mday - 1];
+  const char* name = L == LANG_CS ? NAMEDAY[lt.tm_mon][lt.tm_mday - 1] : nullptr;  // jmeniny jen česky
   const char* holi = czHoliday(lt);
   int y = CY + 40;
   if (name && name[0]) {
@@ -1114,14 +1140,14 @@ static uint16_t alertColor(uint8_t lv) {
 // ---------------- Obrazovka: předpověď ----------------
 static void drawForecast(const Forecast& f) {
   if (!f.ok) {
-    drawCenteredMsg("Předpověď", f.err[0] ? f.err : "načítám…");
+    drawCenteredMsg(tr("Předpověď", "Forecast", "Vorhersage", "Previsioni"), f.err[0] ? f.err : tr("načítám…", "loading…", "lädt…", "caricamento…"));
     return;
   }
   char b[64], t[16];
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(150, 150, 150));
-  spr.drawString("Předpověď", CX, 22);
+  spr.drawString(tr("Předpověď", "Forecast", "Vorhersage", "Previsioni"), CX, 22);
 
   drawWxIcon(84, 62, f.curCode, f.isDay, 46);
   fmtDec(t, sizeof t, f.curT, 1);
@@ -1135,7 +1161,7 @@ static void drawForecast(const Forecast& f) {
   spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(200, 200, 200));
   if (!isnan(f.curGust) && f.curGust >= 30)
-    snprintf(b, sizeof b, "%s · nárazy %.0f km/h", weatherText(f.curCode), f.curGust);
+    snprintf(b, sizeof b, tr("%s · nárazy %.0f km/h", "%s · gusts %.0f km/h", "%s · Böen %.0f km/h", "%s · raffiche %.0f km/h"), weatherText(f.curCode), f.curGust);
   else
     snprintf(b, sizeof b, "%s", weatherText(f.curCode));
   spr.drawString(b, CX, 92);
@@ -1155,7 +1181,7 @@ static void drawForecast(const Forecast& f) {
   int shown = radarLine ? 1 : 0;
   if (f.nAlerts == 0 && !radarLine) {
     spr.setTextColor(rgb(80, 220, 120));
-    spr.drawString("bez výrazných jevů", CX, y + 10);
+    spr.drawString(tr("bez výrazných jevů", "no significant weather", "keine Wettergefahren", "nessun fenomeno rilevante"), CX, y + 10);
   }
   for (int i = 0; i < f.nAlerts && shown < 3; i++) {
     if (radarLine && f.nowcast[0] && !strcmp(f.alert[i], f.nowcast)) continue;
@@ -1196,7 +1222,8 @@ static void drawRain(const Forecast& fc, uint32_t now) {
   float R = RAIN_RADII[constrain(gCfg.rainRadiusIdx, 0, 3)];
   char b[64];
   if (n == 0) {
-    drawCenteredMsg("Meteoradar ČHMI", radarError()[0] ? radarError() : "načítám snímky…");
+    drawCenteredMsg(tr("Meteoradar ČHMI", "Weather radar ČHMI", "Wetterradar ČHMI", "Radar meteo ČHMI"),
+                    radarError()[0] ? radarError() : tr("načítám snímky…", "loading images…", "lade Bilder…", "caricamento immagini…"));
     return;
   }
   // animace: snímky po 600 ms, poslední drží 2,4 s
@@ -1240,7 +1267,7 @@ static void drawRain(const Forecast& fc, uint32_t now) {
   const char* l1 = ri.valid ? ri.line1 : (fc.ok && fc.nowcast[0] ? fc.nowcast : "");
   const char* l2 = ri.valid ? ri.line2 : "";
   if (ago >= 0 && idx == n - 1 && ago > 20) {
-    snprintf(b, sizeof b, "snímek je %d min starý", ago);
+    snprintf(b, sizeof b, tr("snímek je %d min starý", "image is %d min old", "Bild ist %d min alt", "immagine di %d min fa"), ago);
     l2 = b;
   }
   bool wet = ri.valid ? (ri.here || ri.arriveMin > 0) : fc.nowcast[0] != 0;
@@ -1324,7 +1351,7 @@ static void renderFrame(F draw) {
 // jas podle denní doby
 static int scheduledPct() {
   if (!timeValid()) {
-    gPeriod = "den";
+    gPeriod = tr("den", "day", "Tag", "giorno");
     return gCfg.bDay;
   }
   time_t now = time(nullptr);
@@ -1334,7 +1361,9 @@ static int scheduledPct() {
   struct P {
     int start, pct;
     const char* name;
-  } p[3] = {{gCfg.tDay, gCfg.bDay, "den"}, {gCfg.tEve, gCfg.bEve, "večer"}, {gCfg.tNight, gCfg.bNight, "noc"}};
+  } p[3] = {{gCfg.tDay, gCfg.bDay, tr("den", "day", "Tag", "giorno")},
+            {gCfg.tEve, gCfg.bEve, tr("večer", "evening", "Abend", "sera")},
+            {gCfg.tNight, gCfg.bNight, tr("noc", "night", "Nacht", "notte")}};
   // seřadit podle začátku; před prvním začátkem platí poslední období (přes půlnoc)
   for (int i = 0; i < 2; i++)
     for (int j = 0; j < 2 - i; j++)
@@ -1386,7 +1415,11 @@ void brightnessPreview(int pct) {
   gPreviewUntil = millis() + 4000;
 }
 int brightnessCurrent() { return gCurPct; }
-const char* brightnessPeriod() { return until(gPreviewUntil) ? "náhled" : until(gBoostUntil) ? "probuzeno tlačítkem" : gPeriod; }
+const char* brightnessPeriod() {
+  return until(gPreviewUntil)  ? tr("náhled", "preview", "Vorschau", "anteprima")
+         : until(gBoostUntil) ? tr("probuzeno tlačítkem", "woken by button", "per Taste geweckt", "risvegliato dal tasto")
+                               : gPeriod;
+}
 
 // ===================================================================
 //  Stav aplikace pro stránku /system
@@ -1410,14 +1443,18 @@ void appStatusJson(JsonObject o) {
   o["weather_age"] = gPortalMode ? -1 : wAge;
   o["weather_err"] = wErr;
   o["station"] = gCfg.name + " (" + gCfg.wsi + ")";
-  static const char* const OTA_TXT[] = {"nekontrolováno", "kontroluji…", "aktuální verze",
-                                        "je dostupná nová verze", "stahuji…", "chyba"};
-  String ota = OTA_TXT[gOta.state];
+  static const char* const OTA_TXT[LANG_COUNT][6] = {
+      {"nekontrolováno", "kontroluji…", "aktuální verze", "je dostupná nová verze", "stahuji…", "chyba"},
+      {"not checked", "checking…", "up to date", "new version available", "downloading…", "error"},
+      {"nicht geprüft", "prüfe…", "aktuell", "neue Version verfügbar", "lade herunter…", "Fehler"},
+      {"non verificato", "verifica…", "aggiornato", "nuova versione disponibile", "download…", "errore"}};
+  String ota = OTA_TXT[constrain(gCfg.lang, 0, LANG_COUNT - 1)][gOta.state];
   if (gOta.latest[0]) ota += String(" (GitHub: ") + gOta.latest + ")";
   if (gOta.state == OTA_FAILED && gOta.msg[0]) ota += String(": ") + gOta.msg;
   o["ota"] = ota;
   {
-    String ntp = timeValid() ? "synchronizováno" : "zatím nesynchronizováno";
+    String ntp = timeValid() ? tr("synchronizováno", "synchronized", "synchronisiert", "sincronizzato")
+                             : tr("zatím nesynchronizováno", "not yet synchronized", "noch nicht synchronisiert", "non ancora sincronizzato");
     ntp += " · " + gCfg.ntp1;
     if (gCfg.ntp2.length()) ntp += ", " + gCfg.ntp2;
     time_t t = time(nullptr);
@@ -1446,7 +1483,8 @@ void appStatusJson(JsonObject o) {
   }
   o["bright"] = gCurPct;
   o["period"] = brightnessPeriod();
-  o["backlight"] = gPwm ? "PWM na GPIO " + String(gCfg.blPin) : String("softwarové stmívání obrazu");
+  o["backlight"] = gPwm ? String("PWM GPIO ") + gCfg.blPin
+                        : String(tr("softwarové stmívání obrazu", "software dimming", "Software-Dimmung", "attenuazione software"));
   o["stack_net"] = gNetTask ? uxTaskGetStackHighWaterMark(gNetTask) : 0;
   o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
 }
@@ -1536,7 +1574,7 @@ static void drawHoldIndicator() {
   spr.setFont(&fontCZ_12);
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setTextColor(rgb(255, 160, 0));
-  spr.drawString("drž pro nastavení WiFi", CX, CY);
+  spr.drawString(tr("drž pro nastavení WiFi", "hold for WiFi setup", "halten für WLAN-Setup", "tieni premuto: setup WiFi"), CX, CY);
 }
 
 static void drawPortal() {
@@ -1546,24 +1584,24 @@ static void drawPortal() {
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(255, 160, 0));
-  spr.drawString("Nastavení", CX, 28);
+  spr.drawString(tr("Nastavení", "Setup", "Einrichtung", "Configurazione"), CX, 28);
   spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(200, 200, 200));
   if (!client) {
     // QR kód pro připojení k hotspotu (otevřená síť)
     snprintf(b, sizeof b, "WIFI:T:nopass;S:%s;;", ap.c_str());
     spr.qrcode(b, CX - 56, 44, 112, 3);
-    spr.drawString("1. připoj se k WiFi", CX, 170);
+    spr.drawString(tr("1. připoj se k WiFi", "1. connect to WiFi", "1. mit WLAN verbinden", "1. connettiti al WiFi"), CX, 170);
     spr.setTextColor(rgb(255, 255, 255));
     spr.drawString(ap.c_str(), CX, 186);
   } else {
     spr.qrcode("http://192.168.4.1/", CX - 56, 44, 112, 3);
-    spr.drawString("2. otevři v prohlížeči", CX, 170);
+    spr.drawString(tr("2. otevři v prohlížeči", "2. open in browser", "2. im Browser öffnen", "2. apri nel browser"), CX, 170);
     spr.setTextColor(rgb(255, 255, 255));
     spr.drawString("192.168.4.1", CX, 186);
   }
   spr.setTextColor(rgb(110, 110, 110));
-  spr.drawString(settingsHasWifi() ? "stiskem tlačítka zpět" : "verze " FW_VERSION, CX, 206);
+  spr.drawString(settingsHasWifi() ? tr("stiskem tlačítka zpět", "press button to go back", "Taste = zurück", "premi il tasto per uscire") : versionText(), CX, 206);
 }
 
 static void drawOta() {
@@ -1573,7 +1611,7 @@ static void drawOta() {
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(255, 255, 255));
-  spr.drawString("Aktualizace", CX, CY - 30);
+  spr.drawString(tr("Aktualizace", "Update", "Update", "Aggiornamento"), CX, CY - 30);
   spr.setFont(&fontCZ_24);
   snprintf(b, sizeof b, "%d %%", gOta.progress);
   spr.drawString(b, CX, CY + 2);
@@ -1581,7 +1619,7 @@ static void drawOta() {
   spr.setTextColor(rgb(160, 160, 160));
   snprintf(b, sizeof b, "%s → %s", FW_VERSION, gOta.latest);
   spr.drawString(b, CX, CY + 32);
-  spr.drawString("nevypínej napájení", CX, CY + 50);
+  spr.drawString(tr("nevypínej napájení", "do not power off", "nicht ausschalten", "non spegnere"), CX, CY + 50);
 }
 
 static void showBoot(const char* a, const char* b) {
@@ -1589,7 +1627,7 @@ static void showBoot(const char* a, const char* b) {
     drawCenteredMsg(a, b);
     spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(90, 90, 90));
-    spr.drawString("verze " FW_VERSION, CX, 206);
+    spr.drawString(versionText(), CX, 206);
   });
 }
 
@@ -1653,7 +1691,7 @@ static void showSplash(uint32_t ms) {
       spr.setTextDatum(textdatum_t::middle_center);
       spr.setFont(&fontCZ_16);
       spr.setTextColor(rgb(90, 200, 255));
-      spr.drawString("verze " FW_VERSION, CX, 152);
+      spr.drawString(versionText(), CX, 152);
       spr.setFont(&fontCZ_12);
       spr.setTextColor(CLAUDE);
       spr.drawString("powered by Claude Code", CX, 190);
@@ -1686,13 +1724,15 @@ void setup() {
   if (!settingsHasWifi() || portalFlag) {
     gPortalMode = true;
     if (!portalFlag) showSplash(3000);  // první zapnutí (ne při ručním vyvolání nastavení)
-    showBoot("Spouštím hotspot…", nullptr);
+    showBoot(tr("Spouštím hotspot…", "Starting hotspot…", "Starte Hotspot…", "Avvio hotspot…"), nullptr);
     webBegin(true);
     return;
   }
 
   if (!scrOn(gScreen)) onShortPress();
-  showBoot(gOtaBootMode ? "Aktualizace…" : "Připojuji WiFi…", gCfg.ssid.c_str());
+  showBoot(gOtaBootMode ? tr("Aktualizace…", "Updating…", "Update…", "Aggiornamento…")
+                        : tr("Připojuji WiFi…", "Connecting WiFi…", "Verbinde WLAN…", "Connessione WiFi…"),
+           gCfg.ssid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("letadla");
   // SNTP si ukládá jen ukazatele -> řetězce v gCfg platí po celou dobu běhu

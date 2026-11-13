@@ -49,6 +49,10 @@ V sekci **Obrazovky** ve webovém nastavení dále najdeš:
 - **Podklad meteoradaru** a **podklad radaru letadel**: žádný / hranice a města / hranice, řeky a města. Mapa je uložená přímo ve firmwaru (asi 20 kB), takže nepotřebuje internet ani RAM navíc. Hustota měst se řídí poloměrem. Data generuje `tools/make_map.py`: hranice a řeky z Natural Earth (volné dílo), česká města z janpipek/cli-plotting-talk, města v okolí z Natural Earth s českými názvy.
 - **Automatické přepínání obrazovek**: vypnuto / 10 / 15 / 30 / 60 s. Po stisku tlačítka se automatika na minutu pozastaví.
 
+## Jazyk
+
+Rozhraní je k dispozici **česky, anglicky, německy a italsky**. Jazyk se volí nahoře ve webovém nastavení a platí pro displej i webové stránky. Jmeniny se zobrazují jen v češtině, státní svátky ČR se překládají. Texty jsou ve zdrojovém kódu přímo u sebe: `tr("česky", "English", "Deutsch", "Italiano")` (viz `firmware/i18n.h`), šablony webu používají značky `{{klíč}}` s překlady v `portal.cpp`.
+
 ## Čas (NTP)
 
 Ve webovém nastavení v sekci **Čas (NTP)** se nastavuje hlavní a záložní NTP server. Výchozí jsou `pool.ntp.org` a `time.google.com`, jiná možnost je třeba `tik.cesnet.cz`, `ntp.nic.cz` nebo IP adresa routeru. Časová zóna je Praha a letní čas se přepíná sám. Stav synchronizace je vidět na stránce Systémové informace.

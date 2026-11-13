@@ -1,5 +1,6 @@
 #include "radar.h"
 #include "settings.h"
+#include "i18n.h"
 #include "http_body.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -215,7 +216,7 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
   free(c->line);
   free(c);
   if (!ok) {
-    snprintf(sErr, sizeof sErr, "snímek: %s", pngNetError());
+    snprintf(sErr, sizeof sErr, "%s: %s", tr("snímek", "image", "Bild", "immagine"), pngNetError());
     Serial.printf("[Radar] %s\n", sErr);
     return false;
   }
@@ -266,7 +267,7 @@ bool radarUpdate(float radiusKm) {
   static char want[RADAR_FRAMES][14];
   int n = scanIndex(want, RADAR_FRAMES);
   if (n <= 0) {
-    if (n == 0) strlcpy(sErr, "radar: žádné snímky", sizeof sErr);
+    if (n == 0) strlcpy(sErr, tr("radar: žádné snímky", "radar: no images", "Radar: keine Bilder", "radar: nessuna immagine"), sizeof sErr);
     Serial.printf("[Radar] %s\n", sErr);
     return false;
   }
@@ -338,13 +339,15 @@ static void rleToLevels(const Frame& f, uint8_t* out) {
   }
 }
 
-static const char* dir8(float deg) {
-  static const char* D[] = {"S", "SV", "V", "JV", "J", "JZ", "Z", "SZ"};
-  return D[(int)floorf(fmodf(deg + 22.5f + 720.0f, 360.0f) / 45.0f) & 7];
-}
+static int dirIdx(float deg) { return (int)floorf(fmodf(deg + 22.5f + 720.0f, 360.0f) / 45.0f) & 7; }
+static const char* dir8(float deg) { return trCompass(dirIdx(deg)); }
 static const char* dir8to(float deg) {  // "k východu"
-  static const char* D[] = {"k severu", "k SV", "k východu", "k JV", "k jihu", "k JZ", "k západu", "k SZ"};
-  return D[(int)floorf(fmodf(deg + 22.5f + 720.0f, 360.0f) / 45.0f) & 7];
+  static const char* const D[LANG_COUNT][8] = {
+      {"k severu", "k SV", "k východu", "k JV", "k jihu", "k JZ", "k západu", "k SZ"},
+      {"to N", "to NE", "to E", "to SE", "to S", "to SW", "to W", "to NW"},
+      {"nach N", "nach NO", "nach O", "nach SO", "nach S", "nach SW", "nach W", "nach NW"},
+      {"verso N", "verso NE", "verso E", "verso SE", "verso S", "verso SO", "verso O", "verso NO"}};
+  return D[constrain(gCfg.lang, 0, LANG_COUNT - 1)][dirIdx(deg)];
 }
 
 // maximum intenzity v kruhu (px) kolem bodu
@@ -524,34 +527,36 @@ void radarAnalyze(float tempC) {
 
   // texty
   bool cold = !isnan(tempC) && tempC <= 1.0f;
-  auto what = [&](int lv, bool cap) -> const char* {
-    if (lv >= 4) return cap ? "Bouřka" : "bouřka";
-    if (cold) return lv >= 3 ? (cap ? "Silné sněžení" : "silné sněžení") : (cap ? "Sněžení" : "sněžení");
-    if (lv >= 3) return cap ? "Silný déšť" : "silný déšť";
-    if (lv == 2) return cap ? "Déšť" : "déšť";
-    return cap ? "Slabý déšť" : "slabý déšť";
+  auto what = [&](int lv, bool) -> const char* {
+    if (lv >= 4) return tr("Bouřka", "Thunderstorm", "Gewitter", "Temporale");
+    if (cold) return lv >= 3 ? tr("Silné sněžení", "Heavy snow", "Starker Schneefall", "Neve forte")
+                             : tr("Sněžení", "Snow", "Schneefall", "Neve");
+    if (lv >= 3) return tr("Silný déšť", "Heavy rain", "Starker Regen", "Pioggia forte");
+    if (lv == 2) return tr("Déšť", "Rain", "Regen", "Pioggia");
+    return tr("Slabý déšť", "Light rain", "Leichter Regen", "Pioggia debole");
   };
   if (info.here) {
-    if (info.stopMin > 0) snprintf(info.line1, sizeof info.line1, "%s u tebe, skončí asi za %d min", what(info.hereLevel, true), info.stopMin);
-    else snprintf(info.line1, sizeof info.line1, "%s přímo u tebe", what(info.hereLevel, true));
+    if (info.stopMin > 0) snprintf(info.line1, sizeof info.line1, tr("%s u tebe, skončí asi za %d min", "%s here, ends in ~%d min", "%s hier, endet in ca. %d min", "%s qui, finisce tra ~%d min"), what(info.hereLevel, true), info.stopMin);
+    else snprintf(info.line1, sizeof info.line1, tr("%s přímo u tebe", "%s right here", "%s direkt hier", "%s proprio qui"), what(info.hereLevel, true));
   } else if (info.nearKm >= 0) {
     if (info.arriveMin > 0)
-      snprintf(info.line1, sizeof info.line1, "%s %.0f km %s, dorazí asi za %d min", what(info.nearLevel, true),
+      snprintf(info.line1, sizeof info.line1, tr("%s %.0f km %s, dorazí asi za %d min", "%s %.0f km %s, arrives in ~%d min", "%s %.0f km %s, kommt in ca. %d min", "%s a %.0f km %s, arriva tra ~%d min"), what(info.nearLevel, true),
                info.nearKm, dir8(info.nearBrg), info.arriveMin);
     else {
       const char* trend = "";
       if (info.moving && info.speed >= 5) {
         float ux = sinf(info.nearBrg * DEG_TO_RAD), uy = -cosf(info.nearBrg * DEG_TO_RAD);  // směr domov -> srážky
-        trend = (vx * ux + vy * uy) < 0 ? ", blíží se" : ", vzdaluje se";
+        trend = (vx * ux + vy * uy) < 0 ? tr(", blíží se", ", approaching", ", nähert sich", ", in avvicinamento")
+                                        : tr(", vzdaluje se", ", moving away", ", entfernt sich", ", si allontana");
       }
-      snprintf(info.line1, sizeof info.line1, "%s %.0f km %s%s", what(info.nearLevel, true), info.nearKm,
+      snprintf(info.line1, sizeof info.line1, tr("%s %.0f km %s%s", "%s %.0f km %s%s", "%s %.0f km %s%s", "%s a %.0f km %s%s"), what(info.nearLevel, true), info.nearKm,
                dir8(info.nearBrg), trend);
     }
   } else {
-    snprintf(info.line1, sizeof info.line1, "Bez srážek do %.0f km", R);
+    snprintf(info.line1, sizeof info.line1, tr("Bez srážek do %.0f km", "No rain within %.0f km", "Kein Niederschlag bis %.0f km", "Nessuna pioggia entro %.0f km"), R);
   }
-  if (info.moving && info.speed >= 5) snprintf(info.line2, sizeof info.line2, "postup %.0f km/h %s", info.speed, dir8to(info.dir));
-  else if (info.moving && (info.here || info.nearKm >= 0)) strlcpy(info.line2, "srážky skoro stojí", sizeof info.line2);
+  if (info.moving && info.speed >= 5) snprintf(info.line2, sizeof info.line2, tr("postup %.0f km/h %s", "moving %.0f km/h %s", "Zug %.0f km/h %s", "si muove %.0f km/h %s"), info.speed, dir8to(info.dir));
+  else if (info.moving && (info.here || info.nearKm >= 0)) strlcpy(info.line2, tr("srážky skoro stojí", "almost stationary", "fast stationär", "quasi ferma"), sizeof info.line2);
 
   Serial.printf("[Radar] %s | %s\n", info.line1, info.line2);
   free(O);

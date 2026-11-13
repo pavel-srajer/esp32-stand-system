@@ -1,5 +1,6 @@
 #include "sysinfo.h"
 #include "ota.h"
+#include "i18n.h"
 #include <WiFi.h>
 #include <esp_freertos_hooks.h>
 #include <esp_ota_ops.h>
@@ -33,16 +34,16 @@ int sysinfoCpuLoad() { return sLoad; }
 
 static const char* resetReason() {
   switch (esp_reset_reason()) {
-    case ESP_RST_POWERON: return "zapnutí napájení";
-    case ESP_RST_SW: return "softwarový restart";
-    case ESP_RST_PANIC: return "pád (panic)";
+    case ESP_RST_POWERON: return tr("zapnutí napájení", "power on", "Einschalten", "accensione");
+    case ESP_RST_SW: return tr("softwarový restart", "software restart", "Software-Neustart", "riavvio software");
+    case ESP_RST_PANIC: return tr("pád (panic)", "crash (panic)", "Absturz (Panic)", "crash (panic)");
     case ESP_RST_INT_WDT:
     case ESP_RST_TASK_WDT:
     case ESP_RST_WDT: return "watchdog";
-    case ESP_RST_BROWNOUT: return "podpětí (brownout)";
-    case ESP_RST_DEEPSLEEP: return "probuzení";
-    case ESP_RST_EXT: return "tlačítko RESET";
-    default: return "neznámý";
+    case ESP_RST_BROWNOUT: return tr("podpětí (brownout)", "brownout", "Unterspannung", "sottotensione");
+    case ESP_RST_DEEPSLEEP: return tr("probuzení", "wake-up", "Aufwachen", "risveglio");
+    case ESP_RST_EXT: return tr("tlačítko RESET", "RESET button", "RESET-Taste", "tasto RESET");
+    default: return tr("neznámý", "unknown", "unbekannt", "sconosciuto");
   }
 }
 
@@ -89,7 +90,7 @@ void sysinfoJson(JsonObject o) {
 
   JsonObject w = o["wifi"].to<JsonObject>();
   wifi_mode_t m = WiFi.getMode();
-  w["mode"] = (m & WIFI_MODE_AP) ? "hotspot" : "klient";
+  w["mode"] = (m & WIFI_MODE_AP) ? "hotspot" : tr("klient", "client", "Client", "client");
   w["connected"] = WiFi.status() == WL_CONNECTED;
   w["ssid"] = WiFi.SSID();
   w["rssi"] = WiFi.RSSI();

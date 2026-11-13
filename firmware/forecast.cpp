@@ -1,5 +1,6 @@
 #include "forecast.h"
 #include "settings.h"
+#include "i18n.h"
 #include "http_body.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -21,29 +22,31 @@ void forecastGet(Forecast& out) {
 }
 
 const char* weatherText(int c) {
+#define W(cs, en, de, it) return tr(cs, en, de, it)
   switch (c) {
-    case 0: return "jasno";
-    case 1: return "skoro jasno";
-    case 2: return "polojasno";
-    case 3: return "zataženo";
-    case 45: case 48: return "mlha";
-    case 51: case 53: case 55: return "mrholení";
-    case 56: case 57: return "mrznoucí mrholení";
-    case 61: return "slabý déšť";
-    case 63: return "déšť";
-    case 65: return "silný déšť";
-    case 66: case 67: return "mrznoucí déšť";
-    case 71: return "slabé sněžení";
-    case 73: return "sněžení";
-    case 75: return "silné sněžení";
-    case 77: return "sněhová zrna";
-    case 80: case 81: return "přeháňky";
-    case 82: return "silné přeháňky";
-    case 85: case 86: return "sněhové přeháňky";
-    case 95: return "bouřka";
-    case 96: case 99: return "bouřka s kroupami";
+    case 0: W("jasno", "clear", "klar", "sereno");
+    case 1: W("skoro jasno", "mostly clear", "überwiegend klar", "poco nuvoloso");
+    case 2: W("polojasno", "partly cloudy", "teilweise bewölkt", "parz. nuvoloso");
+    case 3: W("zataženo", "overcast", "bedeckt", "coperto");
+    case 45: case 48: W("mlha", "fog", "Nebel", "nebbia");
+    case 51: case 53: case 55: W("mrholení", "drizzle", "Nieselregen", "pioviggine");
+    case 56: case 57: W("mrznoucí mrholení", "freezing drizzle", "gefr. Nieselregen", "pioviggine gelata");
+    case 61: W("slabý déšť", "light rain", "leichter Regen", "pioggia debole");
+    case 63: W("déšť", "rain", "Regen", "pioggia");
+    case 65: W("silný déšť", "heavy rain", "starker Regen", "pioggia forte");
+    case 66: case 67: W("mrznoucí déšť", "freezing rain", "gefrierender Regen", "pioggia gelata");
+    case 71: W("slabé sněžení", "light snow", "leichter Schneefall", "neve debole");
+    case 73: W("sněžení", "snow", "Schneefall", "neve");
+    case 75: W("silné sněžení", "heavy snow", "starker Schneefall", "neve forte");
+    case 77: W("sněhová zrna", "snow grains", "Schneegriesel", "granuli di neve");
+    case 80: case 81: W("přeháňky", "showers", "Schauer", "rovesci");
+    case 82: W("silné přeháňky", "heavy showers", "starke Schauer", "rovesci forti");
+    case 85: case 86: W("sněhové přeháňky", "snow showers", "Schneeschauer", "rovesci di neve");
+    case 95: W("bouřka", "thunderstorm", "Gewitter", "temporale");
+    case 96: case 99: W("bouřka s kroupami", "thunderstorm, hail", "Gewitter mit Hagel", "temporale con grandine");
     default: return "";
   }
+#undef W
 }
 
 static bool isSnow(int c) { return (c >= 71 && c <= 77) || c == 85 || c == 86; }
@@ -63,7 +66,7 @@ static void computeAlerts(Forecast& f) {
   f.nowcast[0] = 0;
   const float WET = 0.1f;  // mm / 15 min
   bool cold = !isnan(f.curT) && f.curT <= 1.0f;
-  const char* what = cold ? "sněžit" : "pršet";
+  const char* what = cold ? tr("sněžit", "snow", "schneien", "nevicare") : tr("pršet", "rain", "regnen", "piovere");
 
   // 1) srážky v nejbližších 2 h (15min krok)
   if (f.nm15 > 0) {
@@ -71,12 +74,25 @@ static void computeAlerts(Forecast& f) {
       int stop = -1;
       for (int i = 1; i < f.nm15; i++)
         if (f.m15[i] < WET) { stop = i; break; }
-      if (stop > 0) snprintf(f.nowcast, sizeof f.nowcast, "%s, přestane asi za %d min", cold ? "Sněží" : "Prší", stop * 15);
-      else snprintf(f.nowcast, sizeof f.nowcast, "%s, další 2 h nepřestane", cold ? "Sněží" : "Prší");
+      const char* now = cold ? tr("Sněží", "Snowing", "Es schneit", "Nevica") : tr("Prší", "Raining", "Es regnet", "Piove");
+      if (stop > 0)
+        snprintf(f.nowcast, sizeof f.nowcast,
+                 tr("%s, přestane asi za %d min", "%s, stops in ~%d min", "%s, endet in ca. %d min", "%s, smette tra ~%d min"),
+                 now, stop * 15);
+      else
+        snprintf(f.nowcast, sizeof f.nowcast,
+                 tr("%s, další 2 h nepřestane", "%s for the next 2 h", "%s, die nächsten 2 h", "%s, per le prossime 2 h"), now);
     } else {
       for (int i = 1; i < f.nm15; i++)
         if (f.m15[i] >= WET) {
-          snprintf(f.nowcast, sizeof f.nowcast, "Začne %s asi za %d min", what, i * 15);
+          if (gCfg.lang == LANG_CS)
+            snprintf(f.nowcast, sizeof f.nowcast, "Začne %s asi za %d min", what, i * 15);
+          else if (gCfg.lang == LANG_DE)
+            snprintf(f.nowcast, sizeof f.nowcast, "In ca. %d min beginnt es zu %s", i * 15, what);
+          else if (gCfg.lang == LANG_IT)
+            snprintf(f.nowcast, sizeof f.nowcast, "Tra ~%d min inizia a %s", i * 15, what);
+          else
+            snprintf(f.nowcast, sizeof f.nowcast, "%s starts in ~%d min", cold ? "Snow" : "Rain", i * 15);
           break;
         }
     }
@@ -87,24 +103,24 @@ static void computeAlerts(Forecast& f) {
   // 2) bouřky / mrznoucí srážky / sníh v příštích 12 h
   for (int i = 0; i < h12; i++)
     if (f.hCode[i] >= 95) {
-      addAlert(f, AL_DANGER, "Bouřky kolem %d:00", f.hHour[i]);
+      addAlert(f, AL_DANGER, tr("Bouřky kolem %d:00", "Thunderstorms around %d:00", "Gewitter gegen %d:00", "Temporali verso le %d:00"), f.hHour[i]);
       break;
     }
   for (int i = 0; i < h12; i++)
     if (isFreezing(f.hCode[i]) || (f.hPrec[i] >= 0.1f && f.hT[i] <= 0.5f && f.hT[i] >= -3)) {
-      addAlert(f, AL_DANGER, "Náledí – mrznoucí srážky kolem %d:00", f.hHour[i]);
+      addAlert(f, AL_DANGER, tr("Náledí – mrznoucí srážky kolem %d:00", "Icy roads – freezing rain ~%d:00", "Glatteis – gefr. Regen gegen %d:00", "Ghiaccio – pioggia gelata ~%d:00"), f.hHour[i]);
       break;
     }
   for (int i = 0; i < h12; i++)
     if (isSnow(f.hCode[i])) {
-      addAlert(f, AL_WARN, "Sněžení kolem %d:00", f.hHour[i]);
+      addAlert(f, AL_WARN, tr("Sněžení kolem %d:00", "Snow around %d:00", "Schneefall gegen %d:00", "Neve verso le %d:00"), f.hHour[i]);
       break;
     }
   // 3) déšť později (když ještě nehlásí nowcast)
   if (!f.nowcast[0]) {
     for (int i = 1; i < h12; i++)
       if (f.hPrec[i] >= 0.3f || f.hProb[i] >= 60) {
-        addAlert(f, AL_INFO, "Srážky kolem %d:00 (%d %%)", f.hHour[i], f.hProb[i]);
+        addAlert(f, AL_INFO, tr("Srážky kolem %d:00 (%d %%)", "Rain around %d:00 (%d %%)", "Niederschlag gegen %d:00 (%d %%)", "Pioggia verso le %d:00 (%d %%)"), f.hHour[i], f.hProb[i]);
         break;
       }
   }
@@ -113,8 +129,8 @@ static void computeAlerts(Forecast& f) {
   int gAt = 0;
   for (int i = 0; i < h12; i++)
     if (f.hGust[i] > gMax) { gMax = f.hGust[i]; gAt = f.hHour[i]; }
-  if (gMax >= 75) addAlert(f, AL_DANGER, "Velmi silný vítr, nárazy %.0f km/h", gMax);
-  else if (gMax >= 50) addAlert(f, AL_WARN, "Silný vítr, nárazy %.0f km/h (%d:00)", gMax, gAt);
+  if (gMax >= 75) addAlert(f, AL_DANGER, tr("Velmi silný vítr, nárazy %.0f km/h", "Very strong wind, gusts %.0f km/h", "Sturm, Böen %.0f km/h", "Vento molto forte, raffiche %.0f km/h"), gMax);
+  else if (gMax >= 50) addAlert(f, AL_WARN, tr("Silný vítr, nárazy %.0f km/h (%d:00)", "Strong wind, gusts %.0f km/h (%d:00)", "Starker Wind, Böen %.0f km/h (%d:00)", "Vento forte, raffiche %.0f km/h (%d:00)"), gMax, gAt);
   // 5) mráz / horko v příštích 24 h
   float tMin = 99, tMax = -99;
   int minAt = 0, maxAt = 0;
@@ -122,10 +138,10 @@ static void computeAlerts(Forecast& f) {
     if (f.hT[i] < tMin) { tMin = f.hT[i]; minAt = f.hHour[i]; }
     if (f.hT[i] > tMax) { tMax = f.hT[i]; maxAt = f.hHour[i]; }
   }
-  if (tMin <= -10) addAlert(f, AL_DANGER, "Silný mráz až %.0f °C (%d:00)", tMin, minAt);
-  else if (tMin <= 0) addAlert(f, AL_INFO, "Mráz až %.0f °C (%d:00)", tMin, minAt);
-  if (tMax >= 33) addAlert(f, AL_DANGER, "Velké horko až %.0f °C", tMax);
-  else if (tMax >= 30) addAlert(f, AL_WARN, "Horko až %.0f °C (%d:00)", tMax, maxAt);
+  if (tMin <= -10) addAlert(f, AL_DANGER, tr("Silný mráz až %.0f °C (%d:00)", "Severe frost %.0f °C (%d:00)", "Strenger Frost %.0f °C (%d:00)", "Gelo intenso %.0f °C (%d:00)"), tMin, minAt);
+  else if (tMin <= 0) addAlert(f, AL_INFO, tr("Mráz až %.0f °C (%d:00)", "Frost down to %.0f °C (%d:00)", "Frost bis %.0f °C (%d:00)", "Gelo fino a %.0f °C (%d:00)"), tMin, minAt);
+  if (tMax >= 33) addAlert(f, AL_DANGER, tr("Velké horko až %.0f °C", "Extreme heat up to %.0f °C", "Große Hitze bis %.0f °C", "Caldo intenso fino a %.0f °C"), tMax);
+  else if (tMax >= 30) addAlert(f, AL_WARN, tr("Horko až %.0f °C (%d:00)", "Hot, up to %.0f °C (%d:00)", "Hitze bis %.0f °C (%d:00)", "Caldo fino a %.0f °C (%d:00)"), tMax, maxAt);
 }
 
 bool forecastUpdate() {

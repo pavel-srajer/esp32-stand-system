@@ -26,6 +26,7 @@ struct Settings {
   int cycleSec = 0;   // automatické přepínání obrazovek (0 = vypnuto)
   String ntp1 = "pool.ntp.org";     // hlavní NTP server
   String ntp2 = "time.google.com";  // záložní NTP server
+  int lang = 0;  // jazyk: 0 čeština, 1 English, 2 Deutsch, 3 Italiano
 };
 
 extern Settings gCfg;

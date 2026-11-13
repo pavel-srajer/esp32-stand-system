@@ -30,6 +30,7 @@ void settingsLoad() {
   gCfg.cycleSec = prefs.getInt("cycle", d.cycleSec);
   gCfg.ntp1 = prefs.getString("ntp1", d.ntp1);
   gCfg.ntp2 = prefs.getString("ntp2", d.ntp2);
+  gCfg.lang = prefs.getInt("lang", d.lang);
   prefs.end();
 }
 
@@ -58,6 +59,7 @@ void settingsSave() {
   prefs.putInt("cycle", gCfg.cycleSec);
   prefs.putString("ntp1", gCfg.ntp1);
   prefs.putString("ntp2", gCfg.ntp2);
+  prefs.putInt("lang", gCfg.lang);
   prefs.end();
 }
 
