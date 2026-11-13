@@ -3,6 +3,8 @@
 Stolní „radar" na **ESP32-C3 Super Mini** s kulatým displejem **GC9A01 1,28"** (240×240).
 Ukazuje letadla v okolí (ADS-B) a aktuální meteodata z ČHMI. Nastavuje se přes WiFi hotspot a umí se sám aktualizovat z GitHub Releases (OTA).
 
+Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
+
 ## Ovládání tlačítkem BOOT (GPIO 9)
 
 | Obrazovka | Krátký stisk | Dlouhý stisk (0,7–5 s) |
