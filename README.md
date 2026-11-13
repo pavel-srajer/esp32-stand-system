@@ -43,6 +43,12 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 
 Ve webovém nastavení v sekci **Obrazovky** zaškrtneš, co se má zobrazovat: třeba jen letadla, jen meteoradar, nebo všechno. Tam se nastavuje i dosah radaru letadel (10–100 km) a poloměr výřezu meteoradaru (25–200 km).
 
+## Mapa a automatické přepínání
+
+V sekci **Obrazovky** ve webovém nastavení dále najdeš:
+- **Podklad meteoradaru** a **podklad radaru letadel**: žádný / hranice a města / hranice, řeky a města. Mapa je uložená přímo ve firmwaru (asi 20 kB), takže nepotřebuje internet ani RAM navíc. Hustota měst se řídí poloměrem. Data generuje `tools/make_map.py`: hranice a řeky z Natural Earth (volné dílo), česká města z janpipek/cli-plotting-talk, města v okolí z Natural Earth s českými názvy.
+- **Automatické přepínání obrazovek**: vypnuto / 10 / 15 / 30 / 60 s. Po stisku tlačítka se automatika na minutu pozastaví.
+
 ## Jas displeje
 
 Ve webovém nastavení se nastavují tři období (den, večer, noc), každé se začátkem a jasem v %. Při posunu jezdce se jas na chvíli ukáže na displeji. Pokud je v noci displej ztlumený pod 30 %, první stisk tlačítka ho rozsvítí na 30 s.

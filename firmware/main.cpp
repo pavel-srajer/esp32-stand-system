@@ -31,6 +31,7 @@
 #include "forecast.h"
 #include "logo.h"
 #include "namedays.h"
+#include "mapdata.h"
 
 // ===================================================================
 //  Konstanty
@@ -641,6 +642,60 @@ static void drawCenteredMsg(const char* a, const char* b = nullptr) {
   }
 }
 
+// ---------------- Obrysová mapa (pozadí radarů) ----------------
+// style: 0 nic, 1 hranice + města, 2 hranice + řeky + města.
+// R = kolik km odpovídá rPx pixelům od středu.
+static void drawMap(float R, float rPx, int style, uint16_t cityCol) {
+  if (style <= 0) return;
+  const float kpp = R / rPx;  // km na pixel
+  const float cl = cosf(gCfg.lat * DEG_TO_RAD);
+  const float sx = MAP_Q * 111.32f * cl / kpp, sy = MAP_Q * 110.57f / kpp;
+  const float ox = (MAP_LON0 - gCfg.lon) * 111.32f * cl / kpp, oy = (MAP_LAT0 - gCfg.lat) * 110.57f / kpp;
+  auto px = [&](int i, int& x, int& y) {
+    x = CX + (int)lroundf(ox + MAP_PTS[i][0] * sx);
+    y = CY - (int)lroundf(oy + MAP_PTS[i][1] * sy);
+  };
+  const uint16_t BORDER = rgb(85, 95, 120), RIVER = rgb(35, 75, 140), RIVER2 = rgb(28, 55, 100);
+  for (const MapLine& l : MAP_LINES) {
+    if (l.kind == 1 && style < 2) continue;
+    if (l.kind == 2 && (style < 2 || R > 100)) continue;  // malé říčky jen při menším poloměru
+    uint16_t col = l.kind == 0 ? BORDER : l.kind == 1 ? RIVER : RIVER2;
+    int x0, y0, x1, y1;
+    px(l.start, x0, y0);
+    for (int k = 1; k < l.n; k++) {
+      px(l.start + k, x1, y1);
+      // úsek celý mimo displej na jedné straně -> přeskočit
+      if (!((x0 < 0 && x1 < 0) || (y0 < 0 && y1 < 0) || (x0 > 239 && x1 > 239) || (y0 > 239 && y1 > 239)))
+        spr.drawLine(x0, y0, x1, y1, col);
+      x0 = x1;
+      y0 = y1;
+    }
+  }
+  // města: hustota podle poloměru, popisky se nesmí překrývat
+  uint32_t minPop = R <= 30 ? 0 : R <= 60 ? 10000 : R <= 120 ? 30000 : 90000;
+  struct Box { int16_t l, t, r, b; };
+  Box boxes[24];
+  int nb = 0;
+  spr.setFont(&fontCZ_10);
+  spr.setTextDatum(textdatum_t::top_center);
+  for (const MapCity& c : MAP_CITIES) {
+    if (c.pop < minPop) continue;
+    int x = CX + (int)lroundf(ox + c.x * sx), y = CY - (int)lroundf(oy + c.y * sy);
+    int dx = x - CX, dy = y - CY;
+    if (dx * dx + dy * dy > 108 * 108) continue;
+    int w = spr.textWidth(c.name);
+    Box b{(int16_t)(x - w / 2 - 1), (int16_t)(y + 2), (int16_t)(x + w / 2 + 1), (int16_t)(y + 13)};
+    bool hit = false;
+    for (int i = 0; i < nb && !hit; i++)
+      hit = !(b.r < boxes[i].l || b.l > boxes[i].r || b.b < boxes[i].t || b.t > boxes[i].b);
+    spr.fillCircle(x, y, 2, cityCol);
+    if (hit || nb >= 24) continue;
+    boxes[nb++] = b;
+    spr.setTextColor(cityCol);
+    spr.drawString(c.name, x, y + 3);
+  }
+}
+
 // ---------------- Obrazovka 1: radar ----------------
 static void drawRadar(const PlaneData& pd, uint32_t now) {
   const int R = 116;
@@ -651,6 +706,7 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
   float sweep = fmodf(now * 0.09f, 360.0f);  // 1 otáčka / 4 s
   spr.fillArc(CX, CY, R, 0, sweep - 90 - 45, sweep - 90, rgb(0, 40, 15));
   spr.fillArc(CX, CY, R, 0, sweep - 90 - 15, sweep - 90, rgb(0, 70, 25));
+  drawMap(range, R, gCfg.planeMap, rgb(110, 110, 110));
 
   for (int i = 1; i <= 3; i++) spr.drawCircle(CX, CY, R * i / 3, ring);
   spr.drawFastHLine(CX - R, CY, 2 * R, ring);
@@ -1148,6 +1204,7 @@ static void drawRain(const Forecast& fc, uint32_t now) {
   uint32_t cycle = (n - 1) * STEP + HOLD, t = now % cycle;
   int idx = min(n - 1, (int)(t / STEP));
   radarForEachRun(idx, rainRun, nullptr);
+  drawMap(R, 120, gCfg.rainMap, rgb(170, 170, 170));  // podklad přes srážky (tlumené čáry)
 
   // překryv: kruhy, domov, sever
   const uint16_t ring = rgb(90, 90, 90);
@@ -1384,6 +1441,9 @@ void appStatusJson(JsonObject o) {
 
 static int gScreen = SCR_RADAR;
 static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
+static uint32_t gLastSwitch = 0;    // kdy se naposledy změnila obrazovka
+static uint32_t gLastPress = 0;     // kdy byl naposledy stisk (pauza automatiky)
+static const uint32_t CYCLE_PAUSE_MS = 60000;
 static const uint32_t PORTAL_HOLD_MS = 5000;
 
 static void onShortPress() {
@@ -1399,6 +1459,7 @@ static void onShortPress() {
     }
   }
   gDetailIdx = 0;
+  gLastSwitch = millis();
 }
 
 static void onLongPress() {
@@ -1439,6 +1500,7 @@ static void pollButton() {
   if (t - lastChange < 30) return;  // debounce
   if (pressed && !down) {
     down = true;
+    gLastPress = t;  // ruční ovládání -> automatické přepínání na chvíli stojí
     downAt = lastChange = t;
     swallow = wakeOnPress();
   } else if (pressed && down && !gPortalMode && t - downAt >= PORTAL_HOLD_MS) {
@@ -1570,6 +1632,11 @@ void loop() {
       WiFi.softAPgetStationNum() == 0) {
     ESP.restart();  // nikdo nic nenastavuje -> zkus znovu uloženou WiFi
   }
+
+  // automatické přepínání obrazovek (po stisku tlačítka minutu pauza)
+  if (!gPortalMode && gCfg.cycleSec > 0 && !gBtnHeldMs && now - gLastSwitch >= (uint32_t)gCfg.cycleSec * 1000 &&
+      (gLastPress == 0 || now - gLastPress >= CYCLE_PAUSE_MS))
+    onShortPress();
 
   uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs) ? 100 : 250;
   if (now - lastDraw < frame) {

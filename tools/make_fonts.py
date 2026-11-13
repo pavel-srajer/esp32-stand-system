@@ -7,7 +7,7 @@ díky čemuž se firmware vejde do OTA oddílů.
 """
 import re, sys, os
 
-SIZES = ["12", "16", "24"]
+SIZES = ["10", "12", "16", "24"]
 EXTRA = list(range(0x100, 0x180)) + [0x2013, 0x2014, 0x2022, 0x2026, 0x2190, 0x2191, 0x2192, 0x2193]
 
 def load(src):

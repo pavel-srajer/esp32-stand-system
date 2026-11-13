@@ -314,7 +314,43 @@ static void handleRoot() {
       h += RR[i];
       h += F(" km</option>");
     }
-    h += F("</select><small>Oba dosahy jdou měnit i dlouhým stiskem tlačítka na příslušné obrazovce.</small></fieldset>");
+    h += F("</select><small>Oba dosahy jdou měnit i dlouhým stiskem tlačítka na příslušné obrazovce.</small>");
+    static const char* const MAPS[] = {"žádný", "hranice a města", "hranice, řeky a města"};
+    auto mapSel = [&](const char* label, const char* name, int val) {
+      h += F("<label>");
+      h += label;
+      h += F("</label><select name='");
+      h += name;
+      h += "'>";
+      for (int i = 0; i < 3; i++) {
+        h += F("<option value='");
+        h += i;
+        h += "'";
+        if (i == val) h += F(" selected");
+        h += ">";
+        h += MAPS[i];
+        h += F("</option>");
+      }
+      h += F("</select>");
+    };
+    {
+      static const int CY[] = {0, 10, 15, 30, 60};
+      h += F("<label>Automatické přepínání obrazovek</label><select name='cycle'>");
+      for (int v : CY) {
+        h += F("<option value='");
+        h += v;
+        h += "'";
+        if (v == gCfg.cycleSec) h += F(" selected");
+        h += ">";
+        h += v ? String("každých ") + v + " s" : String("vypnuto");
+        h += F("</option>");
+      }
+      h += F("</select><small>Po stisku tlačítka se automatika na minutu pozastaví.</small>");
+    }
+    mapSel("Podklad meteoradaru", "rmap", gCfg.rainMap);
+    mapSel("Podklad radaru letadel", "pmap", gCfg.planeMap);
+    h += F("<small>Obrysová mapa je uložená přímo v zařízení (hranice a řeky: Natural Earth). "
+           "Hustota měst se řídí poloměrem.</small></fieldset>");
   }
 
   // --- ČHMI ---
@@ -463,6 +499,9 @@ static void handleSave() {
     for (int i = 0; i < 6; i++)
       if (server.hasArg("scr" + String(i))) m |= 1 << i;
     gCfg.screens = m ? m : 1;
+    if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);
+    if (server.hasArg("rmap")) gCfg.rainMap = constrain(server.arg("rmap").toInt(), 0, 2);
+    if (server.hasArg("pmap")) gCfg.planeMap = constrain(server.arg("pmap").toInt(), 0, 2);
     if (server.hasArg("prange")) gCfg.rangeIdx = constrain(server.arg("prange").toInt(), 0, 3);
     if (server.hasArg("rrad")) gCfg.rainRadiusIdx = constrain(server.arg("rrad").toInt(), 0, 3);
   }

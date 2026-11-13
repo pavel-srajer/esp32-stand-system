@@ -20,6 +20,10 @@ struct Settings {
   // zapnuté obrazovky (bit = pořadí: radar letadel, detail, předpověď, meteoradar, stanice ČHMI, hodiny)
   int screens = 0x2F;   // vše kromě měření ze stanice ČHMI
   int rainRadiusIdx = 1;  // meteoradar: index do {25, 50, 100, 200} km
+  // podklad map: 0 žádný, 1 hranice a města, 2 hranice, řeky a města
+  int rainMap = 2;    // meteoradar
+  int planeMap = 0;   // radar letadel
+  int cycleSec = 0;   // automatické přepínání obrazovek (0 = vypnuto)
 };
 
 extern Settings gCfg;
