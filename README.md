@@ -55,6 +55,7 @@ Ve webovém nastavení se nastavují tři období (den, večer, noc), každé se
 - Zařízení minutu po startu a pak jednou denně zkontroluje `releases/latest` tohoto repozitáře.
   Je-li tam novější verze a v nastavení jsou zapnuté **automatické aktualizace** (výchozí stav), stáhne `firmware.bin`, nainstaluje ho a restartuje se. Na displeji se mezitím ukazuje průběh.
 - Ve webovém nastavení je tlačítko **„Zkontrolovat a nainstalovat nejnovější verzi"**.
+- Když zařízení najde novou verzi, nejdřív se restartuje a teprve hned po startu ji stáhne. Za běhu je RAM rozdrobená radarem, předpovědí a logy a šifrované spojení na server GitHubu by se nemuselo vejít. Když stažení selže, běží dál stará verze a další pokus přijde za den.
 - Repozitář musí být **veřejný**, protože zařízení se ke GitHub API připojuje bez tokenu.
 - Lokálně sestavený firmware (verze `dev`) se automaticky nepřepisuje, ale tlačítko na webu funguje i u něj.
 

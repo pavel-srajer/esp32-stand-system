@@ -25,3 +25,7 @@ extern volatile bool gOtaRequest;  // požadavek z webu: zkontrolovat a nainstal
 
 // Zjistí poslední verzi; pokud je novější a install==true, nainstaluje ji (a restartuje).
 void otaCheck(bool install);
+
+// true = zařízení bylo restartováno kvůli aktualizaci; stahuje se hned po startu,
+// než se paměť zaplní radarem, předpovědí a dalšími daty
+extern bool gOtaBootMode;

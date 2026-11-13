@@ -4,9 +4,11 @@
 #include <HTTPUpdate.h>
 #include <ArduinoJson.h>
 #include "http_body.h"
+#include "settings.h"
 
 OtaStatus gOta;
 volatile bool gOtaRequest = false;
+bool gOtaBootMode = false;
 
 // "v1.2.3" -> 1002003; neznámý formát -> -1
 static long parseVer(const char* v) {
@@ -74,6 +76,14 @@ void otaCheck(bool install) {
   if (!install) {
     gOta.state = OTA_AVAILABLE;
     return;
+  }
+  if (!gOtaBootMode) {
+    // Za běhu je RAM rozdrobená a druhé TLS spojení (GitHub přesměrovává na CDN) by
+    // nemuselo projít. Restart a stažení hned po startu, kdy je paměť volná.
+    Serial.println("[OTA] nová verze – restart a instalace po startu");
+    settingsSetOtaFlag(true);
+    delay(200);
+    ESP.restart();
   }
 
   Serial.printf("[OTA] stahuji %s\n", url.c_str());

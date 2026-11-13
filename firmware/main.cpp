@@ -508,6 +508,11 @@ static void netTask(void*) {
   uint32_t weatherInterval = WEATHER_REFRESH_MS;
   for (;;) {
     ensureWiFi();
+    if (WiFi.status() == WL_CONNECTED && gOtaBootMode) {
+      // restart kvůli aktualizaci: stáhnout hned, dokud je paměť volná
+      otaCheck(true);           // při úspěchu se zařízení restartuje
+      gOtaBootMode = false;     // nepovedlo se -> normální provoz (zkusí se zase za den)
+    }
     if (WiFi.status() == WL_CONNECTED) {
       uint32_t now = millis();
       if (gForcePlanes || now - lastPlanes >= PLANES_REFRESH_MS) {
@@ -1533,6 +1538,7 @@ void setup() {
   gLoopTask = xTaskGetCurrentTaskHandle();
   sysinfoBegin();
 
+  gOtaBootMode = settingsTakeOtaFlag();
   bool portalFlag = settingsTakePortalFlag();
   if (!settingsHasWifi() || portalFlag) {
     gPortalMode = true;
@@ -1542,7 +1548,7 @@ void setup() {
   }
 
   if (!scrOn(gScreen)) onShortPress();
-  showBoot("Připojuji WiFi…", gCfg.ssid.c_str());
+  showBoot(gOtaBootMode ? "Aktualizace…" : "Připojuji WiFi…", gCfg.ssid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("letadla");
   configTzTime(TZ_INFO, "pool.ntp.org", "time.google.com");

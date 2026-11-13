@@ -32,3 +32,7 @@ bool settingsHasWifi();
 // Příznak "po restartu spustit konfigurační portál"
 void settingsSetPortalFlag(bool on);
 bool settingsTakePortalFlag();  // přečte a smaže
+
+// Příznak "po restartu hned instalovat aktualizaci" (dokud je paměť volná)
+void settingsSetOtaFlag(bool on);
+bool settingsTakeOtaFlag();

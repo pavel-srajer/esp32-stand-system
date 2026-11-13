@@ -72,3 +72,17 @@ bool settingsTakePortalFlag() {
   prefs.end();
   return f;
 }
+
+void settingsSetOtaFlag(bool on) {
+  prefs.begin("cfg", false);
+  prefs.putBool("otanow", on);
+  prefs.end();
+}
+
+bool settingsTakeOtaFlag() {
+  prefs.begin("cfg", false);
+  bool f = prefs.getBool("otanow", false);
+  if (f) prefs.remove("otanow");
+  prefs.end();
+  return f;
+}
