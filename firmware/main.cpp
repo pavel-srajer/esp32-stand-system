@@ -25,6 +25,7 @@
 #include "ota.h"
 #include "fonts_cz.h"
 #include "http_body.h"
+#include "sysinfo.h"
 
 // ===================================================================
 //  Konstanty
@@ -877,6 +878,38 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
 // ===================================================================
 //  Tlačítko a hlavní smyčka
 // ===================================================================
+// ===================================================================
+//  Stav aplikace pro stránku /system
+// ===================================================================
+static TaskHandle_t gNetTask = nullptr, gLoopTask = nullptr;
+
+void appStatusJson(JsonObject o) {
+  float range = RANGES_KM[gRangeIdx];
+  xSemaphoreTake(gMutex, portMAX_DELAY);
+  int n = 0;
+  while (n < gPlanes.count && gPlanes.p[n].distKm <= range) n++;
+  long pAge = gPlanes.updatedMs ? (long)((millis() - gPlanes.updatedMs) / 1000) : -1;
+  long wAge = gWeather.updatedMs ? (long)((millis() - gWeather.updatedMs) / 1000) : -1;
+  String pErr = gPlanes.err, wErr = gWeather.err;
+  xSemaphoreGive(gMutex);
+
+  o["planes"] = n;
+  o["range"] = (int)range;
+  o["planes_age"] = gPortalMode ? -1 : pAge;
+  o["planes_err"] = pErr;
+  o["weather_age"] = gPortalMode ? -1 : wAge;
+  o["weather_err"] = wErr;
+  o["station"] = gCfg.name + " (" + gCfg.wsi + ")";
+  static const char* const OTA_TXT[] = {"nekontrolováno", "kontroluji…", "aktuální verze",
+                                        "je dostupná nová verze", "stahuji…", "chyba"};
+  String ota = OTA_TXT[gOta.state];
+  if (gOta.latest[0]) ota += String(" (GitHub: ") + gOta.latest + ")";
+  if (gOta.state == OTA_FAILED && gOta.msg[0]) ota += String(": ") + gOta.msg;
+  o["ota"] = ota;
+  o["stack_net"] = gNetTask ? uxTaskGetStackHighWaterMark(gNetTask) : 0;
+  o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
+}
+
 enum Screen { SCR_RADAR, SCR_DETAIL, SCR_WEATHER, SCR_CLOCK, SCR_COUNT };
 static int gScreen = SCR_RADAR;
 static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
@@ -1012,6 +1045,8 @@ void setup() {
   settingsLoad();
   gRangeIdx = constrain(gCfg.rangeIdx, 0, NUM_RANGES - 1);
   gMutex = xSemaphoreCreateMutex();
+  gLoopTask = xTaskGetCurrentTaskHandle();
+  sysinfoBegin();
 
   bool portalFlag = settingsTakePortalFlag();
   if (!settingsHasWifi() || portalFlag) {
@@ -1026,7 +1061,7 @@ void setup() {
   WiFi.setHostname("letadla");
   configTzTime(TZ_INFO, "pool.ntp.org", "time.google.com");
   webBegin(false);  // nastavení i v domácí síti na IP zařízení
-  xTaskCreate(netTask, "net", 12288, nullptr, 1, nullptr);
+  xTaskCreate(netTask, "net", 12288, nullptr, 1, &gNetTask);
 }
 
 void loop() {

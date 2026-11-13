@@ -30,6 +30,8 @@ Nastavení se ukládá do flash paměti a aktualizace firmwaru ho nesmažou. Poz
 - v prohlížeči na **IP adrese zařízení** (je vidět na obrazovce hodin),
 - podržením tlačítka 5 s, které znovu spustí hotspot.
 
+Na stránce **Systémové informace** (`http://<IP zařízení>/system`) jsou živé údaje, které se obnovují každé 2 s: teplota čipu, vytížení CPU, využití RAM a flash, síla WiFi signálu, doba běhu, důvod posledního restartu a stáří stažených dat. Totéž ve formátu JSON vrací `/api/status`.
+
 Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 min), přepne se samo do hotspotu. Pokud v hotspotu 5 minut nikdo nic nenastaví, zkusí znovu uloženou WiFi.
 
 ## Aktualizace firmwaru (OTA z GitHubu)

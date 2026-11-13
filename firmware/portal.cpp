@@ -1,6 +1,7 @@
 #include "portal.h"
 #include "settings.h"
 #include "ota.h"
+#include "sysinfo.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -100,7 +101,8 @@ input,select{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;bor
 .row{display:flex;gap:10px}.row>div{flex:1}small{color:#7d8590}
 button{width:100%;padding:14px;border:0;border-radius:10px;background:#238636;color:#fff;font-size:1.1em;margin-top:6px}
 a{color:#58a6ff}.hide{display:none}</style></head><body><main>
-<h1>✈ Letadla &amp; ČHMI – nastavení</h1><form method="post" action="/save">)HTML";
+<h1>✈ Letadla &amp; ČHMI – nastavení</h1>
+<p><a href="/system">Systémové informace →</a></p><form method="post" action="/save">)HTML";
 
 static const char PAGE_TAIL[] PROGMEM = R"HTML(<button type="submit">Uložit a restartovat</button></form>
 <p><small>Nastavení se dá později otevřít i na IP adrese zařízení v domácí síti,
@@ -111,6 +113,75 @@ function u(){c.className=s.value=='-1'?'':'hide'}s.onchange=u;u();
 var n=document.getElementById('ssid_sel'),m=document.getElementById('ssid');
 n.onchange=function(){if(n.value)m.value=n.value;};
 </script></body></html>)HTML";
+
+static const char PAGE_SYS[] PROGMEM = R"HTML(<!doctype html><html lang="cs"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Systém – Letadla</title><style>
+body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:16px}
+main{max-width:720px;margin:auto}h1{font-size:1.4em;margin:.2em 0 .3em}a{color:#58a6ff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0}
+.card{border:1px solid #30363d;border-radius:10px;padding:12px 14px;background:#161b22}
+.lbl{font-size:.75em;letter-spacing:.08em;text-transform:uppercase;color:#7d8590}
+.big{font-size:1.9em;font-weight:600;font-variant-numeric:tabular-nums;margin:2px 0}
+.sub{font-size:.85em;color:#9da7b3;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:4px;background:#30363d;overflow:hidden;margin:8px 0 4px}
+.bar i{display:block;height:100%;background:#3fb950;transition:width .4s}
+.bar i.w{background:#d29922}.bar i.c{background:#f85149}
+table{width:100%;border-collapse:collapse;font-size:.92em}td{padding:6px 4px;border-bottom:1px solid #21262d;vertical-align:top}
+td:first-child{color:#9da7b3;width:42%}h2{font-size:1.05em;margin:18px 0 6px;color:#58a6ff}
+#st{font-size:.8em;color:#7d8590}</style></head><body><main>
+<p><a href="/">← Nastavení</a></p><h1>Systémové informace</h1><div id="st">načítám…</div>
+<div class="grid">
+<div class="card"><div class="lbl">Teplota čipu</div><div class="big" id="temp">–</div><div class="bar"><i id="tempb"></i></div><div class="sub">vnitřní senzor, ±2 °C</div></div>
+<div class="card"><div class="lbl">Vytížení CPU</div><div class="big" id="cpu">–</div><div class="bar"><i id="cpub"></i></div><div class="sub" id="cpus"></div></div>
+<div class="card"><div class="lbl">RAM (heap)</div><div class="big" id="ram">–</div><div class="bar"><i id="ramb"></i></div><div class="sub" id="rams"></div></div>
+<div class="card"><div class="lbl">Flash – firmware</div><div class="big" id="fl">–</div><div class="bar"><i id="flb"></i></div><div class="sub" id="fls"></div></div>
+</div>
+<h2>Zařízení</h2><table id="dev"></table>
+<h2>WiFi</h2><table id="wifi"></table>
+<h2>Aplikace</h2><table id="app"></table>
+</main><script>
+function kb(b){return b>=1048576?(b/1048576).toFixed(2)+' MB':(b/1024).toFixed(1)+' kB'}
+function bar(id,p,w,c){var e=document.getElementById(id);e.style.width=Math.max(0,Math.min(100,p))+'%';e.className=p>=c?'c':p>=w?'w':''}
+function up(s){var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+' d ':'')+h+' h '+m+' min'}
+function age(s){return s<0?'zatím ne':s<60?'před '+s+' s':'před '+Math.round(s/60)+' min'}
+function rows(id,r){document.getElementById(id).innerHTML=r.map(function(x){return '<tr><td>'+x[0]+'</td><td>'+x[1]+'</td></tr>'}).join('')}
+function t(id,v){document.getElementById(id).textContent=v}
+function esc(v){return String(v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function load(){fetch('/api/status').then(function(r){return r.json()}).then(function(j){
+ t('temp',j.temp==null?'–':String(j.temp).replace('.',',')+' °C');bar('tempb',(j.temp||0)/90*100,60,75);
+ t('cpu',j.cpu<0?'–':j.cpu+' %');bar('cpub',j.cpu,60,85);t('cpus',j.mhz+' MHz, 1 jádro (RISC-V)');
+ var h=j.heap,used=h.total-h.free;t('ram',Math.round(used/h.total*100)+' %');bar('ramb',used/h.total*100,75,90);
+ t('rams','volno '+kb(h.free)+' z '+kb(h.total)+' · minimum '+kb(h.min)+' · největší blok '+kb(h.block));
+ var f=j.flash;t('fl',Math.round(f.used/f.slot*100)+' %');bar('flb',f.used/f.slot*100,80,92);
+ t('fls',kb(f.used)+' z '+kb(f.slot)+' (oddíl '+f.part+')');
+ rows('dev',[['Firmware',esc(j.fw)],['Sestaveno',esc(j.build)],['Čip',esc(j.chip)+' rev '+j.rev+', '+j.mhz+' MHz'],
+  ['Flash celkem',kb(f.size)+', '+f.mhz+' MHz'],['Nastavení (NVS)',f.nvs_used+' / '+f.nvs_total+' položek'],
+  ['Běží',up(j.uptime)],['Poslední restart',esc(j.reset)]]);
+ var w=j.wifi;rows('wifi',[['Režim',esc(w.mode)+(w.connected?', připojeno':'')],['Síť',esc(w.ssid||'–')],
+  ['Signál',w.connected?w.rssi+' dBm':'–'],['Kanál',w.ch],['IP adresa',esc(w.ip)],['MAC',esc(w.mac)]].concat(w.mode=='hotspot'?[['Připojení klienti',w.clients]]:[]));
+ var a=j.app;rows('app',[['Letadla v dosahu',a.planes+' (dosah '+a.range+' km)'],['ADS-B data',age(a.planes_age)+(a.planes_err?' · chyba: '+esc(a.planes_err):'')],
+  ['Počasí ČHMI',age(a.weather_age)+(a.weather_err?' · chyba: '+esc(a.weather_err):'')],['Stanice',esc(a.station)],
+  ['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
+ t('st','aktualizováno '+new Date().toLocaleTimeString('cs-CZ'));
+}).catch(function(){t('st','zařízení neodpovídá')})}
+load();setInterval(load,2000);
+</script></body></html>)HTML";
+
+static void handleSystem() {
+  gLastActivity = millis();
+  server.send_P(200, "text/html; charset=utf-8", PAGE_SYS);
+}
+
+static void handleStatus() {
+  gLastActivity = millis();
+  JsonDocument doc;
+  sysinfoJson(doc.to<JsonObject>());
+  String out;
+  serializeJson(doc, out);
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", out);
+}
 
 static void handleRoot() {
   gLastActivity = millis();
@@ -298,6 +369,8 @@ void webBegin(bool apMode) {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
   server.on("/update", HTTP_POST, handleUpdate);
+  server.on("/system", HTTP_GET, handleSystem);
+  server.on("/api/status", HTTP_GET, handleStatus);
   server.onNotFound(handleNotFound);
   server.begin();
   gLastActivity = millis();
