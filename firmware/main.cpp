@@ -30,6 +30,7 @@
 #include "radar.h"
 #include "forecast.h"
 #include "logo.h"
+#include "namedays.h"
 
 // ===================================================================
 //  Konstanty
@@ -876,6 +877,46 @@ static void drawWeather(const Weather& w) {
 }
 
 // ---------------- Obrazovka 4: hodiny ----------------
+// ---------------- Jmeniny a státní svátky ----------------
+// Velikonoční neděle (gregoriánský kalendář, anonymní algoritmus)
+static void easterSunday(int Y, int& m, int& d) {
+  int a = Y % 19, b = Y / 100, c = Y % 100, dd = b / 4, e = b % 4, f = (b + 8) / 25, g = (b - f + 1) / 3;
+  int h = (19 * a + b - dd - g + 15) % 30, i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  int mm = (a + 11 * h + 22 * l) / 451;
+  m = (h + l - 7 * mm + 114) / 31;
+  d = (h + l - 7 * mm + 114) % 31 + 1;
+}
+
+// státní svátek ČR (krátký název), nebo nullptr
+static const char* czHoliday(const struct tm& lt) {
+  int m = lt.tm_mon + 1, d = lt.tm_mday;
+  struct H {
+    uint8_t m, d;
+    const char* n;
+  };
+  static const H FIXED[] = {{1, 1, "Den obnovy státu, Nový rok"}, {5, 1, "Svátek práce"}, {5, 8, "Den vítězství"},
+                            {7, 5, "Den slovanských věrozvěstů"}, {7, 6, "Den upálení Jana Husa"},
+                            {9, 28, "Den české státnosti"},   {10, 28, "Den vzniku Československa"},
+                            {11, 17, "Den boje za svobodu"},  {12, 24, "Štědrý den"},
+                            {12, 25, "1. svátek vánoční"},    {12, 26, "2. svátek vánoční"}};
+  for (auto& h : FIXED)
+    if (h.m == m && h.d == d) return h.n;
+  int em, ed;
+  easterSunday(lt.tm_year + 1900, em, ed);
+  struct tm e = {};
+  e.tm_year = lt.tm_year;
+  e.tm_mon = em - 1;
+  e.tm_mday = ed;
+  e.tm_hour = 12;
+  for (int off : {-2, 1}) {  // Velký pátek, Velikonoční pondělí
+    struct tm x = e;
+    x.tm_mday += off;
+    mktime(&x);
+    if (x.tm_mon == lt.tm_mon && x.tm_mday == d) return off < 0 ? "Velký pátek" : "Velikonoční pondělí";
+  }
+  return nullptr;
+}
+
 static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc) {
   if (!timeValid()) {
     drawCenteredMsg("čekám na čas…");
@@ -895,12 +936,31 @@ static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc)
   spr.setFont(&fonts::Font7);
   spr.setTextColor(rgb(255, 255, 255));
   snprintf(b, sizeof b, "%02d:%02d", lt.tm_hour, lt.tm_min);
-  spr.drawString(b, CX, CY - 10);
+  spr.drawString(b, CX, CY - 22);
 
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(180, 180, 180));
   snprintf(b, sizeof b, "%s %d. %d.", DNY[lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
-  spr.drawString(b, CX, CY + 32);
+  spr.drawString(b, CX, CY + 18);
+
+  // kdo má svátek + případný státní svátek
+  const char* name = NAMEDAY[lt.tm_mon][lt.tm_mday - 1];
+  const char* holi = czHoliday(lt);
+  int y = CY + 40;
+  if (name && name[0]) {
+    snprintf(b, sizeof b, "svátek: %s", name);
+    spr.setTextColor(rgb(255, 170, 200));
+    spr.drawString(b, CX, y);
+    y += 19;
+  }
+  if (holi) {
+    spr.setFont(&fontCZ_12);
+    spr.setTextColor(rgb(255, 90, 80));
+    spr.drawString(holi, CX, y - 2);
+    y += 15;
+  }
+  spr.setFont(&fontCZ_16);
+  int yInfo = max(y + 6, CY + 66);
 
   float temp = (w.ok && !isnan(w.t)) ? w.t : (fc.ok ? fc.curT : NAN);
   if (!isnan(temp)) {
@@ -908,19 +968,19 @@ static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc)
     fmtDec(t, sizeof t, temp, 1);
     snprintf(b, sizeof b, "%s °C", t);
     spr.setTextColor(tempColor(temp));
-    spr.drawString(b, CX - 40, CY + 62);
+    spr.drawString(b, CX - 40, yInfo);
   }
   float range = RANGES_KM[gRangeIdx];
   int n = 0;
   while (n < pd.count && pd.p[n].distKm <= range) n++;
   snprintf(b, sizeof b, "%d", n);
   spr.setTextColor(rgb(0, 220, 100));
-  spr.drawString(b, CX + 32, CY + 62);
-  drawPlaneIcon(CX + 32 + spr.textWidth(b) / 2 + 12, CY + 62, 45, rgb(0, 220, 100), 7);
+  spr.drawString(b, CX + 32, yInfo);
+  drawPlaneIcon(CX + 32 + spr.textWidth(b) / 2 + 12, yInfo, 45, rgb(0, 220, 100), 7);
   if (WiFi.status() == WL_CONNECTED) {  // adresa webového nastavení
     spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(90, 90, 90));
-    spr.drawString(WiFi.localIP().toString().c_str(), CX, CY + 88);
+    spr.drawString(WiFi.localIP().toString().c_str(), CX, min(yInfo + 22, 216));
   }
 }
 

@@ -14,7 +14,7 @@ Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 | **Předpověď**: aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko). Dole je výhled na 2–8 h | obnovit |
 | **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI**: teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
-| **Hodiny**: čas, datum, teplota, počet letadel, IP adresa | obnovit |
+| **Hodiny**: čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
 
 Krátký stisk přepne na další zapnutou obrazovku. Které obrazovky se zobrazují, se nastavuje ve webovém rozhraní.
 
