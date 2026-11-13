@@ -6,6 +6,10 @@
 //   dlouhý stisk  -> radar: změna dosahu 10/25/50/100 km
 //                    detail: další letadlo (podle vzdálenosti)
 //                    počasí/hodiny: okamžitá aktualizace dat
+//   držet 5 s     -> konfigurační hotspot "Letadla-XXXX" (WiFi, poloha, stanice)
+//
+// Při prvním spuštění (nebo když se nejde připojit k WiFi) se zařízení samo
+// přepne do konfiguračního hotspotu bez hesla, nastavení na http://192.168.4.1
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -15,16 +19,23 @@
 #include <time.h>
 #include <math.h>
 
-#if !__has_include("config.h")
-#error "Chybí config.h – zkopíruj firmware/config.example.h na firmware/config.h a vyplň WiFi a polohu."
-#endif
-#include "config.h"
 #include "display.h"
+#include "settings.h"
+#include "portal.h"
+#include "ota.h"
+#include "fonts_cz.h"
 
 // ===================================================================
 //  Konstanty
 // ===================================================================
 static const int PIN_BUTTON = 9;  // tlačítko BOOT
+static const uint32_t PLANES_REFRESH_MS = 10000;    // API povolují max ~1 dotaz/s
+static const uint32_t WEATHER_REFRESH_MS = 600000;  // ČHMI publikuje 10min data
+static const uint32_t PORTAL_IDLE_RESTART_MS = 300000;  // portál bez aktivity -> zkus znovu WiFi
+static const char* TZ_INFO = "CET-1CEST,M3.5.0,M10.5.0/3";
+// ESP32-C3 Super Mini má špatně navrženou anténu; s plným výkonem se často
+// nepřipojí k WiFi. Snížení vysílacího výkonu to typicky vyřeší.
+static const bool WIFI_LOW_TX_POWER = true;
 static const float RANGES_KM[] = {10, 25, 50, 100};
 static const int NUM_RANGES = sizeof(RANGES_KM) / sizeof(RANGES_KM[0]);
 
@@ -83,7 +94,8 @@ struct Weather {
 static PlaneData gPlanes;
 static Weather gWeather;
 static SemaphoreHandle_t gMutex;
-static volatile int gRangeIdx = DEFAULT_RANGE_IDX;
+static volatile int gRangeIdx = 1;
+static bool gPortalMode = false;
 static volatile bool gForcePlanes = true;
 static volatile bool gForceWeather = true;
 
@@ -99,8 +111,8 @@ static void copyTrim(char* dst, size_t n, const char* src) {
 
 static void distBearing(float lat, float lon, float& distKm, float& brg) {
   const float R = 6371.0f;
-  float dLat = (lat - HOME_LAT) * DEG_TO_RAD;
-  float dLon = (lon - HOME_LON) * DEG_TO_RAD * cosf(HOME_LAT * DEG_TO_RAD);
+  float dLat = (lat - gCfg.lat) * DEG_TO_RAD;
+  float dLon = (lon - gCfg.lon) * DEG_TO_RAD * cosf(gCfg.lat * DEG_TO_RAD);
   float n = dLat * R, e = dLon * R;
   distKm = sqrtf(n * n + e * e);
   brg = atan2f(e, n) * RAD_TO_DEG;
@@ -163,7 +175,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   float rangeKm = RANGES_KM[gRangeIdx];
   int nm = (int)ceilf(rangeKm / 1.852f) + 1;
   char url[128];
-  snprintf(url, sizeof url, tmpl, HOME_LAT, HOME_LON, nm);
+  snprintf(url, sizeof url, tmpl, gCfg.lat, gCfg.lon, nm);
 
   WiFiClientSecure client;
   client.setInsecure();  // bez ověřování certifikátu (veřejná data)
@@ -365,7 +377,7 @@ static bool fetchChmiDay(time_t day, ChmiParse& cp, int& httpCode) {
   char url[160];
   snprintf(url, sizeof url,
            "https://opendata.chmi.cz/meteorology/climate/now/data/10m-%s-%04d%02d%02d.json",
-           CHMI_WSI, u.tm_year + 1900, u.tm_mon + 1, u.tm_mday);
+           gCfg.wsi.c_str(), u.tm_year + 1900, u.tm_mon + 1, u.tm_mday);
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -468,20 +480,30 @@ static bool fetchWeather() {
 // ===================================================================
 //  Síťový task
 // ===================================================================
+static void requestPortal() {
+  settingsSetPortalFlag(true);
+  ESP.restart();
+}
+
 static void ensureWiFi() {
+  static bool everConnected = false;
+  static int failures = 0;
   if (WiFi.status() == WL_CONNECTED) return;
-  Serial.println("[WiFi] připojuji...");
+  Serial.printf("[WiFi] připojuji k %s...\n", gCfg.ssid.c_str());
   WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-#if WIFI_LOW_TX_POWER
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
-#endif
+  WiFi.begin(gCfg.ssid.c_str(), gCfg.pass.c_str());
+  if (WIFI_LOW_TX_POWER) WiFi.setTxPower(WIFI_POWER_8_5dBm);
   uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) vTaskDelay(pdMS_TO_TICKS(250));
-  if (WiFi.status() == WL_CONNECTED)
+  if (WiFi.status() == WL_CONNECTED) {
+    everConnected = true;
+    failures = 0;
     Serial.printf("[WiFi] OK, IP %s, RSSI %d\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
-  else
+  } else {
     Serial.println("[WiFi] nepodařilo se připojit");
+    // od zapnutí se ještě nikdy nepřipojilo (špatné heslo, jiná síť...) -> hotspot
+    if (!everConnected && ++failures >= 3) requestPortal();
+  }
 }
 
 static void netTask(void*) {
@@ -501,6 +523,20 @@ static void netTask(void*) {
         bool ok = fetchWeather();
         weatherInterval = ok ? WEATHER_REFRESH_MS : 60000;  // při chybě zkus za minutu
         lastWeather = millis();
+      }
+      // OTA: první kontrola minutu po startu, pak jednou denně; nebo na požádání z webu
+      static uint32_t lastOta = 0;
+      static bool otaChecked = false;
+      if (gOtaRequest) {
+        gOtaRequest = false;
+        otaCheck(true);
+        lastOta = millis();
+        otaChecked = true;
+      } else if ((!otaChecked && millis() > 60000) || (otaChecked && millis() - lastOta > 86400000UL)) {
+        otaChecked = true;
+        lastOta = millis();
+        // vývojová verze ("dev") se automaticky nepřepisuje
+        otaCheck(gCfg.autoUpdate && FW_VERSION[0] == 'v');
       }
     }
     vTaskDelay(pdMS_TO_TICKS(200));
@@ -567,12 +603,12 @@ static void drawWifiDot() {
 }
 
 static void drawCenteredMsg(const char* a, const char* b = nullptr) {
-  spr.setFont(&fonts::efontJA_16);
+  spr.setFont(&fontCZ_16);
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setTextColor(rgb(255, 255, 255));
   spr.drawString(a, CX, b ? CY - 10 : CY);
   if (b) {
-    spr.setFont(&fonts::efontJA_12);
+    spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(160, 160, 160));
     spr.drawString(b, CX, CY + 12);
   }
@@ -606,7 +642,7 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
     spr.drawString(b, CX + 3, CY - R * i / 3 + 6);
   }
   spr.setTextDatum(textdatum_t::top_center);
-  spr.setFont(&fonts::efontJA_12);
+  spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(0, 220, 100));
   spr.drawString("S", CX, CY - R + 2);  // sever
   spr.fillCircle(CX, CY, 2, rgb(255, 255, 255));  // domov
@@ -629,7 +665,7 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
   }
 
   // počet a nejbližší letadlo
-  spr.setFont(&fonts::efontJA_12);
+  spr.setFont(&fontCZ_12);
   spr.setTextDatum(textdatum_t::top_center);
   spr.setTextColor(rgb(200, 200, 200));
   snprintf(b, sizeof b, "%d %s · %.0f km", shown, planesWord(shown), range);
@@ -677,7 +713,7 @@ static void drawDetail(const PlaneData& pd) {
   drawPlaneIcon(CX + (int)(108 * sinf(a)), CY - (int)(108 * cosf(a)), pl.track, col, 8);
 
   spr.setTextDatum(textdatum_t::middle_center);
-  spr.setFont(&fonts::efontJA_12);
+  spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(150, 150, 150));
   snprintf(b, sizeof b, "%d / %d", gDetailIdx + 1, n);
   spr.drawString(b, CX, 30);
@@ -686,18 +722,18 @@ static void drawDetail(const PlaneData& pd) {
   spr.setTextColor(col);
   spr.drawString(pl.flight, CX, 60);
 
-  spr.setFont(&fonts::efontJA_16);
+  spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(200, 200, 200));
   snprintf(b, sizeof b, "%s  %s", pl.type[0] ? pl.type : "", pl.reg);
   spr.drawString(b, CX, 90);
 
   // výška
-  spr.setFont(&fonts::efontJA_24);
+  spr.setFont(&fontCZ_24);
   spr.setTextColor(rgb(255, 255, 255));
   altText(t, sizeof t, pl.alt);
   spr.drawString(t, CX, 120);
   if (pl.alt != ALT_GROUND && pl.alt != ALT_UNKNOWN) {
-    spr.setFont(&fonts::efontJA_12);
+    spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(150, 150, 150));
     snprintf(b, sizeof b, "%ld ft · FL%03ld", (long)pl.alt, lroundf(pl.alt / 100.0f));
     spr.drawString(b, CX, 142);
@@ -710,7 +746,7 @@ static void drawDetail(const PlaneData& pd) {
   }
 
   // rychlost, kurz, vzdálenost
-  spr.setFont(&fonts::efontJA_16);
+  spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(255, 230, 120));
   if (!isnan(pl.gs)) snprintf(b, sizeof b, "%ld km/h", lroundf(pl.gs * 1.852f));
   else strlcpy(b, "– km/h", sizeof b);
@@ -742,9 +778,10 @@ static void drawWeather(const Weather& w) {
   }
 
   spr.setTextDatum(textdatum_t::middle_center);
-  spr.setFont(&fonts::efontJA_12);
+  spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(150, 150, 150));
-  spr.drawString("ČHMI · " CHMI_NAME, CX, 32);
+  snprintf(b, sizeof b, "ČHMI · %s", gCfg.name.c_str());
+  spr.drawString(b, CX, 32);
 
   // teplota
   if (!isnan(w.t)) fmtDec(t, sizeof t, w.t, 1);
@@ -761,7 +798,7 @@ static void drawWeather(const Weather& w) {
   spr.drawString("C", x0 + tw + 11, 66);
 
   spr.setTextDatum(textdatum_t::middle_center);
-  spr.setFont(&fonts::efontJA_16);
+  spr.setFont(&fontCZ_16);
   int y = 110;
   if (!isnan(w.h)) {
     snprintf(b, sizeof b, "vlhkost %.0f %%", w.h);
@@ -772,7 +809,7 @@ static void drawWeather(const Weather& w) {
   if (!isnan(w.p)) {
     float p = w.p;
     float tt = isnan(w.t) ? 10 : w.t;
-    p = w.p * powf(1 - 0.0065f * CHMI_ELEVATION_M / (tt + 0.0065f * CHMI_ELEVATION_M + 273.15f), -5.257f);
+    p = w.p * powf(1 - 0.0065f * gCfg.elev / (tt + 0.0065f * gCfg.elev + 273.15f), -5.257f);
     snprintf(b, sizeof b, "tlak %.0f hPa", p);
     spr.setTextColor(rgb(200, 200, 200));
     spr.drawString(b, CX, y);
@@ -806,7 +843,7 @@ static void drawWeather(const Weather& w) {
     struct tm lt;
     localtime_r(&w.obs, &lt);
     snprintf(b, sizeof b, "měřeno %02d:%02d", lt.tm_hour, lt.tm_min);
-    spr.setFont(&fonts::efontJA_12);
+    spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(120, 120, 120));
     spr.drawString(b, CX, 208);
   }
@@ -834,7 +871,7 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
   snprintf(b, sizeof b, "%02d:%02d", lt.tm_hour, lt.tm_min);
   spr.drawString(b, CX, CY - 10);
 
-  spr.setFont(&fonts::efontJA_16);
+  spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(180, 180, 180));
   snprintf(b, sizeof b, "%s %d. %d.", DNY[lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
   spr.drawString(b, CX, CY + 32);
@@ -853,6 +890,11 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
   spr.setTextColor(rgb(0, 220, 100));
   spr.drawString(b, CX + 32, CY + 62);
   drawPlaneIcon(CX + 32 + spr.textWidth(b) / 2 + 12, CY + 62, 45, rgb(0, 220, 100), 7);
+  if (WiFi.status() == WL_CONNECTED) {  // adresa webového nastavení
+    spr.setFont(&fontCZ_12);
+    spr.setTextColor(rgb(90, 90, 90));
+    spr.drawString(WiFi.localIP().toString().c_str(), CX, CY + 88);
+  }
 }
 
 // ===================================================================
@@ -860,16 +902,25 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
 // ===================================================================
 enum Screen { SCR_RADAR, SCR_DETAIL, SCR_WEATHER, SCR_CLOCK, SCR_COUNT };
 static int gScreen = SCR_RADAR;
+static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
+static const uint32_t PORTAL_HOLD_MS = 5000;
 
 static void onShortPress() {
+  if (gPortalMode) {  // v portálu: krátký stisk = zpět do normálního režimu
+    if (settingsHasWifi()) ESP.restart();
+    return;
+  }
   gScreen = (gScreen + 1) % SCR_COUNT;
   gDetailIdx = 0;
 }
 
 static void onLongPress() {
+  if (gPortalMode) return;
   switch (gScreen) {
     case SCR_RADAR:
       gRangeIdx = (gRangeIdx + 1) % NUM_RANGES;
+      gCfg.rangeIdx = gRangeIdx;
+      settingsSaveRange();
       gForcePlanes = true;
       break;
     case SCR_DETAIL:
@@ -882,29 +933,98 @@ static void onLongPress() {
   }
 }
 
+// krátký stisk < 0,7 s, dlouhý 0,7–5 s (akce po puštění), držení 5 s = konfigurační hotspot
 static void pollButton() {
-  static bool down = false, longFired = false;
+  static bool down = false;
   static uint32_t downAt = 0, lastChange = 0;
   bool pressed = digitalRead(PIN_BUTTON) == LOW;
   uint32_t t = millis();
+  if (down) gBtnHeldMs = t - downAt;
   if (t - lastChange < 30) return;  // debounce
   if (pressed && !down) {
     down = true;
-    longFired = false;
     downAt = lastChange = t;
-  } else if (pressed && down && !longFired && t - downAt > 700) {
-    longFired = true;
-    onLongPress();
+  } else if (pressed && down && !gPortalMode && t - downAt >= PORTAL_HOLD_MS) {
+    requestPortal();
   } else if (!pressed && down) {
     down = false;
+    gBtnHeldMs = 0;
     lastChange = t;
-    if (!longFired) onShortPress();
+    uint32_t held = t - downAt;
+    if (held < 700) onShortPress();
+    else onLongPress();
   }
+}
+
+static void drawHoldIndicator() {
+  if (gBtnHeldMs < 1200 || gPortalMode) return;
+  float frac = min(1.0f, (float)gBtnHeldMs / PORTAL_HOLD_MS);
+  spr.fillArc(CX, CY, 119, 113, -90, -90 + 360 * frac, rgb(255, 160, 0));
+  spr.fillRoundRect(CX - 80, CY - 16, 160, 32, 8, rgb(0, 0, 0));
+  spr.setFont(&fontCZ_12);
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setTextColor(rgb(255, 160, 0));
+  spr.drawString("drž pro nastavení WiFi", CX, CY);
+}
+
+static void drawPortal() {
+  char b[64];
+  String ap = apName();
+  bool client = WiFi.softAPgetStationNum() > 0;
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setFont(&fontCZ_16);
+  spr.setTextColor(rgb(255, 160, 0));
+  spr.drawString("Nastavení", CX, 28);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(200, 200, 200));
+  if (!client) {
+    // QR kód pro připojení k hotspotu (otevřená síť)
+    snprintf(b, sizeof b, "WIFI:T:nopass;S:%s;;", ap.c_str());
+    spr.qrcode(b, CX - 56, 44, 112, 3);
+    spr.drawString("1. připoj se k WiFi", CX, 170);
+    spr.setTextColor(rgb(255, 255, 255));
+    spr.drawString(ap.c_str(), CX, 186);
+  } else {
+    spr.qrcode("http://192.168.4.1/", CX - 56, 44, 112, 3);
+    spr.drawString("2. otevři v prohlížeči", CX, 170);
+    spr.setTextColor(rgb(255, 255, 255));
+    spr.drawString("192.168.4.1", CX, 186);
+  }
+  spr.setTextColor(rgb(110, 110, 110));
+  spr.drawString(settingsHasWifi() ? "stiskem tlačítka zpět" : "verze " FW_VERSION, CX, 206);
+}
+
+static void drawOta() {
+  char b[48];
+  spr.fillArc(CX, CY, 118, 110, -90, 270, rgb(40, 40, 40));
+  spr.fillArc(CX, CY, 118, 110, -90, -90 + 360 * gOta.progress / 100, rgb(0, 160, 255));
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setFont(&fontCZ_16);
+  spr.setTextColor(rgb(255, 255, 255));
+  spr.drawString("Aktualizace", CX, CY - 30);
+  spr.setFont(&fontCZ_24);
+  snprintf(b, sizeof b, "%d %%", gOta.progress);
+  spr.drawString(b, CX, CY + 2);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(160, 160, 160));
+  snprintf(b, sizeof b, "%s → %s", FW_VERSION, gOta.latest);
+  spr.drawString(b, CX, CY + 32);
+  spr.drawString("nevypínej napájení", CX, CY + 50);
+}
+
+static void showBoot(const char* a, const char* b) {
+  spr.fillScreen(TFT_BLACK);
+  drawCenteredMsg(a, b);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(90, 90, 90));
+  spr.drawString("verze " FW_VERSION, CX, 206);
+  spr.pushSprite(0, 0);
 }
 
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+  Serial.printf("\nesp32-stand-system %s\n", FW_VERSION);
 
   tft.init();
   tft.setRotation(0);
@@ -912,13 +1032,23 @@ void setup() {
   spr.setColorDepth(8);  // 240x240x8 bit = 57 kB (16 bit by nenechalo dost RAM pro TLS)
   if (!spr.createSprite(240, 240)) Serial.println("Sprite: málo paměti!");
 
-  spr.fillScreen(TFT_BLACK);
-  drawCenteredMsg("Připojuji WiFi…", WIFI_SSID);
-  spr.pushSprite(0, 0);
-
+  settingsLoad();
+  gRangeIdx = constrain(gCfg.rangeIdx, 0, NUM_RANGES - 1);
   gMutex = xSemaphoreCreateMutex();
+
+  bool portalFlag = settingsTakePortalFlag();
+  if (!settingsHasWifi() || portalFlag) {
+    gPortalMode = true;
+    showBoot("Spouštím hotspot…", nullptr);
+    webBegin(true);
+    return;
+  }
+
+  showBoot("Připojuji WiFi…", gCfg.ssid.c_str());
   WiFi.mode(WIFI_STA);
+  WiFi.setHostname("letadla");
   configTzTime(TZ_INFO, "pool.ntp.org", "time.google.com");
+  webBegin(false);  // nastavení i v domácí síti na IP zařízení
   xTaskCreate(netTask, "net", 12288, nullptr, 1, nullptr);
 }
 
@@ -928,26 +1058,39 @@ void loop() {
   static uint32_t lastDraw = 0;
 
   pollButton();
+  webLoop();
   uint32_t now = millis();
-  uint32_t frame = (gScreen == SCR_RADAR) ? 66 : 250;
+
+  if (gPortalMode && settingsHasWifi() && now - webLastActivity() > PORTAL_IDLE_RESTART_MS &&
+      WiFi.softAPgetStationNum() == 0) {
+    ESP.restart();  // nikdo nic nenastavuje -> zkus znovu uloženou WiFi
+  }
+
+  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs) ? 66 : 250;
   if (now - lastDraw < frame) {
     delay(5);
     return;
   }
   lastDraw = now;
 
-  xSemaphoreTake(gMutex, portMAX_DELAY);
-  pd = gPlanes;
-  w = gWeather;
-  xSemaphoreGive(gMutex);
-
   spr.fillScreen(TFT_BLACK);
-  switch (gScreen) {
-    case SCR_RADAR: drawRadar(pd, now); break;
-    case SCR_DETAIL: drawDetail(pd); break;
-    case SCR_WEATHER: drawWeather(w); break;
-    case SCR_CLOCK: drawClock(pd, w); break;
+  if (gPortalMode) {
+    drawPortal();
+  } else if (gOta.state == OTA_DOWNLOADING) {
+    drawOta();
+  } else {
+    xSemaphoreTake(gMutex, portMAX_DELAY);
+    pd = gPlanes;
+    w = gWeather;
+    xSemaphoreGive(gMutex);
+    switch (gScreen) {
+      case SCR_RADAR: drawRadar(pd, now); break;
+      case SCR_DETAIL: drawDetail(pd); break;
+      case SCR_WEATHER: drawWeather(w); break;
+      case SCR_CLOCK: drawClock(pd, w); break;
+    }
+    drawWifiDot();
+    drawHoldIndicator();
   }
-  drawWifiDot();
   spr.pushSprite(0, 0);
 }

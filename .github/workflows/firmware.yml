@@ -1,0 +1,61 @@
+name: Firmware
+
+# Každý push / PR: kontrolní build.
+# Tag vX.Y.Z: build s verzí X.Y.Z + GitHub Release s firmware.bin (pro OTA)
+# a firmware-full.bin (pro první nahrání přes USB na adresu 0x0).
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Instalace PlatformIO
+        run: pip install platformio esptool
+
+      - name: Build
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VER="$GITHUB_REF_NAME"; else VER="dev-${GITHUB_SHA::7}"; fi
+          echo "Verze: $VER"
+          export PLATFORMIO_BUILD_FLAGS="-DFW_VERSION=\\\"$VER\\\""
+          pio run -e esp32c3
+
+      - name: Sestavení výstupů
+        run: |
+          B=.pio/build/esp32c3
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)
+          mkdir dist
+          cp $B/firmware.bin dist/firmware.bin
+          python -m esptool --chip esp32c3 merge_bin -o dist/firmware-full.bin \
+            --flash_mode dio --flash_size 4MB \
+            0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$BOOT_APP0" 0x10000 $B/firmware.bin
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: dist/*
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
