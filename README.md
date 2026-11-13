@@ -10,7 +10,7 @@ Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 | Obrazovka | Dlouhý stisk (0,7–5 s) |
 |---|---|
 | **Radar letadel**: letadla kolem domova, barva podle výšky | dosah 10 / 25 / 50 / 100 km |
-| **Detail letadla**: volací znak, typ, registrace, výška, rychlost, kurz | další letadlo |
+| **Detail letadla**: logo společnosti, volací znak, typ, registrace, výška, rychlost, kurz | další letadlo |
 | **Předpověď**: aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko). Dole je výhled na 2–8 h | obnovit |
 | **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI**: teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
@@ -38,6 +38,10 @@ Nastavení se ukládá do flash paměti a aktualizace firmwaru ho nesmažou. Poz
 Na stránce **Systémové informace** (`http://<IP zařízení>/system`) jsou živé údaje, které se obnovují každé 2 s: teplota čipu, vytížení CPU, využití RAM a flash, síla WiFi signálu, doba běhu, důvod posledního restartu a stáří stažených dat. Totéž ve formátu JSON vrací `/api/status`.
 
 Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 min), přepne se samo do hotspotu. Pokud v hotspotu 5 minut nikdo nic nenastaví, zkusí znovu uloženou WiFi.
+
+## Volba obrazovek
+
+Ve webovém nastavení v sekci **Obrazovky** zaškrtneš, co se má zobrazovat: třeba jen letadla, jen meteoradar, nebo všechno. Tam se nastavuje i dosah radaru letadel (10–100 km) a poloměr výřezu meteoradaru (25–200 km).
 
 ## Jas displeje
 
@@ -107,6 +111,7 @@ Pokud se deska nechce nahrávat, podrž BOOT, stiskni RESET a BOOT pusť.
 ## Zdroje dat
 
 - **Letadla:** [airplanes.live](https://airplanes.live) API (`/v2/point/lat/lon/radius`), při výpadku [adsb.lol](https://adsb.lol). Obě jsou zdarma, bez klíče, pro nekomerční použití. Dotaz jde jednou za 10 s.
+- **Loga leteckých společností:** [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos) (`flightaware_logos`, 90×90 PNG podle ICAO kódu). Kód se vezme ze začátku volacího znaku (CSA123 → CSA). Logo se stáhne až při prvním zobrazení a v paměti zůstává posledních 6. Loga jsou majetkem příslušných společností.
 - **Předpověď:** [Open-Meteo](https://open-meteo.com) (zdarma, bez klíče): aktuální stav, 15minutové srážky na 2 h dopředu, hodinová a denní předpověď. Obnovuje se každých 15 min.
 - **Meteoradar:** ČHMI, kompozit maximální odrazivosti `maxz/png_masked` (PNG každých 5 min). Zařízení stáhne posledních 6 snímků, ořízne je na okolí domova a uloží komprimované (RLE), aby se vešly do RAM.
 - **Měření ze stanice:** otevřená data ČHMI, 10minutová měření:

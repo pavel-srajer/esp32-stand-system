@@ -291,6 +291,18 @@ static void handleRoot() {
       h += NAMES[i];
       h += F("</label>");
     }
+    static const int PR[] = {10, 25, 50, 100};
+    h += F("<label>Dosah radaru letadel</label><select name='prange'>");
+    for (int i = 0; i < 4; i++) {
+      h += F("<option value='");
+      h += i;
+      h += "'";
+      if (i == gCfg.rangeIdx) h += F(" selected");
+      h += ">";
+      h += PR[i];
+      h += F(" km</option>");
+    }
+    h += F("</select>");
     static const int RR[] = {25, 50, 100, 200};
     h += F("<label>Výřez meteoradaru (poloměr)</label><select name='rrad'>");
     for (int i = 0; i < 4; i++) {
@@ -302,7 +314,7 @@ static void handleRoot() {
       h += RR[i];
       h += F(" km</option>");
     }
-    h += F("</select><small>Na obrazovce meteoradaru se poloměr mění i dlouhým stiskem.</small></fieldset>");
+    h += F("</select><small>Oba dosahy jdou měnit i dlouhým stiskem tlačítka na příslušné obrazovce.</small></fieldset>");
   }
 
   // --- ČHMI ---
@@ -451,6 +463,7 @@ static void handleSave() {
     for (int i = 0; i < 6; i++)
       if (server.hasArg("scr" + String(i))) m |= 1 << i;
     gCfg.screens = m ? m : 1;
+    if (server.hasArg("prange")) gCfg.rangeIdx = constrain(server.arg("prange").toInt(), 0, 3);
     if (server.hasArg("rrad")) gCfg.rainRadiusIdx = constrain(server.arg("rrad").toInt(), 0, 3);
   }
   if (server.hasArg("bl")) gCfg.blPin = server.arg("bl").toInt();

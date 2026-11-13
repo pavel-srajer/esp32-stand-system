@@ -29,6 +29,7 @@
 #include "brightness.h"
 #include "radar.h"
 #include "forecast.h"
+#include "logo.h"
 
 // ===================================================================
 //  Konstanty
@@ -518,6 +519,7 @@ static void netTask(void*) {
         weatherInterval = ok ? WEATHER_REFRESH_MS : 60000;  // při chybě zkus za minutu
         lastWeather = millis();
       }
+      logoService();  // logo pro obrazovku Detail (jen když nějaké čeká)
       // předpověď (Open-Meteo) – pro předpověď, meteoradar i hodiny
       static uint32_t lastFc = 0, fcInterval = FORECAST_REFRESH_MS;
       static bool fcDone = false;
@@ -725,34 +727,45 @@ static void drawDetail(const PlaneData& pd) {
   float a = pl.brg * DEG_TO_RAD;
   drawPlaneIcon(CX + (int)(108 * sinf(a)), CY - (int)(108 * cosf(a)), pl.track, col, 8);
 
+  // logo společnosti (stahuje se na pozadí; dokud není, rozložení bez loga)
+  static uint8_t logoPx[LOGO_SIZE * LOGO_SIZE];
+  char icao[4];
+  bool logo = logoIcaoFromCallsign(pl.flight, icao) && logoGet(icao, logoPx);
+  // svislé pozice: index, volací znak, typ, výška, FL, rychlost, vzdálenost
+  const int* Y;
+  static const int Y_LOGO[] = {216, 88, 114, 138, 158, 178, 198};
+  static const int Y_PLAIN[] = {30, 60, 90, 120, 142, 166, 188};
+  Y = logo ? Y_LOGO : Y_PLAIN;
+  if (logo) spr.pushImage(CX - LOGO_SIZE / 2, 16, LOGO_SIZE, LOGO_SIZE, (const lgfx::rgb332_t*)logoPx);
+
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(150, 150, 150));
   snprintf(b, sizeof b, "%d / %d", gDetailIdx + 1, n);
-  spr.drawString(b, CX, 30);
+  spr.drawString(b, CX, Y[0]);
 
   spr.setFont(&fonts::FreeSansBold18pt7b);
   spr.setTextColor(col);
-  spr.drawString(pl.flight, CX, 60);
+  spr.drawString(pl.flight, CX, Y[1]);
 
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(200, 200, 200));
   snprintf(b, sizeof b, "%s  %s", pl.type[0] ? pl.type : "", pl.reg);
-  spr.drawString(b, CX, 90);
+  spr.drawString(b, CX, Y[2]);
 
   // výška
   spr.setFont(&fontCZ_24);
   spr.setTextColor(rgb(255, 255, 255));
   altText(t, sizeof t, pl.alt);
-  spr.drawString(t, CX, 120);
+  spr.drawString(t, CX, Y[3]);
   if (pl.alt != ALT_GROUND && pl.alt != ALT_UNKNOWN) {
     spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(150, 150, 150));
     snprintf(b, sizeof b, "%ld ft · FL%03ld", (long)pl.alt, lroundf(pl.alt / 100.0f));
-    spr.drawString(b, CX, 142);
+    spr.drawString(b, CX, Y[4]);
     // stoupání / klesání
     if (abs(pl.vrate) > 300) {
-      int x = CX + 80, y = 120;
+      int x = CX + 80, y = Y[3];
       if (pl.vrate > 0) spr.fillTriangle(x, y - 8, x - 6, y + 4, x + 6, y + 4, rgb(0, 255, 80));
       else spr.fillTriangle(x, y + 8, x - 6, y - 4, x + 6, y - 4, rgb(255, 120, 0));
     }
@@ -767,11 +780,11 @@ static void drawDetail(const PlaneData& pd) {
     size_t l = strlen(b);
     snprintf(b + l, sizeof b - l, " · %ld°", lroundf(pl.track));
   }
-  spr.drawString(b, CX, 166);
+  spr.drawString(b, CX, Y[5]);
   fmtDec(t, sizeof t, pl.distKm, 1);
   snprintf(b, sizeof b, "%s km %s", t, compass8(pl.brg));
   spr.setTextColor(rgb(120, 200, 255));
-  spr.drawString(b, CX, 188);
+  spr.drawString(b, CX, Y[6]);
 }
 
 // ---------------- Obrazovka 3: počasí ----------------
