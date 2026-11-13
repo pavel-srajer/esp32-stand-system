@@ -3,6 +3,7 @@
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <ArduinoJson.h>
+#include "http_body.h"
 
 OtaStatus gOta;
 volatile bool gOtaRequest = false;
@@ -20,7 +21,7 @@ void otaCheck(bool install) {
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
-  http.useHTTP10(true);
+  BodyStream::prepare(http);
   http.setConnectTimeout(8000);
   http.setTimeout(10000);
   http.setUserAgent("esp32-stand-system/" FW_VERSION);
@@ -38,13 +39,14 @@ void otaCheck(bool install) {
     Serial.printf("[OTA] %s\n", gOta.msg);
     return;
   }
+  BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http));
   JsonDocument filter;
   filter["tag_name"] = true;
   JsonObject fa = filter["assets"].add<JsonObject>();
   fa["name"] = true;
   fa["browser_download_url"] = true;
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+  DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
   http.end();
   if (err) {
     gOta.state = OTA_FAILED;

@@ -24,6 +24,7 @@
 #include "portal.h"
 #include "ota.h"
 #include "fonts_cz.h"
+#include "http_body.h"
 
 // ===================================================================
 //  Konstanty
@@ -180,7 +181,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   WiFiClientSecure client;
   client.setInsecure();  // bez ověřování certifikátu (veřejná data)
   HTTPClient http;
-  http.useHTTP10(true);  // bez chunked kódování -> lze parsovat přímo ze streamu
+  BodyStream::prepare(http);  // HTTP/1.1 (HTTP/1.0 některé servery odmítají s 426)
   http.setConnectTimeout(8000);
   http.setTimeout(10000);
   http.setUserAgent("esp32-stand-system/1.0");
@@ -191,11 +192,12 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   int code = http.GET();
   if (code != 200) {
     Serial.printf("[ADSB] %s -> HTTP %d\n", url, code);
-    snprintf(out.err, sizeof out.err, "ADS-B HTTP %d", code);
+    snprintf(out.err, sizeof out.err, "%s HTTP %d", strstr(tmpl, "adsb.lol") ? "adsb.lol" : "airplanes.live", code);
     http.end();
     return false;
   }
 
+  BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http));
   JsonDocument filter;
   JsonObject f = filter["ac"].add<JsonObject>();
   for (const char* k : {"hex", "flight", "r", "t", "alt_baro", "gs", "track", "baro_rate", "lat", "lon"})
@@ -203,7 +205,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
 
   JsonDocument doc;
   DeserializationError err =
-      deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+      deserializeJson(doc, body, DeserializationOption::Filter(filter));
   http.end();
   if (err) {
     Serial.printf("[ADSB] JSON: %s\n", err.c_str());
@@ -262,31 +264,6 @@ static void fetchPlanes() {
 // ===================================================================
 //  ČHMI – 10minutová data, streamové parsování (soubor má ~200 kB)
 // ===================================================================
-class BufReader {
-  Client* c;
-  uint8_t buf[512];
-  int len = 0, pos = 0;
-  uint32_t last;
-
- public:
-  explicit BufReader(Client* cl) : c(cl), last(millis()) {}
-  int read() {
-    if (pos < len) return buf[pos++];
-    for (;;) {
-      int av = c->available();
-      if (av > 0) {
-        len = c->read(buf, av > (int)sizeof buf ? sizeof buf : av);
-        pos = 0;
-        last = millis();
-        if (len > 0) return buf[pos++];
-      }
-      if (!c->connected() && c->available() <= 0) return -1;
-      if (millis() - last > 10000) return -1;
-      delay(2);
-    }
-  }
-};
-
 struct ElemVal {
   char code[12];
   char dt[24];
@@ -382,7 +359,7 @@ static bool fetchChmiDay(time_t day, ChmiParse& cp, int& httpCode) {
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
-  http.useHTTP10(true);
+  BodyStream::prepare(http);
   http.setConnectTimeout(8000);
   http.setTimeout(15000);
   http.setUserAgent("esp32-stand-system/1.0");
@@ -394,7 +371,7 @@ static bool fetchChmiDay(time_t day, ChmiParse& cp, int& httpCode) {
     return false;
   }
 
-  BufReader r(http.getStreamPtr());
+  BodyStream r(http.getStreamPtr(), BodyStream::isChunked(http));
   static const char HDR[] = "\"header\"";
   size_t hi = 0;
   char rowBuf[160];
