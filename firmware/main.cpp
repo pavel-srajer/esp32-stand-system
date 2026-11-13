@@ -534,10 +534,15 @@ static void netTask(void*) {
       // meteoradar ČHMI
       static uint32_t lastRain = 0;
       static bool rainDone = false;
-      if (scrOn(SCR_RAIN) && (gForceRain || !rainDone || millis() - lastRain >= RAIN_REFRESH_MS)) {
+      if ((scrOn(SCR_RAIN) || scrOn(SCR_FORECAST)) &&
+          (gForceRain || !rainDone || millis() - lastRain >= RAIN_REFRESH_MS)) {
         gForceRain = false;
         rainDone = true;
-        radarUpdate(RAIN_RADII[constrain(gCfg.rainRadiusIdx, 0, 3)]);
+        if (radarUpdate(RAIN_RADII[constrain(gCfg.rainRadiusIdx, 0, 3)])) {
+          Forecast f;
+          forecastGet(f);
+          radarAnalyze(f.ok ? f.curT : NAN);  // kde prší, kam se to hýbe, kdy to dorazí
+        }
         lastRain = millis();
       }
       // OTA: první kontrola minutu po startu, pak jednou denně; nebo na požádání z webu
@@ -1073,18 +1078,32 @@ static void drawForecast(const Forecast& f) {
     snprintf(b, sizeof b, "%s", weatherText(f.curCode));
   spr.drawString(b, CX, 92);
 
-  // upozornění
+  // upozornění; na prvním místě skutečné měření radaru (nahrazuje modelový odhad srážek)
   int y = 112;
-  if (f.nAlerts == 0) {
+  RadarInfo ri;
+  radarInfoGet(ri);
+  bool radarLine = ri.valid && (ri.here || ri.nearKm >= 0);
+  if (radarLine) {
+    uint16_t col = ri.maxLevel >= 4 && (ri.here || ri.arriveMin > 0) ? rgb(255, 80, 60)
+                   : (ri.here || ri.arriveMin > 0) ? rgb(255, 180, 0) : rgb(120, 200, 255);
+    spr.setTextColor(col);
+    spr.drawString(ri.line1, CX, y);
+    y += 17;
+  }
+  int shown = radarLine ? 1 : 0;
+  if (f.nAlerts == 0 && !radarLine) {
     spr.setTextColor(rgb(80, 220, 120));
     spr.drawString("bez výrazných jevů", CX, y + 10);
   }
-  for (int i = 0; i < f.nAlerts && i < 3; i++, y += 17) {
+  for (int i = 0; i < f.nAlerts && shown < 3; i++) {
+    if (radarLine && f.nowcast[0] && !strcmp(f.alert[i], f.nowcast)) continue;
+    shown++;
     uint16_t col = alertColor(f.alertLevel[i]);
     int w = spr.textWidth(f.alert[i]);
     spr.fillCircle(CX - w / 2 - 7, y, 3, col);
     spr.setTextColor(col);
     spr.drawString(f.alert[i], CX + 3, y);
+    y += 17;
   }
 
   // hodinový pruh: za 2, 4, 6, 8 h
@@ -1152,18 +1171,28 @@ static void drawRain(const Forecast& fc, uint32_t now) {
   for (int i = 0; i < n; i++)
     spr.fillCircle(CX - (n - 1) * 5 + i * 10, 38, i == idx ? 3 : 2, i == idx ? rgb(255, 255, 255) : rgb(90, 90, 90));
 
-  // dole: věta o srážkách z předpovědi
-  const char* msg = fc.ok && fc.nowcast[0] ? fc.nowcast : (fc.ok ? "v příštích 2 h bez srážek" : "");
+  // dole: vyhodnocení radaru (kde prší, kam se to hýbe, kdy to dorazí)
+  RadarInfo ri;
+  radarInfoGet(ri);
+  const char* l1 = ri.valid ? ri.line1 : (fc.ok && fc.nowcast[0] ? fc.nowcast : "");
+  const char* l2 = ri.valid ? ri.line2 : "";
   if (ago >= 0 && idx == n - 1 && ago > 20) {
     snprintf(b, sizeof b, "snímek je %d min starý", ago);
-    msg = b;
+    l2 = b;
   }
-  if (msg[0]) {
-    spr.setFont(&fontCZ_12);
-    int w = spr.textWidth(msg) + 16;
-    spr.fillRoundRect(CX - w / 2, 192, w, 22, 6, TFT_BLACK);
-    spr.setTextColor(fc.nowcast[0] ? rgb(255, 190, 60) : rgb(120, 220, 140));
-    spr.drawString(msg, CX, 203);
+  bool wet = ri.valid ? (ri.here || ri.arriveMin > 0) : fc.nowcast[0] != 0;
+  spr.setFont(&fontCZ_12);
+  int w = max(spr.textWidth(l1), spr.textWidth(l2)) + 14;
+  int h = l2[0] ? 34 : 20;
+  if (l1[0]) {
+    spr.fillRoundRect(CX - w / 2, 214 - h, w, h, 6, TFT_BLACK);
+    spr.setTextColor(ri.valid && ri.maxLevel >= 4 && (ri.here || ri.arriveMin > 0) ? rgb(255, 80, 60)
+                     : wet ? rgb(255, 190, 60) : rgb(120, 220, 140));
+    spr.drawString(l1, CX, 214 - h + 10);
+    if (l2[0]) {
+      spr.setTextColor(rgb(150, 150, 150));
+      spr.drawString(l2, CX, 214 - h + 25);
+    }
   }
 }
 
@@ -1313,6 +1342,11 @@ void appStatusJson(JsonObject o) {
   o["rain_frames"] = radarFrameCount();
   o["rain_age"] = radarUpdatedMs() ? (long)((millis() - radarUpdatedMs()) / 1000) : -1;
   o["rain_err"] = radarError();
+  {
+    RadarInfo ri;
+    radarInfoGet(ri);
+    o["rain_info"] = ri.valid ? String(ri.line1) + (ri.line2[0] ? String(" · ") + ri.line2 : String("")) : String("");
+  }
   o["bright"] = gCurPct;
   o["period"] = brightnessPeriod();
   o["backlight"] = gPwm ? "PWM na GPIO " + String(gCfg.blPin) : String("softwarové stmívání obrazu");

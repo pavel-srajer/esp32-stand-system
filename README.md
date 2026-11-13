@@ -12,7 +12,7 @@ Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 | **Radar letadel**: letadla kolem domova, barva podle výšky | dosah 10 / 25 / 50 / 100 km |
 | **Detail letadla**: logo společnosti, volací znak, typ, registrace, výška, rychlost, kurz | další letadlo |
 | **Předpověď**: aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko). Dole je výhled na 2–8 h | obnovit |
-| **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova | poloměr 25 / 50 / 100 / 200 km |
+| **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova. Dole je vyhodnocení, třeba „Déšť 12 km Z, dorazí asi za 25 min“ nebo „Bouřka u tebe, skončí asi za 20 min“, a pod ním rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI**: teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
 | **Hodiny**: čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
 
@@ -114,6 +114,7 @@ Pokud se deska nechce nahrávat, podrž BOOT, stiskni RESET a BOOT pusť.
 - **Loga leteckých společností:** [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos) (`flightaware_logos`, 90×90 PNG podle ICAO kódu). Kód se vezme ze začátku volacího znaku (CSA123 → CSA). Logo se stáhne až při prvním zobrazení a v paměti zůstává posledních 6. Loga jsou majetkem příslušných společností.
 - **Předpověď:** [Open-Meteo](https://open-meteo.com) (zdarma, bez klíče): aktuální stav, 15minutové srážky na 2 h dopředu, hodinová a denní předpověď. Obnovuje se každých 15 min.
 - **Meteoradar:** ČHMI, kompozit maximální odrazivosti `maxz/png_masked` (PNG každých 5 min). Zařízení stáhne posledních 6 snímků, ořízne je na okolí domova a uloží komprimované (RLE), aby se vešly do RAM.
+- **Vyhodnocení radaru:** v nejnovějším snímku se najdou nejbližší srážky (vzdálenost, směr, intenzita podle barvy). Porovnáním nejstaršího a nejnovějšího snímku se určí, kam a jak rychle se srážky posouvají. Pak se z domova díváme proti směru pohybu, co a kdy k nám dorazí, případně kdy přestane. Výsledek je i na prvním řádku upozornění na obrazovce Předpověď, kde nahrazuje modelový odhad.
 - **Měření ze stanice:** otevřená data ČHMI, 10minutová měření:
   `https://opendata.chmi.cz/meteorology/climate/now/data/10m-<WSI>-<YYYYMMDD>.json`.
   Soubor má stovky kB, proto se parsuje průběžně ze streamu a v paměti zůstane jen poslední hodnota každé veličiny. Stahuje se jednou za 10 min.
