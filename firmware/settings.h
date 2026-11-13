@@ -24,6 +24,8 @@ struct Settings {
   int rainMap = 2;    // meteoradar
   int planeMap = 0;   // radar letadel
   int cycleSec = 0;   // automatické přepínání obrazovek (0 = vypnuto)
+  String ntp1 = "pool.ntp.org";     // hlavní NTP server
+  String ntp2 = "time.google.com";  // záložní NTP server
 };
 
 extern Settings gCfg;

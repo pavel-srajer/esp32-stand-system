@@ -28,6 +28,8 @@ void settingsLoad() {
   gCfg.rainMap = prefs.getInt("rmap", d.rainMap);
   gCfg.planeMap = prefs.getInt("pmap", d.planeMap);
   gCfg.cycleSec = prefs.getInt("cycle", d.cycleSec);
+  gCfg.ntp1 = prefs.getString("ntp1", d.ntp1);
+  gCfg.ntp2 = prefs.getString("ntp2", d.ntp2);
   prefs.end();
 }
 
@@ -54,6 +56,8 @@ void settingsSave() {
   prefs.putInt("rmap", gCfg.rainMap);
   prefs.putInt("pmap", gCfg.planeMap);
   prefs.putInt("cycle", gCfg.cycleSec);
+  prefs.putString("ntp1", gCfg.ntp1);
+  prefs.putString("ntp2", gCfg.ntp2);
   prefs.end();
 }
 

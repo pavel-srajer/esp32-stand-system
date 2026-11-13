@@ -198,7 +198,7 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
   ['Počasí ČHMI (stanice)',age(a.weather_age)+(a.weather_err?' · chyba: '+esc(a.weather_err):'')],
   ['Předpověď Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · upozornění: '+a.fc_alerts:'')+(a.fc_err?' · chyba: '+esc(a.fc_err):'')],
   ['Meteoradar ČHMI',a.rain_frames+' snímků, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['Radar u tebe',esc(a.rain_info||'–')],['Loga společností',esc(a.logo||'–')],['Stanice',esc(a.station)],
-  ['Jas displeje',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
+  ['Jas displeje',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['Čas (NTP)',esc(a.ntp)],['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
  t('st','aktualizováno '+new Date().toLocaleTimeString('cs-CZ'));
 }).catch(function(){t('st','zařízení neodpovídá')})}
 load();setInterval(load,2000);
@@ -423,6 +423,14 @@ static void handleRoot() {
   h += F("<small>Posunutím jezdce se jas na chvíli ukáže na displeji. Jas 0 % = zhasnuto. "
          "Je-li v noci displej ztlumený pod 30 %, první stisk tlačítka ho rozsvítí na 30 s.</small></fieldset>");
 
+  // --- Čas ---
+  h += F("<fieldset><legend>Čas (NTP)</legend><label>Hlavní NTP server</label><input name='ntp1' value=\"");
+  h += esc(gCfg.ntp1);
+  h += F("\" placeholder='pool.ntp.org'><label>Záložní NTP server</label><input name='ntp2' value=\"");
+  h += esc(gCfg.ntp2);
+  h += F("\" placeholder='(nepovinné)'><small>Např. pool.ntp.org, tik.cesnet.cz, ntp.nic.cz, time.google.com, "
+         "nebo IP adresa routeru. Časová zóna je Praha (letní čas se přepíná sám).</small></fieldset>");
+
   // --- Firmware ---
   h += F("<fieldset><legend>Firmware</legend><p><small>Verze <b>" FW_VERSION "</b>");
   if (gOta.latest[0]) {
@@ -494,6 +502,13 @@ static void handleSave() {
     gCfg.elev = server.arg("elev").toInt();
   }
   gCfg.autoUpdate = server.hasArg("autoupd");
+  if (server.hasArg("ntp1")) {
+    String n1 = server.arg("ntp1"), n2 = server.arg("ntp2");
+    n1.trim();
+    n2.trim();
+    gCfg.ntp1 = n1.length() ? n1 : String("pool.ntp.org");
+    gCfg.ntp2 = n2;
+  }
   {
     int m = 0;
     for (int i = 0; i < 6; i++)

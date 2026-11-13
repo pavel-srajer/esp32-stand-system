@@ -49,6 +49,10 @@ V sekci **Obrazovky** ve webovém nastavení dále najdeš:
 - **Podklad meteoradaru** a **podklad radaru letadel**: žádný / hranice a města / hranice, řeky a města. Mapa je uložená přímo ve firmwaru (asi 20 kB), takže nepotřebuje internet ani RAM navíc. Hustota měst se řídí poloměrem. Data generuje `tools/make_map.py`: hranice a řeky z Natural Earth (volné dílo), česká města z janpipek/cli-plotting-talk, města v okolí z Natural Earth s českými názvy.
 - **Automatické přepínání obrazovek**: vypnuto / 10 / 15 / 30 / 60 s. Po stisku tlačítka se automatika na minutu pozastaví.
 
+## Čas (NTP)
+
+Ve webovém nastavení v sekci **Čas (NTP)** se nastavuje hlavní a záložní NTP server. Výchozí jsou `pool.ntp.org` a `time.google.com`, jiná možnost je třeba `tik.cesnet.cz`, `ntp.nic.cz` nebo IP adresa routeru. Časová zóna je Praha a letní čas se přepíná sám. Stav synchronizace je vidět na stránce Systémové informace.
+
 ## Jas displeje
 
 Ve webovém nastavení se nastavují tři období (den, večer, noc), každé se začátkem a jasem v %. Při posunu jezdce se jas na chvíli ukáže na displeji. Pokud je v noci displej ztlumený pod 30 %, první stisk tlačítka ho rozsvítí na 30 s.

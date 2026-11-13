@@ -1417,6 +1417,18 @@ void appStatusJson(JsonObject o) {
   if (gOta.state == OTA_FAILED && gOta.msg[0]) ota += String(": ") + gOta.msg;
   o["ota"] = ota;
   {
+    String ntp = timeValid() ? "synchronizováno" : "zatím nesynchronizováno";
+    ntp += " · " + gCfg.ntp1;
+    if (gCfg.ntp2.length()) ntp += ", " + gCfg.ntp2;
+    time_t t = time(nullptr);
+    struct tm lt;
+    localtime_r(&t, &lt);
+    char b[24];
+    strftime(b, sizeof b, " · %d.%m. %H:%M:%S", &lt);
+    if (timeValid()) ntp += b;
+    o["ntp"] = ntp;
+  }
+  {
     Forecast f;
     forecastGet(f);
     o["fc_age"] = f.updatedMs ? (long)((millis() - f.updatedMs) / 1000) : -1;
@@ -1613,7 +1625,10 @@ void setup() {
   showBoot(gOtaBootMode ? "Aktualizace…" : "Připojuji WiFi…", gCfg.ssid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("letadla");
-  configTzTime(TZ_INFO, "pool.ntp.org", "time.google.com");
+  // SNTP si ukládá jen ukazatele -> řetězce v gCfg platí po celou dobu běhu
+  if (gCfg.ntp1.isEmpty()) gCfg.ntp1 = "pool.ntp.org";
+  if (gCfg.ntp2.isEmpty()) configTzTime(TZ_INFO, gCfg.ntp1.c_str());
+  else configTzTime(TZ_INFO, gCfg.ntp1.c_str(), gCfg.ntp2.c_str());
   webBegin(false);  // nastavení i v domácí síti na IP zařízení
   xTaskCreate(netTask, "net", 16384, nullptr, 1, &gNetTask);
 }
