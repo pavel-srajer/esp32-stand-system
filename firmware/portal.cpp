@@ -282,12 +282,18 @@ void webBegin(bool apMode) {
   gAp = apMode;
   if (apMode) {
     WiFi.mode(WIFI_AP_STA);
+    // ESP32-C3 Super Mini: s plným vysílacím výkonem hotspot často není vidět
+    // (nebo deska padá na podpětí) -> snížit výkon hned po zapnutí WiFi i po startu AP
+    WiFi.setTxPower(WIFI_POWER_8_5dBm);
     scan();  // před spuštěním AP, ať sken neruší klienty
+    bool ok = WiFi.softAP(apName().c_str(), nullptr, 6);  // bez hesla, kanál 6
+    WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    delay(100);
     WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
-    WiFi.softAP(apName().c_str());  // bez hesla
     dns.setErrorReplyCode(DNSReplyCode::NoError);
     dns.start(53, "*", IPAddress(192, 168, 4, 1));
-    Serial.printf("[Portal] hotspot %s, http://192.168.4.1/\n", apName().c_str());
+    Serial.printf("[Portal] hotspot %s %s, IP %s, TX power %d\n", apName().c_str(), ok ? "OK" : "SELHAL",
+                  WiFi.softAPIP().toString().c_str(), (int)WiFi.getTxPower());
   }
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
