@@ -35,6 +35,13 @@ Na stránce **Systémové informace** (`http://<IP zařízení>/system`) jsou ž
 
 Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 min), přepne se samo do hotspotu. Pokud v hotspotu 5 minut nikdo nic nenastaví, zkusí znovu uloženou WiFi.
 
+## Jas displeje
+
+Ve webovém nastavení se nastavují tři období (den, večer, noc), každé se začátkem a jasem v %. Při posunu jezdce se jas na chvíli ukáže na displeji. Pokud je v noci displej ztlumený pod 30 %, první stisk tlačítka ho rozsvítí na 30 s.
+
+- **Modul s pinem BL/BLK:** připoj ho na volný GPIO (5, 6, 7, 20 nebo 21) a vyber ho v nastavení. Jas se pak řídí PWM podsvícením.
+- **Modul bez pinu BL** (většina 7pinových): podsvícení svítí stále, ztmavuje se jen obraz. Černé pozadí proto dál slabě prosvítá.
+
 ## Aktualizace firmwaru (OTA z GitHubu)
 
 - Zařízení minutu po startu a pak jednou denně zkontroluje `releases/latest` tohoto repozitáře.

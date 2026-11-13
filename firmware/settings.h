@@ -12,6 +12,11 @@ struct Settings {
   int elev = 302;      // nadmořská výška stanice (přepočet tlaku)
   int rangeIdx = 1;    // dosah radaru (index do RANGES_KM)
   bool autoUpdate = true;  // automatické OTA aktualizace z GitHub Releases
+  // jas displeje: pin podsvícení (-1 = nepřipojen -> softwarové stmívání obrazu)
+  int blPin = -1;
+  // začátky období v minutách od půlnoci a jas v %
+  int tDay = 7 * 60, tEve = 20 * 60, tNight = 22 * 60 + 30;
+  int bDay = 100, bEve = 60, bNight = 15;
 };
 
 extern Settings gCfg;

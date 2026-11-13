@@ -2,6 +2,7 @@
 #include "settings.h"
 #include "ota.h"
 #include "sysinfo.h"
+#include "brightness.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -97,6 +98,7 @@ static const char PAGE_HEAD[] PROGMEM = R"HTML(<!doctype html><html lang="cs"><h
 #map{height:300px;border-radius:8px;margin-top:8px}.srch{display:flex;gap:8px}.srch input{flex:1;min-width:0}
 .sbtn{width:auto!important;margin:0!important;padding:10px 14px!important;font-size:1em!important;background:#1f6feb!important}
 #near{display:block;margin-top:6px;color:#3fb950}
+input[type=range]{padding:0;border:0;background:none;height:38px;accent-color:#58a6ff}.pct{color:#e6edf3;font-weight:600}
 body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:16px}
 main{max-width:460px;margin:auto}h1{font-size:1.4em;margin:.2em 0 .8em}
 fieldset{border:1px solid #30363d;border-radius:10px;margin:0 0 16px;padding:12px 14px}
@@ -116,6 +118,9 @@ var s=document.getElementById('st'),c=document.getElementById('custom');
 function u(){c.className=s.value=='-1'?'':'hide'}s.onchange=u;u();
 var n=document.getElementById('ssid_sel'),m=document.getElementById('ssid');
 n.onchange=function(){if(n.value)m.value=n.value;};
+var bt=0;document.querySelectorAll('.br').forEach(function(r){r.oninput=function(){
+ document.getElementById('v'+r.name).textContent=r.value;clearTimeout(bt);
+ bt=setTimeout(function(){fetch('/api/bright?p='+r.value).catch(function(){})},150)}});
 (function(){
 var la=document.querySelector('[name=lat]'),lo=document.querySelector('[name=lon]'),near=document.getElementById('near');
 function num(v){return parseFloat(String(v).replace(',','.'))}
@@ -191,7 +196,7 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
   ['Signál',w.connected?w.rssi+' dBm':'–'],['Kanál',w.ch],['IP adresa',esc(w.ip)],['MAC',esc(w.mac)]].concat(w.mode=='hotspot'?[['Připojení klienti',w.clients]]:[]));
  var a=j.app;rows('app',[['Letadla v dosahu',a.planes+' (dosah '+a.range+' km)'],['ADS-B data',age(a.planes_age)+(a.planes_err?' · chyba: '+esc(a.planes_err):'')],
   ['Počasí ČHMI',age(a.weather_age)+(a.weather_err?' · chyba: '+esc(a.weather_err):'')],['Stanice',esc(a.station)],
-  ['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
+  ['Jas displeje',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
  t('st','aktualizováno '+new Date().toLocaleTimeString('cs-CZ'));
 }).catch(function(){t('st','zařízení neodpovídá')})}
 load();setInterval(load,2000);
@@ -210,6 +215,12 @@ static void handleStatus() {
   serializeJson(doc, out);
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", out);
+}
+
+static void handleBright() {
+  gLastActivity = millis();
+  brightnessPreview(server.arg("p").toInt());
+  server.send(204);
 }
 
 static void handleRoot() {
@@ -289,6 +300,51 @@ static void handleRoot() {
   h += gCfg.elev;
   h += F("'><small>Seznam stanic: opendata.chmi.cz → meteorology/climate/now/metadata</small></div></fieldset>");
 
+  // --- Jas ---
+  h += F("<fieldset><legend>Jas displeje</legend><label>Podsvícení (pin BL displeje)</label><select name='bl'>");
+  static const int BL_PINS[] = {-1, 5, 6, 7, 20, 21};
+  for (int pin : BL_PINS) {
+    h += F("<option value='");
+    h += pin;
+    h += "'";
+    if (pin == gCfg.blPin) h += F(" selected");
+    h += ">";
+    if (pin < 0) h += F("nepřipojeno – ztmavuje se obraz");
+    else h += String("GPIO ") + pin;
+    h += F("</option>");
+  }
+  h += F("</select><small>Většina kulatých modulů nemá pin BL vyvedený a podsvícení svítí stále. Pak se ztmavuje "
+         "jen obraz (černá dál slabě prosvítá). Má-li modul pin BL/BLK, připoj ho na volný GPIO a vyber ho zde.</small>");
+  struct Per {
+    const char* label;
+    const char* tn;
+    const char* bn;
+    int t, b;
+  } per[3] = {{"Den", "tday", "bday", gCfg.tDay, gCfg.bDay},
+              {"Večer", "teve", "beve", gCfg.tEve, gCfg.bEve},
+              {"Noc", "tnight", "bnight", gCfg.tNight, gCfg.bNight}};
+  for (auto& p : per) {
+    char tm[8];
+    snprintf(tm, sizeof tm, "%02d:%02d", p.t / 60, p.t % 60);
+    h += F("<div class='row'><div><label>");
+    h += p.label;
+    h += F(" od</label><input type='time' name='");
+    h += p.tn;
+    h += F("' value='");
+    h += tm;
+    h += F("'></div><div><label>Jas <span class='pct' id='v");
+    h += p.bn;
+    h += "'>";
+    h += p.b;
+    h += F("</span> %</label><input type='range' class='br' min='0' max='100' step='5' name='");
+    h += p.bn;
+    h += F("' value='");
+    h += p.b;
+    h += F("'></div></div>");
+  }
+  h += F("<small>Posunutím jezdce se jas na chvíli ukáže na displeji. Jas 0 % = zhasnuto. "
+         "Je-li v noci displej ztlumený pod 30 %, první stisk tlačítka ho rozsvítí na 30 s.</small></fieldset>");
+
   // --- Firmware ---
   h += F("<fieldset><legend>Firmware</legend><p><small>Verze <b>" FW_VERSION "</b>");
   if (gOta.latest[0]) {
@@ -360,6 +416,18 @@ static void handleSave() {
     gCfg.elev = server.arg("elev").toInt();
   }
   gCfg.autoUpdate = server.hasArg("autoupd");
+  if (server.hasArg("bl")) gCfg.blPin = server.arg("bl").toInt();
+  auto hm = [](const String& v, int def) {
+    int hh, mm;
+    return sscanf(v.c_str(), "%d:%d", &hh, &mm) == 2 && hh >= 0 && hh < 24 && mm >= 0 && mm < 60 ? hh * 60 + mm : def;
+  };
+  auto pc = [](const String& v, int def) { return v.length() ? constrain(v.toInt(), 0, 100) : def; };
+  gCfg.tDay = hm(server.arg("tday"), gCfg.tDay);
+  gCfg.tEve = hm(server.arg("teve"), gCfg.tEve);
+  gCfg.tNight = hm(server.arg("tnight"), gCfg.tNight);
+  gCfg.bDay = pc(server.arg("bday"), gCfg.bDay);
+  gCfg.bEve = pc(server.arg("beve"), gCfg.bEve);
+  gCfg.bNight = pc(server.arg("bnight"), gCfg.bNight);
   settingsSave();
   Serial.printf("[Portal] uloženo: SSID=%s, %.5f %.5f, %s\n", gCfg.ssid.c_str(), gCfg.lat, gCfg.lon,
                 gCfg.wsi.c_str());
@@ -416,6 +484,7 @@ void webBegin(bool apMode) {
   server.on("/update", HTTP_POST, handleUpdate);
   server.on("/system", HTTP_GET, handleSystem);
   server.on("/api/status", HTTP_GET, handleStatus);
+  server.on("/api/bright", HTTP_GET, handleBright);
   server.onNotFound(handleNotFound);
   server.begin();
   gLastActivity = millis();

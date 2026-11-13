@@ -16,6 +16,13 @@ void settingsLoad() {
   gCfg.elev = prefs.getInt("elev", d.elev);
   gCfg.rangeIdx = prefs.getInt("range", d.rangeIdx);
   gCfg.autoUpdate = prefs.getBool("autoupd", d.autoUpdate);
+  gCfg.blPin = prefs.getInt("bl", d.blPin);
+  gCfg.tDay = prefs.getInt("tday", d.tDay);
+  gCfg.tEve = prefs.getInt("teve", d.tEve);
+  gCfg.tNight = prefs.getInt("tnight", d.tNight);
+  gCfg.bDay = prefs.getInt("bday", d.bDay);
+  gCfg.bEve = prefs.getInt("beve", d.bEve);
+  gCfg.bNight = prefs.getInt("bnight", d.bNight);
   prefs.end();
 }
 
@@ -30,6 +37,13 @@ void settingsSave() {
   prefs.putInt("elev", gCfg.elev);
   prefs.putInt("range", gCfg.rangeIdx);
   prefs.putBool("autoupd", gCfg.autoUpdate);
+  prefs.putInt("bl", gCfg.blPin);
+  prefs.putInt("tday", gCfg.tDay);
+  prefs.putInt("teve", gCfg.tEve);
+  prefs.putInt("tnight", gCfg.tNight);
+  prefs.putInt("bday", gCfg.bDay);
+  prefs.putInt("beve", gCfg.bEve);
+  prefs.putInt("bnight", gCfg.bNight);
   prefs.end();
 }
 

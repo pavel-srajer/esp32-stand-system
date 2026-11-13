@@ -26,6 +26,7 @@
 #include "fonts_cz.h"
 #include "http_body.h"
 #include "sysinfo.h"
+#include "brightness.h"
 
 // ===================================================================
 //  Konstanty
@@ -879,6 +880,114 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
 //  Tlačítko a hlavní smyčka
 // ===================================================================
 // ===================================================================
+//  Jas displeje
+// ===================================================================
+// S pinem podsvícení (BL na GPIO) se jas řídí PWM. Bez něj se ztmavuje obraz:
+// snímek (RGB332) se při odesílání převádí přes tabulku 256 barev se započteným jasem.
+static uint16_t gLut[256];
+static int gLutPct = -1;
+static int gCurPct = 100;
+static uint32_t gBoostUntil = 0, gPreviewUntil = 0;
+static int gPreviewPct = 100;
+static const char* gPeriod = "den";
+static bool gPwm = false;
+static const int BL_CH = 0;
+
+static bool until(uint32_t t) { return (int32_t)(t - millis()) > 0; }
+
+static void buildLut(int pct) {
+  float f = pct / 100.0f;
+  for (int v = 0; v < 256; v++) {
+    int r = ((v >> 5) & 7) * 255 / 7, g = ((v >> 2) & 7) * 255 / 7, b = (v & 3) * 85;
+    gLut[v] = lgfx::color565(lroundf(r * f), lroundf(g * f), lroundf(b * f));
+  }
+  gLutPct = pct;
+}
+
+static void pushFrame() {
+  int soft = gPwm ? 100 : gCurPct;
+  if (soft != gLutPct) buildLut(soft);
+  static uint16_t line[240 * 12];
+  const uint8_t* src = (const uint8_t*)spr.getBuffer();
+  if (!src) return;
+  tft.startWrite();
+  for (int y = 0; y < 240; y += 12) {
+    const uint8_t* row = src + y * 240;
+    for (int i = 0; i < 240 * 12; i++) line[i] = gLut[row[i]];
+    tft.setAddrWindow(0, y, 240, 12);
+    tft.writePixels(line, 240 * 12, true);
+  }
+  tft.endWrite();
+}
+
+// jas podle denní doby
+static int scheduledPct() {
+  if (!timeValid()) {
+    gPeriod = "den";
+    return gCfg.bDay;
+  }
+  time_t now = time(nullptr);
+  struct tm lt;
+  localtime_r(&now, &lt);
+  int m = lt.tm_hour * 60 + lt.tm_min;
+  struct P {
+    int start, pct;
+    const char* name;
+  } p[3] = {{gCfg.tDay, gCfg.bDay, "den"}, {gCfg.tEve, gCfg.bEve, "večer"}, {gCfg.tNight, gCfg.bNight, "noc"}};
+  // seřadit podle začátku; před prvním začátkem platí poslední období (přes půlnoc)
+  for (int i = 0; i < 2; i++)
+    for (int j = 0; j < 2 - i; j++)
+      if (p[j].start > p[j + 1].start) std::swap(p[j], p[j + 1]);
+  int cur = 2;
+  for (int i = 0; i < 3; i++)
+    if (m >= p[i].start) cur = i;
+  gPeriod = p[cur].name;
+  return p[cur].pct;
+}
+
+static void updateBrightness() {
+  int pct;
+  if (gPortalMode) pct = 100;
+  else if (until(gPreviewUntil)) pct = gPreviewPct;
+  else {
+    pct = scheduledPct();
+    if (until(gBoostUntil)) pct = max(pct, max(gCfg.bDay, 60));
+  }
+  pct = constrain(pct, 0, 100);
+  if (pct == gCurPct && gLutPct >= 0) return;
+  gCurPct = pct;
+  if (gPwm) {
+    float f = pct / 100.0f;
+    int duty = pct == 0 ? 0 : max(1, (int)(1023 * f * f));  // kvadraticky ~ vnímaný jas
+    ledcWrite(BL_CH, duty);
+  }
+}
+
+static void brightnessBegin() {
+  if (gCfg.blPin >= 0) {
+    ledcSetup(BL_CH, 5000, 10);
+    ledcAttachPin(gCfg.blPin, BL_CH);
+    ledcWrite(BL_CH, 1023);
+    gPwm = true;
+  }
+  buildLut(100);
+}
+
+// v ztlumeném režimu první stisk tlačítka jen rozsvítí displej na 30 s
+static bool wakeOnPress() {
+  bool dim = !gPortalMode && !until(gBoostUntil) && scheduledPct() < 30;
+  if (until(gBoostUntil) || dim) gBoostUntil = millis() + 30000;
+  return dim;
+}
+
+void brightnessPreview(int pct) {
+  gPreviewPct = constrain(pct, 0, 100);
+  gPreviewUntil = millis() + 4000;
+}
+int brightnessCurrent() { return gCurPct; }
+const char* brightnessPeriod() { return until(gPreviewUntil) ? "náhled" : until(gBoostUntil) ? "probuzeno tlačítkem" : gPeriod; }
+
+// ===================================================================
 //  Stav aplikace pro stránku /system
 // ===================================================================
 static TaskHandle_t gNetTask = nullptr, gLoopTask = nullptr;
@@ -906,6 +1015,9 @@ void appStatusJson(JsonObject o) {
   if (gOta.latest[0]) ota += String(" (GitHub: ") + gOta.latest + ")";
   if (gOta.state == OTA_FAILED && gOta.msg[0]) ota += String(": ") + gOta.msg;
   o["ota"] = ota;
+  o["bright"] = gCurPct;
+  o["period"] = brightnessPeriod();
+  o["backlight"] = gPwm ? "PWM na GPIO " + String(gCfg.blPin) : String("softwarové stmívání obrazu");
   o["stack_net"] = gNetTask ? uxTaskGetStackHighWaterMark(gNetTask) : 0;
   o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
 }
@@ -945,7 +1057,7 @@ static void onLongPress() {
 
 // krátký stisk < 0,7 s, dlouhý 0,7–5 s (akce po puštění), držení 5 s = konfigurační hotspot
 static void pollButton() {
-  static bool down = false;
+  static bool down = false, swallow = false;
   static uint32_t downAt = 0, lastChange = 0;
   bool pressed = digitalRead(PIN_BUTTON) == LOW;
   uint32_t t = millis();
@@ -954,6 +1066,7 @@ static void pollButton() {
   if (pressed && !down) {
     down = true;
     downAt = lastChange = t;
+    swallow = wakeOnPress();
   } else if (pressed && down && !gPortalMode && t - downAt >= PORTAL_HOLD_MS) {
     requestPortal();
   } else if (!pressed && down) {
@@ -961,6 +1074,7 @@ static void pollButton() {
     gBtnHeldMs = 0;
     lastChange = t;
     uint32_t held = t - downAt;
+    if (swallow) return;  // stisk jen probudil displej
     if (held < 700) onShortPress();
     else onLongPress();
   }
@@ -1028,7 +1142,7 @@ static void showBoot(const char* a, const char* b) {
   spr.setFont(&fontCZ_12);
   spr.setTextColor(rgb(90, 90, 90));
   spr.drawString("verze " FW_VERSION, CX, 206);
-  spr.pushSprite(0, 0);
+  pushFrame();
 }
 
 void setup() {
@@ -1043,6 +1157,7 @@ void setup() {
   if (!spr.createSprite(240, 240)) Serial.println("Sprite: málo paměti!");
 
   settingsLoad();
+  brightnessBegin();
   gRangeIdx = constrain(gCfg.rangeIdx, 0, NUM_RANGES - 1);
   gMutex = xSemaphoreCreateMutex();
   gLoopTask = xTaskGetCurrentTaskHandle();
@@ -1084,6 +1199,7 @@ void loop() {
     return;
   }
   lastDraw = now;
+  updateBrightness();
 
   spr.fillScreen(TFT_BLACK);
   if (gPortalMode) {
@@ -1104,5 +1220,5 @@ void loop() {
     drawWifiDot();
     drawHoldIndicator();
   }
-  spr.pushSprite(0, 0);
+  pushFrame();
 }
