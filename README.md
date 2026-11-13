@@ -40,17 +40,12 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 
 ### Jak vydat novou verzi
 
-```bash
-git tag v0.2.0
-```
-
-```bash
-git push origin v0.2.0
-```
-
-GitHub Actions (`.github/workflows/firmware.yml`) firmware sestaví s verzí z tagu a vytvoří Release se dvěma soubory:
+Změň číslo v souboru **`VERSION`** (např. `0.2.0`) a pushni do `main`. Stačí to udělat i přímo v editoru na GitHubu.
+GitHub Actions (`.github/workflows/firmware.yml`) pak vytvoří tag `v0.2.0` a Release se dvěma soubory:
 - `firmware.bin` stahují zařízení přes OTA,
 - `firmware-full.bin` je kompletní obraz pro první nahrání přes USB (adresa `0x0`).
+
+Ruční push tagu `vX.Y.Z` funguje taky.
 
 Číslo verze musí ve formátu `vX.Y.Z` stoupat.
 

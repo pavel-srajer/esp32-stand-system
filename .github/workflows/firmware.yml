@@ -1,8 +1,10 @@
 name: Firmware
 
 # Každý push / PR: kontrolní build.
-# Tag vX.Y.Z: build s verzí X.Y.Z + GitHub Release s firmware.bin (pro OTA)
+# Nová verze: změň soubor VERSION (např. 0.2.0) a pushni do main – workflow
+# vytvoří tag v0.2.0 a GitHub Release s firmware.bin (pro OTA)
 # a firmware-full.bin (pro první nahrání přes USB na adresu 0x0).
+# Funguje i ruční push tagu vX.Y.Z.
 on:
   push:
     branches: [main]
@@ -30,10 +32,29 @@ jobs:
       - name: Instalace PlatformIO
         run: pip install platformio esptool
 
-      - name: Build
+      - name: Verze
+        id: ver
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VER="$GITHUB_REF_NAME"; else VER="dev-${GITHUB_SHA::7}"; fi
-          echo "Verze: $VER"
+          REL=0
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VER="$GITHUB_REF_NAME"; REL=1
+          else
+            FILE_VER="v$(tr -d ' \r\n' < VERSION)"
+            if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]] && \
+               ! git ls-remote --exit-code --tags origin "refs/tags/$FILE_VER" >/dev/null; then
+              VER="$FILE_VER"; REL=1   # nová verze v souboru VERSION -> release
+            else
+              VER="dev-${GITHUB_SHA::7}"
+            fi
+          fi
+          echo "Verze: $VER (release: $REL)"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "release=$REL" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
           export PLATFORMIO_BUILD_FLAGS="-DFW_VERSION=\\\"$VER\\\""
           pio run -e esp32c3
 
@@ -54,8 +75,11 @@ jobs:
           path: dist/*
 
       - name: GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.ver.outputs.release == '1'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: ${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: dist/*
           generate_release_notes: true
