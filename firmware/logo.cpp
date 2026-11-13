@@ -2,7 +2,7 @@
 #include "http_body.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-#include <PNGdec.h>
+#include "png_net.h"
 #include <LovyanGFX.hpp>
 
 static const char* LOGO_URL = "https://raw.githubusercontent.com/Jxck-S/airline-logos/main/flightaware_logos/%s.png";
@@ -16,6 +16,7 @@ struct Entry {
 };
 static Entry sCache[CACHE];
 static char sPending[4] = "";
+static uint32_t sRetryAt = 0;  // po chybě sítě chvíli nezkoušet
 static SemaphoreHandle_t sMutex = nullptr;
 
 static void lock() {
@@ -82,71 +83,33 @@ static int drawCb(PNGDRAW* d) {
   return 1;
 }
 
+static bool logoReady(PNG& png, void* user) {
+  Ctx* c = (Ctx*)user;
+  c->png = &png;
+  c->W = png.getWidth();
+  c->H = png.getHeight();
+  c->nextRow = 0;
+  c->line = (uint16_t*)malloc(c->W * 2);
+  return c->line != nullptr;
+}
+
 // stáhne a dekóduje; vrací: 1 = OK, 0 = logo neexistuje, -1 = chyba (zkusit později)
 static int fetch(const char* icao, uint8_t* out) {
   char url[128];
   snprintf(url, sizeof url, LOGO_URL, icao);
-  uint8_t* buf = nullptr;
-  int len = 0;
-  {
-    WiFiClientSecure client;
-    client.setInsecure();
-    HTTPClient http;
-    BodyStream::prepare(http);
-    http.setConnectTimeout(8000);
-    http.setTimeout(10000);
-    if (!http.begin(client, url)) return -1;
-    int code = http.GET();
-    if (code == 404) {
-      http.end();
-      return 0;
-    }
-    if (code != 200) {
-      http.end();
-      return -1;
-    }
-    int size = http.getSize();
-    int cap = size > 0 ? size : 32768;
-    if (cap > 32768 || (int)ESP.getMaxAllocHeap() < cap + 60000) {
-      http.end();
-      return -1;
-    }
-    buf = (uint8_t*)malloc(cap);
-    if (!buf) {
-      http.end();
-      return -1;
-    }
-    BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http));
-    int ch;
-    while (len < cap && (ch = body.read()) >= 0) buf[len++] = ch;
-    http.end();
-  }
-  int res = -1;
-  Ctx* c = new (std::nothrow) Ctx;
-  PNG* png = new (std::nothrow) PNG;
-  if (c && png && png->openRAM(buf, len, drawCb) == PNG_SUCCESS) {
-    c->png = png;
-    c->W = png->getWidth();
-    c->H = png->getHeight();
-    c->out = out;
-    c->nextRow = 0;
-    c->line = (uint16_t*)malloc(c->W * 2);
-    if (c->line) {
-      memset(out, 0, LOGO_SIZE * LOGO_SIZE);
-      png->decode(c, 0);
-      res = 1;
-    }
-    png->close();
-    free(c->line);
-  }
-  delete png;
-  delete c;
-  free(buf);
-  return res;
+  Ctx c{};
+  c.out = out;
+  memset(out, 0, LOGO_SIZE * LOGO_SIZE);
+  int code = 0;
+  bool ok = pngDecodeUrl(url, drawCb, logoReady, &c, code);
+  free(c.line);
+  if (ok) return 1;
+  return code == 404 ? 0 : -1;
 }
 
 void logoService() {
   char icao[4];
+  if ((int32_t)(sRetryAt - millis()) > 0) return;
   lock();
   strlcpy(icao, sPending, sizeof icao);
   sPending[0] = 0;
@@ -157,8 +120,9 @@ void logoService() {
   if (!px) return;
   int r = fetch(icao, px);
   Serial.printf("[Logo] %s: %s\n", icao, r > 0 ? "OK" : r == 0 ? "neexistuje" : "chyba");
-  if (r < 0) {  // síťová chyba: zkusí se znovu při dalším požadavku
+  if (r < 0) {  // síťová chyba: zkusí se znovu za 30 s
     free(px);
+    sRetryAt = millis() + 30000;
     return;
   }
   if (r == 0) {

@@ -3,7 +3,7 @@
 #include "http_body.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-#include <PNGdec.h>
+#include "png_net.h"
 #include <LovyanGFX.hpp>
 #include <math.h>
 
@@ -149,6 +149,7 @@ struct DecodeCtx {
   int16_t sx[RADAR_N];  // zdrojový sloupec pro výstupní x (-1 = mimo data)
   int16_t sy[RADAR_N];  // zdrojový řádek pro výstupní y
   int nextRow;          // první výstupní řádek, který ještě nebyl vyplněn
+  float radiusKm;
 };
 
 static float mercY(float lat) { return logf(tanf(0.7853982f + lat * DEG_TO_RAD * 0.5f)); }
@@ -171,84 +172,51 @@ static int drawCb(PNGDRAW* d) {
   return 1;
 }
 
+// po přečtení hlavičky: rozměry známé -> tabulky ořezu
+static bool radarReady(PNG& png, void* user) {
+  DecodeCtx* c = (DecodeCtx*)user;
+  int W = png.getWidth(), H = png.getHeight();
+  c->png = &png;
+  c->nextRow = 0;
+  c->line = (uint16_t*)malloc(W * 2);
+  if (!c->line) return false;
+  float cosLat = cosf(gCfg.lat * DEG_TO_RAD);
+  float yT = mercY(LAT_TOP), yB = mercY(LAT_BOTTOM);
+  for (int i = 0; i < RADAR_N; i++) {
+    float off = ((i + 0.5f) / RADAR_N * 2 - 1) * c->radiusKm;  // km od středu
+    float lon = gCfg.lon + off / (111.32f * cosLat);
+    float lat = gCfg.lat - off / 110.57f;
+    int x = lroundf((lon - LON_LEFT) / (LON_RIGHT - LON_LEFT) * (W - 1));
+    int y = lroundf((yT - mercY(lat)) / (yT - yB) * (H - 1));
+    c->sx[i] = (lon < LON_LEFT || lon > LON_DATA_RIGHT || x < 0 || x >= W) ? -1 : x;
+    c->sy[i] = (lat > LAT_DATA_TOP || lat < LAT_BOTTOM || y < 0 || y >= H) ? -1 : y;
+  }
+  return true;
+}
+
 static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
   char url[160];
   snprintf(url, sizeof url, "%s%s%s.0.png", RADAR_DIR, NAME_PREFIX, ts);
 
-  // 1) stáhnout PNG do RAM
-  uint8_t* buf = nullptr;
-  int len = 0;
-  {
-    WiFiClientSecure client;
-    client.setInsecure();
-    HTTPClient http;
-    httpSetup(http);
-    if (!http.begin(client, url)) return false;
-    int code = http.GET();
-    if (code != 200) {
-      http.end();
-      snprintf(sErr, sizeof sErr, "radar PNG HTTP %d", code);
-      return false;
-    }
-    int size = http.getSize();
-    int cap = size > 0 ? size : 65536;
-    if (cap > 98304 || (int)ESP.getMaxAllocHeap() < cap + 60000) {
-      http.end();
-      snprintf(sErr, sizeof sErr, "málo RAM (%d kB)", (int)(ESP.getMaxAllocHeap() / 1024));
-      return false;
-    }
-    buf = (uint8_t*)malloc(cap);
-    if (!buf) {
-      http.end();
-      return false;
-    }
-    BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http), 15000);
-    int ch;
-    while (len < cap && (ch = body.read()) >= 0) buf[len++] = ch;
-    http.end();  // uvolní TLS ještě před dekódováním
-  }
-  if (len < 8 || memcmp(buf, "\x89PNG", 4) != 0) {
-    free(buf);
-    strlcpy(sErr, "radar: není PNG", sizeof sErr);
+  // PNG se dekóduje přímo ze sítě (sdílený statický dekodér, viz png_net.cpp)
+  DecodeCtx* c = (DecodeCtx*)calloc(1, sizeof(DecodeCtx));
+  uint8_t* frame = (uint8_t*)calloc(RADAR_N * RADAR_N, 1);
+  if (!c || !frame) {
+    free(c);
+    free(frame);
+    snprintf(sErr, sizeof sErr, "málo RAM (%d kB)", (int)(ESP.getMaxAllocHeap() / 1024));
     return false;
   }
-
-  // 2) dekódovat s ořezem kolem domova
-  DecodeCtx* c = new (std::nothrow) DecodeCtx;
-  PNG* png = new (std::nothrow) PNG;
-  uint8_t* frame = (uint8_t*)calloc(RADAR_N * RADAR_N, 1);
-  bool ok = false;
-  if (c && png && frame && png->openRAM(buf, len, drawCb) == PNG_SUCCESS) {
-    int W = png->getWidth(), H = png->getHeight();
-    c->png = png;
-    c->frame = frame;
-    c->nextRow = 0;
-    c->line = (uint16_t*)malloc(W * 2);
-    float cosLat = cosf(gCfg.lat * DEG_TO_RAD);
-    float yT = mercY(LAT_TOP), yB = mercY(LAT_BOTTOM);
-    for (int i = 0; i < RADAR_N; i++) {
-      float off = ((i + 0.5f) / RADAR_N * 2 - 1) * radiusKm;  // km od středu
-      float lon = gCfg.lon + off / (111.32f * cosLat);
-      float lat = gCfg.lat - off / 110.57f;
-      int x = lroundf((lon - LON_LEFT) / (LON_RIGHT - LON_LEFT) * (W - 1));
-      int y = lroundf((yT - mercY(lat)) / (yT - yB) * (H - 1));
-      c->sx[i] = (lon < LON_LEFT || lon > LON_DATA_RIGHT || x < 0 || x >= W) ? -1 : x;
-      c->sy[i] = (lat > LAT_DATA_TOP || lat < LAT_BOTTOM || y < 0 || y >= H) ? -1 : y;
-    }
-    if (c->line) {
-      png->decode(c, 0);
-      ok = true;
-    }
-    png->close();
-    free(c->line);
-  } else if (png) {
-    strlcpy(sErr, "radar: chyba PNG", sizeof sErr);
-  }
-  delete png;
-  delete c;
-  free(buf);
+  c->frame = frame;
+  c->radiusKm = radiusKm;
+  int code = 0;
+  bool ok = pngDecodeUrl(url, drawCb, radarReady, c, code);
+  free(c->line);
+  free(c);
   if (!ok) {
     free(frame);
+    if (code != 200) snprintf(sErr, sizeof sErr, "radar PNG HTTP %d", code);
+    else strlcpy(sErr, "radar: chyba PNG", sizeof sErr);
     return false;
   }
 
