@@ -1593,6 +1593,75 @@ static void showBoot(const char* a, const char* b) {
   });
 }
 
+// Silueta letadla (trup, křídla, ocas), heading ve stupních, s = poloviční délka
+static void drawAirliner(int x, int y, float heading, uint16_t col, float s) {
+  float a = heading * DEG_TO_RAD, sa = sinf(a), ca = cosf(a);
+  auto P = [&](float px, float py, int& ox, int& oy) {
+    ox = x + (int)lroundf(px * ca - py * sa);
+    oy = y + (int)lroundf(px * sa + py * ca);
+  };
+  auto tri = [&](float ax, float ay, float bx, float by, float cx, float cy) {
+    int x0, y0, x1, y1, x2, y2;
+    P(ax, ay, x0, y0);
+    P(bx, by, x1, y1);
+    P(cx, cy, x2, y2);
+    spr.fillTriangle(x0, y0, x1, y1, x2, y2, col);
+  };
+  float w = s * 0.12f;  // poloviční šířka trupu
+  tri(-w, -s * 0.8f, w, -s * 0.8f, 0, -s);          // příď
+  tri(-w, -s * 0.8f, w, -s * 0.8f, -w, s * 0.85f);  // trup
+  tri(w, -s * 0.8f, w, s * 0.85f, -w, s * 0.85f);
+  tri(-w, -s * 0.2f, -s, s * 0.25f, -s, s * 0.38f);  // levé křídlo (šípové)
+  tri(-w, -s * 0.2f, -w, s * 0.15f, -s, s * 0.38f);
+  tri(w, -s * 0.2f, s, s * 0.25f, s, s * 0.38f);     // pravé křídlo
+  tri(w, -s * 0.2f, w, s * 0.15f, s, s * 0.38f);
+  tri(-w, s * 0.6f, -s * 0.38f, s * 0.92f, -w, s * 0.85f);  // výškovky
+  tri(w, s * 0.6f, s * 0.38f, s * 0.92f, w, s * 0.85f);
+}
+
+// Úvodní obrazovka po zapnutí (~3 s): otáčející se radar, letadlo, autor a verze
+static void showSplash(uint32_t ms) {
+  const uint16_t RING = rgb(0, 70, 35), SWEEP1 = rgb(0, 45, 20), SWEEP2 = rgb(0, 85, 35);
+  const uint16_t AMBER = rgb(255, 190, 60), CLAUDE = rgb(217, 119, 87);
+  uint32_t t0 = millis();
+  for (;;) {
+    uint32_t t = millis() - t0;
+    if (t >= ms) break;
+    float sweep = 360.0f * t / ms;               // jedna otáčka za celou dobu
+    float fly = min(1.0f, t / (ms * 0.6f));      // letadlo přiletí zleva dole
+    int px = 46 + (int)(74 * fly), py = 96 - (int)(36 * fly);
+    updateBrightness();
+    renderFrame([&] {
+      spr.fillArc(CX, CY, 117, 0, sweep - 90 - 50, sweep - 90, SWEEP1);
+      spr.fillArc(CX, CY, 117, 0, sweep - 90 - 12, sweep - 90, SWEEP2);
+      spr.drawCircle(CX, CY, 117, RING);
+      spr.drawCircle(CX, CY, 78, RING);
+      spr.drawCircle(CX, CY, 39, RING);
+      drawAirliner(px, py, 64, AMBER, 17);
+
+      spr.setTextDatum(textdatum_t::middle_center);
+      spr.setFont(&fontCZ_12);
+      spr.setTextColor(rgb(150, 150, 150));
+      spr.drawString("Made by", CX, 98);
+      spr.setFont(&fontCZ_24);
+      spr.setTextColor(rgb(255, 255, 255));
+      int tw = spr.textWidth("Pablo Garage");
+      spr.drawString("Pablo Garage", CX - 4, 122);
+      spr.setFont(&fontCZ_12);  // ® menší, nahoře vpravo
+      spr.setTextDatum(textdatum_t::middle_left);
+      spr.drawString("®", CX - 4 + tw / 2 + 1, 114);
+      spr.setTextDatum(textdatum_t::middle_center);
+      spr.setFont(&fontCZ_16);
+      spr.setTextColor(rgb(90, 200, 255));
+      spr.drawString("verze " FW_VERSION, CX, 152);
+      spr.setFont(&fontCZ_12);
+      spr.setTextColor(CLAUDE);
+      spr.drawString("powered by Claude Code", CX, 190);
+    });
+    delay(20);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
@@ -1616,6 +1685,7 @@ void setup() {
   bool portalFlag = settingsTakePortalFlag();
   if (!settingsHasWifi() || portalFlag) {
     gPortalMode = true;
+    if (!portalFlag) showSplash(3000);  // první zapnutí (ne při ručním vyvolání nastavení)
     showBoot("Spouštím hotspot…", nullptr);
     webBegin(true);
     return;
@@ -1631,6 +1701,7 @@ void setup() {
   else configTzTime(TZ_INFO, gCfg.ntp1.c_str(), gCfg.ntp2.c_str());
   webBegin(false);  // nastavení i v domácí síti na IP zařízení
   xTaskCreate(netTask, "net", 16384, nullptr, 1, &gNetTask);
+  if (!gOtaBootMode) showSplash(3000);  // WiFi se mezitím už připojuje
 }
 
 void loop() {
