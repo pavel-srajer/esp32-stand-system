@@ -7,12 +7,16 @@ Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 
 ## Ovládání tlačítkem BOOT (GPIO 9)
 
-| Obrazovka | Krátký stisk | Dlouhý stisk (0,7–5 s) |
-|---|---|---|
-| **Radar**: letadla kolem domova, barva podle výšky, nejbližší dole | další obrazovka | dosah 10 / 25 / 50 / 100 km |
-| **Detail letadla**: volací znak, typ, registrace, výška, rychlost, kurz, vzdálenost | další obrazovka | další letadlo (podle vzdálenosti) |
-| **Počasí ČHMI**: teplota, vlhkost, tlak (přepočtený na hladinu moře), vítr, srážky dnes | další obrazovka | okamžitá aktualizace |
-| **Hodiny**: čas, datum, teplota, počet letadel, IP adresa | další obrazovka | okamžitá aktualizace |
+| Obrazovka | Dlouhý stisk (0,7–5 s) |
+|---|---|
+| **Radar letadel**: letadla kolem domova, barva podle výšky | dosah 10 / 25 / 50 / 100 km |
+| **Detail letadla**: volací znak, typ, registrace, výška, rychlost, kurz | další letadlo |
+| **Předpověď**: aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko). Dole je výhled na 2–8 h | obnovit |
+| **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova | poloměr 25 / 50 / 100 / 200 km |
+| **Měření ze stanice ČHMI**: teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
+| **Hodiny**: čas, datum, teplota, počet letadel, IP adresa | obnovit |
+
+Krátký stisk přepne na další zapnutou obrazovku. Které obrazovky se zobrazují, se nastavuje ve webovém rozhraní.
 
 **Když tlačítko podržíš 5 s**, spustí se konfigurační hotspot. Během držení se po obvodu displeje plní oranžový kruh.
 
@@ -103,7 +107,9 @@ Pokud se deska nechce nahrávat, podrž BOOT, stiskni RESET a BOOT pusť.
 ## Zdroje dat
 
 - **Letadla:** [airplanes.live](https://airplanes.live) API (`/v2/point/lat/lon/radius`), při výpadku [adsb.lol](https://adsb.lol). Obě jsou zdarma, bez klíče, pro nekomerční použití. Dotaz jde jednou za 10 s.
-- **Počasí:** otevřená data ČHMI, 10minutová měření:
+- **Předpověď:** [Open-Meteo](https://open-meteo.com) (zdarma, bez klíče): aktuální stav, 15minutové srážky na 2 h dopředu, hodinová a denní předpověď. Obnovuje se každých 15 min.
+- **Meteoradar:** ČHMI, kompozit maximální odrazivosti `maxz/png_masked` (PNG každých 5 min). Zařízení stáhne posledních 6 snímků, ořízne je na okolí domova a uloží komprimované (RLE), aby se vešly do RAM.
+- **Měření ze stanice:** otevřená data ČHMI, 10minutová měření:
   `https://opendata.chmi.cz/meteorology/climate/now/data/10m-<WSI>-<YYYYMMDD>.json`.
   Soubor má stovky kB, proto se parsuje průběžně ze streamu a v paměti zůstane jen poslední hodnota každé veličiny. Stahuje se jednou za 10 min.
 

@@ -27,11 +27,19 @@
 #include "http_body.h"
 #include "sysinfo.h"
 #include "brightness.h"
+#include "radar.h"
+#include "forecast.h"
 
 // ===================================================================
 //  Konstanty
 // ===================================================================
 static const int PIN_BUTTON = 9;  // tlačítko BOOT
+
+// obrazovky (pořadí = bity v gCfg.screens)
+enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_COUNT };
+static const float RAIN_RADII[] = {25, 50, 100, 200};
+static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
+static const uint32_t RAIN_REFRESH_MS = 300000;      // ČHMI radar každých 5 min
 static const uint32_t PLANES_REFRESH_MS = 10000;    // API povolují max ~1 dotaz/s
 static const uint32_t WEATHER_REFRESH_MS = 600000;  // ČHMI publikuje 10min data
 static const uint32_t PORTAL_IDLE_RESTART_MS = 300000;  // portál bez aktivity -> zkus znovu WiFi
@@ -101,6 +109,13 @@ static volatile int gRangeIdx = 1;
 static bool gPortalMode = false;
 static volatile bool gForcePlanes = true;
 static volatile bool gForceWeather = true;
+static volatile bool gForceForecast = false;
+static volatile bool gForceRain = false;
+
+static bool scrOn(int s) {
+  int m = (gCfg.screens & ((1 << SCR_COUNT) - 1)) ? gCfg.screens : 1;
+  return m & (1 << s);
+}
 
 // ===================================================================
 //  Pomocné funkce
@@ -497,11 +512,30 @@ static void netTask(void*) {
         fetchPlanes();
         lastPlanes = millis();
       }
-      if (timeValid() && (gForceWeather || millis() - lastWeather >= weatherInterval)) {
+      if (scrOn(SCR_WEATHER) && timeValid() && (gForceWeather || millis() - lastWeather >= weatherInterval)) {
         gForceWeather = false;
         bool ok = fetchWeather();
         weatherInterval = ok ? WEATHER_REFRESH_MS : 60000;  // při chybě zkus za minutu
         lastWeather = millis();
+      }
+      // předpověď (Open-Meteo) – pro předpověď, meteoradar i hodiny
+      static uint32_t lastFc = 0, fcInterval = FORECAST_REFRESH_MS;
+      static bool fcDone = false;
+      if ((scrOn(SCR_FORECAST) || scrOn(SCR_RAIN) || scrOn(SCR_CLOCK)) &&
+          (gForceForecast || !fcDone || millis() - lastFc >= fcInterval)) {
+        gForceForecast = false;
+        fcDone = true;
+        fcInterval = forecastUpdate() ? FORECAST_REFRESH_MS : 120000;
+        lastFc = millis();
+      }
+      // meteoradar ČHMI
+      static uint32_t lastRain = 0;
+      static bool rainDone = false;
+      if (scrOn(SCR_RAIN) && (gForceRain || !rainDone || millis() - lastRain >= RAIN_REFRESH_MS)) {
+        gForceRain = false;
+        rainDone = true;
+        radarUpdate(RAIN_RADII[constrain(gCfg.rainRadiusIdx, 0, 3)]);
+        lastRain = millis();
       }
       // OTA: první kontrola minutu po startu, pak jednou denně; nebo na požádání z webu
       static uint32_t lastOta = 0;
@@ -829,7 +863,7 @@ static void drawWeather(const Weather& w) {
 }
 
 // ---------------- Obrazovka 4: hodiny ----------------
-static void drawClock(const PlaneData& pd, const Weather& w) {
+static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc) {
   if (!timeValid()) {
     drawCenteredMsg("čekám na čas…");
     return;
@@ -855,11 +889,12 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
   snprintf(b, sizeof b, "%s %d. %d.", DNY[lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
   spr.drawString(b, CX, CY + 32);
 
-  if (w.ok && !isnan(w.t)) {
+  float temp = (w.ok && !isnan(w.t)) ? w.t : (fc.ok ? fc.curT : NAN);
+  if (!isnan(temp)) {
     char t[12];
-    fmtDec(t, sizeof t, w.t, 1);
+    fmtDec(t, sizeof t, temp, 1);
     snprintf(b, sizeof b, "%s °C", t);
-    spr.setTextColor(tempColor(w.t));
+    spr.setTextColor(tempColor(temp));
     spr.drawString(b, CX - 40, CY + 62);
   }
   float range = RANGES_KM[gRangeIdx];
@@ -879,6 +914,186 @@ static void drawClock(const PlaneData& pd, const Weather& w) {
 // ===================================================================
 //  Tlačítko a hlavní smyčka
 // ===================================================================
+// ---------------- Ikony počasí ----------------
+static void drawCloud(int x, int y, int s, uint16_t col) {
+  spr.fillCircle(x - s / 4, y + s / 16, s / 5, col);
+  spr.fillCircle(x + s / 12, y - s / 10, s / 4, col);
+  spr.fillCircle(x + s / 3, y + s / 12, s / 6, col);
+  spr.fillRoundRect(x - s / 2 + s / 16, y + s / 16, s - s / 8, s / 5, s / 10, col);
+}
+
+static void drawWxIcon(int x, int y, int code, bool day, int s) {
+  const uint16_t SUN = rgb(255, 200, 0), MOON = rgb(230, 230, 190), CL = rgb(200, 206, 216),
+                 DK = rgb(130, 136, 150), RAIN = rgb(80, 150, 255), SNOW = rgb(240, 245, 255), BOLT = rgb(255, 225, 0);
+  bool clear = code <= 2;
+  if (clear) {  // slunce / měsíc (u polojasna menší a posunuté)
+    int ox = code ? x - s / 5 : x, oy = code ? y - s / 6 : y, r = code ? s / 5 : s / 4;
+    if (day) {
+      spr.fillCircle(ox, oy, r, SUN);
+      for (int a = 0; a < 360; a += 45) {
+        float rad = a * DEG_TO_RAD;
+        spr.drawLine(ox + cosf(rad) * (r + 3), oy + sinf(rad) * (r + 3), ox + cosf(rad) * (r + s / 7),
+                     oy + sinf(rad) * (r + s / 7), SUN);
+      }
+    } else {
+      spr.fillCircle(ox, oy, r, MOON);
+      spr.fillCircle(ox + r / 2, oy - r / 3, r, TFT_BLACK);
+    }
+    if (code) drawCloud(x + s / 8, y + s / 8, s * 3 / 4, CL);
+    return;
+  }
+  if (code == 45 || code == 48) {  // mlha
+    for (int i = 0; i < 4; i++) spr.fillRoundRect(x - s / 2 + (i & 1) * 4, y - s / 4 + i * s / 6, s - 8, 3, 1, DK);
+    return;
+  }
+  bool storm = code >= 95;
+  drawCloud(x, y - s / 8, s, storm ? DK : CL);
+  int by = y + s / 5;
+  if (storm) {
+    spr.fillTriangle(x + 2, by, x - 6, by + s / 4, x + 1, by + s / 4, BOLT);
+    spr.fillTriangle(x + 1, by + s / 5, x - 2, by + s / 2, x + 7, by + s / 6, BOLT);
+  } else if ((code >= 71 && code <= 77) || code == 85 || code == 86) {
+    for (int i = -1; i <= 1; i++) {
+      spr.fillCircle(x + i * s / 4, by + s / 8 + (i & 1) * 5, 2, SNOW);
+      spr.fillCircle(x + i * s / 4 + s / 8, by + s / 4 + (i & 1) * 3, 2, SNOW);
+    }
+  } else if (code >= 51) {
+    int drops = (code == 65 || code == 82 || code == 67) ? 4 : (code >= 61 ? 3 : 2);
+    for (int i = 0; i < drops; i++) {
+      int dx = x - s / 3 + i * (2 * s / 3) / max(1, drops - 1);
+      spr.drawLine(dx, by + 2, dx - 4, by + s / 4, RAIN);
+      spr.drawLine(dx + 1, by + 2, dx - 3, by + s / 4, RAIN);
+    }
+  }
+}
+
+static uint16_t alertColor(uint8_t lv) {
+  return lv == AL_DANGER ? rgb(255, 80, 60) : lv == AL_WARN ? rgb(255, 180, 0) : rgb(120, 200, 255);
+}
+
+// ---------------- Obrazovka: předpověď ----------------
+static void drawForecast(const Forecast& f) {
+  if (!f.ok) {
+    drawCenteredMsg("Předpověď", f.err[0] ? f.err : "načítám…");
+    return;
+  }
+  char b[64], t[16];
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(150, 150, 150));
+  spr.drawString("Předpověď", CX, 22);
+
+  drawWxIcon(84, 62, f.curCode, f.isDay, 46);
+  fmtDec(t, sizeof t, f.curT, 1);
+  spr.setFont(&fonts::FreeSansBold18pt7b);
+  spr.setTextColor(tempColor(f.curT));
+  spr.setTextDatum(textdatum_t::middle_left);
+  int tw = spr.textWidth(t);
+  spr.drawString(t, 116, 58);
+  spr.drawCircle(116 + tw + 5, 47, 3, tempColor(f.curT));
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(200, 200, 200));
+  if (!isnan(f.curGust) && f.curGust >= 30)
+    snprintf(b, sizeof b, "%s · nárazy %.0f km/h", weatherText(f.curCode), f.curGust);
+  else
+    snprintf(b, sizeof b, "%s", weatherText(f.curCode));
+  spr.drawString(b, CX, 92);
+
+  // upozornění
+  int y = 112;
+  if (f.nAlerts == 0) {
+    spr.setTextColor(rgb(80, 220, 120));
+    spr.drawString("bez výrazných jevů", CX, y + 10);
+  }
+  for (int i = 0; i < f.nAlerts && i < 3; i++, y += 17) {
+    uint16_t col = alertColor(f.alertLevel[i]);
+    int w = spr.textWidth(f.alert[i]);
+    spr.fillCircle(CX - w / 2 - 7, y, 3, col);
+    spr.setTextColor(col);
+    spr.drawString(f.alert[i], CX + 3, y);
+  }
+
+  // hodinový pruh: za 2, 4, 6, 8 h
+  spr.drawFastHLine(48, 164, 144, rgb(50, 50, 50));
+  for (int k = 0; k < 4; k++) {
+    int i = 2 + k * 2;
+    if (i >= f.nh) break;
+    int x = 69 + k * 34;
+    snprintf(b, sizeof b, "%d:00", f.hHour[i]);
+    spr.setTextColor(rgb(140, 140, 140));
+    spr.drawString(b, x, 176);
+    fmtDec(t, sizeof t, f.hT[i], 0);
+    snprintf(b, sizeof b, "%s°", t);
+    spr.setTextColor(tempColor(f.hT[i]));
+    spr.drawString(b, x, 192);
+    // srážky: sloupek podle pravděpodobnosti
+    int ph = f.hProb[i] * 12 / 100;
+    spr.drawRect(x - 9, 202, 18, 13, rgb(50, 50, 60));
+    if (ph) spr.fillRect(x - 8, 214 - ph, 16, ph, f.hPrec[i] >= 0.1f ? rgb(70, 140, 255) : rgb(40, 70, 120));
+  }
+}
+
+// ---------------- Obrazovka: meteoradar ----------------
+static void rainRun(int x, int y, int len, uint8_t c, void*) { spr.fillRect(x * 2, y * 2, len * 2, 2, c); }
+
+static void drawRain(const Forecast& fc, uint32_t now) {
+  int n = radarFrameCount();
+  float R = RAIN_RADII[constrain(gCfg.rainRadiusIdx, 0, 3)];
+  char b[64];
+  if (n == 0) {
+    drawCenteredMsg("Meteoradar ČHMI", radarError()[0] ? radarError() : "načítám snímky…");
+    return;
+  }
+  // animace: snímky po 600 ms, poslední drží 2,4 s
+  const uint32_t STEP = 600, HOLD = 2400;
+  uint32_t cycle = (n - 1) * STEP + HOLD, t = now % cycle;
+  int idx = min(n - 1, (int)(t / STEP));
+  radarForEachRun(idx, rainRun, nullptr);
+
+  // překryv: kruhy, domov, sever
+  const uint16_t ring = rgb(90, 90, 90);
+  spr.drawCircle(CX, CY, 60, ring);
+  spr.drawCircle(CX, CY, 118, ring);
+  spr.drawFastHLine(CX - 6, CY, 13, rgb(255, 255, 255));
+  spr.drawFastVLine(CX, CY - 6, 13, rgb(255, 255, 255));
+  spr.setFont(&fonts::Font0);
+  spr.setTextColor(rgb(160, 160, 160));
+  spr.setTextDatum(textdatum_t::middle_left);
+  snprintf(b, sizeof b, "%.0f", R / 2);
+  spr.drawString(b, CX + 3, CY - 56);
+  snprintf(b, sizeof b, "%.0f km", R);
+  spr.drawString(b, CX + 3, CY - 112);
+
+  // čas snímku a průběh animace
+  time_t ft = radarFrameTime(idx);
+  struct tm lt;
+  localtime_r(&ft, &lt);
+  int ago = timeValid() ? (int)((time(nullptr) - ft) / 60) : -1;
+  spr.fillRoundRect(CX - 52, 14, 104, 30, 6, TFT_BLACK);
+  spr.setFont(&fontCZ_16);
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setTextColor(idx == n - 1 ? rgb(255, 255, 255) : rgb(170, 170, 170));
+  snprintf(b, sizeof b, "%02d:%02d", lt.tm_hour, lt.tm_min);
+  spr.drawString(b, CX, 24);
+  for (int i = 0; i < n; i++)
+    spr.fillCircle(CX - (n - 1) * 5 + i * 10, 38, i == idx ? 3 : 2, i == idx ? rgb(255, 255, 255) : rgb(90, 90, 90));
+
+  // dole: věta o srážkách z předpovědi
+  const char* msg = fc.ok && fc.nowcast[0] ? fc.nowcast : (fc.ok ? "v příštích 2 h bez srážek" : "");
+  if (ago >= 0 && idx == n - 1 && ago > 20) {
+    snprintf(b, sizeof b, "snímek je %d min starý", ago);
+    msg = b;
+  }
+  if (msg[0]) {
+    spr.setFont(&fontCZ_12);
+    int w = spr.textWidth(msg) + 16;
+    spr.fillRoundRect(CX - w / 2, 192, w, 22, 6, TFT_BLACK);
+    spr.setTextColor(fc.nowcast[0] ? rgb(255, 190, 60) : rgb(120, 220, 140));
+    spr.drawString(msg, CX, 203);
+  }
+}
+
 // ===================================================================
 //  Jas displeje
 // ===================================================================
@@ -1015,6 +1230,16 @@ void appStatusJson(JsonObject o) {
   if (gOta.latest[0]) ota += String(" (GitHub: ") + gOta.latest + ")";
   if (gOta.state == OTA_FAILED && gOta.msg[0]) ota += String(": ") + gOta.msg;
   o["ota"] = ota;
+  {
+    Forecast f;
+    forecastGet(f);
+    o["fc_age"] = f.updatedMs ? (long)((millis() - f.updatedMs) / 1000) : -1;
+    o["fc_err"] = f.err;
+    o["fc_alerts"] = f.nAlerts;
+  }
+  o["rain_frames"] = radarFrameCount();
+  o["rain_age"] = radarUpdatedMs() ? (long)((millis() - radarUpdatedMs()) / 1000) : -1;
+  o["rain_err"] = radarError();
   o["bright"] = gCurPct;
   o["period"] = brightnessPeriod();
   o["backlight"] = gPwm ? "PWM na GPIO " + String(gCfg.blPin) : String("softwarové stmívání obrazu");
@@ -1022,7 +1247,6 @@ void appStatusJson(JsonObject o) {
   o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
 }
 
-enum Screen { SCR_RADAR, SCR_DETAIL, SCR_WEATHER, SCR_CLOCK, SCR_COUNT };
 static int gScreen = SCR_RADAR;
 static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
 static const uint32_t PORTAL_HOLD_MS = 5000;
@@ -1032,7 +1256,13 @@ static void onShortPress() {
     if (settingsHasWifi()) ESP.restart();
     return;
   }
-  gScreen = (gScreen + 1) % SCR_COUNT;
+  for (int k = 1; k <= SCR_COUNT; k++) {
+    int sc = (gScreen + k) % SCR_COUNT;
+    if (scrOn(sc)) {
+      gScreen = sc;
+      break;
+    }
+  }
   gDetailIdx = 0;
 }
 
@@ -1048,9 +1278,18 @@ static void onLongPress() {
     case SCR_DETAIL:
       gDetailIdx++;
       break;
+    case SCR_RAIN:
+      gCfg.rainRadiusIdx = (gCfg.rainRadiusIdx + 1) % 4;
+      settingsSave();
+      gForceRain = true;
+      break;
+    case SCR_FORECAST:
+      gForceForecast = true;
+      break;
     default:
       gForceWeather = true;
       gForcePlanes = true;
+      gForceForecast = true;
       break;
   }
 }
@@ -1171,17 +1410,19 @@ void setup() {
     return;
   }
 
+  if (!scrOn(gScreen)) onShortPress();
   showBoot("Připojuji WiFi…", gCfg.ssid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("letadla");
   configTzTime(TZ_INFO, "pool.ntp.org", "time.google.com");
   webBegin(false);  // nastavení i v domácí síti na IP zařízení
-  xTaskCreate(netTask, "net", 12288, nullptr, 1, &gNetTask);
+  xTaskCreate(netTask, "net", 16384, nullptr, 1, &gNetTask);
 }
 
 void loop() {
   static PlaneData pd;
   static Weather w;
+  static Forecast fc;
   static uint32_t lastDraw = 0;
 
   pollButton();
@@ -1211,11 +1452,14 @@ void loop() {
     pd = gPlanes;
     w = gWeather;
     xSemaphoreGive(gMutex);
+    forecastGet(fc);
     switch (gScreen) {
       case SCR_RADAR: drawRadar(pd, now); break;
       case SCR_DETAIL: drawDetail(pd); break;
       case SCR_WEATHER: drawWeather(w); break;
-      case SCR_CLOCK: drawClock(pd, w); break;
+      case SCR_CLOCK: drawClock(pd, w, fc); break;
+      case SCR_FORECAST: drawForecast(fc); break;
+      case SCR_RAIN: drawRain(fc, now); break;
     }
     drawWifiDot();
     drawHoldIndicator();

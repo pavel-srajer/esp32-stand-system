@@ -195,7 +195,9 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
  var w=j.wifi;rows('wifi',[['Režim',esc(w.mode)+(w.connected?', připojeno':'')],['Síť',esc(w.ssid||'–')],
   ['Signál',w.connected?w.rssi+' dBm':'–'],['Kanál',w.ch],['IP adresa',esc(w.ip)],['MAC',esc(w.mac)]].concat(w.mode=='hotspot'?[['Připojení klienti',w.clients]]:[]));
  var a=j.app;rows('app',[['Letadla v dosahu',a.planes+' (dosah '+a.range+' km)'],['ADS-B data',age(a.planes_age)+(a.planes_err?' · chyba: '+esc(a.planes_err):'')],
-  ['Počasí ČHMI',age(a.weather_age)+(a.weather_err?' · chyba: '+esc(a.weather_err):'')],['Stanice',esc(a.station)],
+  ['Počasí ČHMI (stanice)',age(a.weather_age)+(a.weather_err?' · chyba: '+esc(a.weather_err):'')],
+  ['Předpověď Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · upozornění: '+a.fc_alerts:'')+(a.fc_err?' · chyba: '+esc(a.fc_err):'')],
+  ['Meteoradar ČHMI',a.rain_frames+' snímků, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['Stanice',esc(a.station)],
   ['Jas displeje',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
  t('st','aktualizováno '+new Date().toLocaleTimeString('cs-CZ'));
 }).catch(function(){t('st','zařízení neodpovídá')})}
@@ -275,11 +277,39 @@ static void handleRoot() {
          "Jinak: na mapy.cz pravé tlačítko na místo → souřadnice.</small><small id='near'></small>"
          "</fieldset>");
 
+  // --- Obrazovky ---
+  {
+    static const char* const NAMES[] = {"Radar letadel", "Detail letadla", "Předpověď a upozornění",
+                                        "Meteoradar ČHMI (animace)", "Měření ze stanice ČHMI", "Hodiny"};
+    h += F("<fieldset><legend>Obrazovky</legend><small>Krátký stisk tlačítka přepíná mezi zapnutými obrazovkami.</small>");
+    for (int i = 0; i < 6; i++) {
+      h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='scr");
+      h += i;
+      h += "'";
+      if (gCfg.screens & (1 << i)) h += F(" checked");
+      h += "> ";
+      h += NAMES[i];
+      h += F("</label>");
+    }
+    static const int RR[] = {25, 50, 100, 200};
+    h += F("<label>Výřez meteoradaru (poloměr)</label><select name='rrad'>");
+    for (int i = 0; i < 4; i++) {
+      h += F("<option value='");
+      h += i;
+      h += "'";
+      if (i == gCfg.rainRadiusIdx) h += F(" selected");
+      h += ">";
+      h += RR[i];
+      h += F(" km</option>");
+    }
+    h += F("</select><small>Na obrazovce meteoradaru se poloměr mění i dlouhým stiskem.</small></fieldset>");
+  }
+
   // --- ČHMI ---
   int sel = -1;
   for (int i = 0; i < NUM_STATIONS; i++)
     if (gCfg.wsi == STATIONS[i].wsi) sel = i;
-  h += F("<fieldset><legend>Meteostanice ČHMI</legend><label>Stanice</label><select id='st' name='st'>");
+  h += F("<fieldset><legend>Meteostanice ČHMI (obrazovka Měření)</legend><label>Stanice</label><select id='st' name='st'>");
   for (int i = 0; i < NUM_STATIONS; i++) {
     h += F("<option value='");
     h += i;
@@ -416,6 +446,13 @@ static void handleSave() {
     gCfg.elev = server.arg("elev").toInt();
   }
   gCfg.autoUpdate = server.hasArg("autoupd");
+  {
+    int m = 0;
+    for (int i = 0; i < 6; i++)
+      if (server.hasArg("scr" + String(i))) m |= 1 << i;
+    gCfg.screens = m ? m : 1;
+    if (server.hasArg("rrad")) gCfg.rainRadiusIdx = constrain(server.arg("rrad").toInt(), 0, 3);
+  }
   if (server.hasArg("bl")) gCfg.blPin = server.arg("bl").toInt();
   auto hm = [](const String& v, int def) {
     int hh, mm;

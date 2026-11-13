@@ -23,6 +23,8 @@ void settingsLoad() {
   gCfg.bDay = prefs.getInt("bday", d.bDay);
   gCfg.bEve = prefs.getInt("beve", d.bEve);
   gCfg.bNight = prefs.getInt("bnight", d.bNight);
+  gCfg.screens = prefs.getInt("screens", d.screens);
+  gCfg.rainRadiusIdx = prefs.getInt("rrad", d.rainRadiusIdx);
   prefs.end();
 }
 
@@ -44,6 +46,8 @@ void settingsSave() {
   prefs.putInt("bday", gCfg.bDay);
   prefs.putInt("beve", gCfg.bEve);
   prefs.putInt("bnight", gCfg.bNight);
+  prefs.putInt("screens", gCfg.screens);
+  prefs.putInt("rrad", gCfg.rainRadiusIdx);
   prefs.end();
 }
 

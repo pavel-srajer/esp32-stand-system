@@ -17,6 +17,9 @@ struct Settings {
   // začátky období v minutách od půlnoci a jas v %
   int tDay = 7 * 60, tEve = 20 * 60, tNight = 22 * 60 + 30;
   int bDay = 100, bEve = 60, bNight = 15;
+  // zapnuté obrazovky (bit = pořadí: radar letadel, detail, předpověď, meteoradar, stanice ČHMI, hodiny)
+  int screens = 0x2F;   // vše kromě měření ze stanice ČHMI
+  int rainRadiusIdx = 1;  // meteoradar: index do {25, 50, 100, 200} km
 };
 
 extern Settings gCfg;
