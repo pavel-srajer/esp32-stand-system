@@ -26,22 +26,23 @@ struct Station {
   const char* wsi;
   const char* name;
   int elev;
+  float lat, lon;  // přibližná poloha (pro výběr nejbližší stanice z mapy)
 };
 static const Station STATIONS[] = {
-    {"0-20000-0-11518", "Praha-Ruzyně", 364},
-    {"0-20000-0-11520", "Praha-Libuš", 302},
-    {"0-20000-0-11406", "Cheb", 471},
-    {"0-20000-0-11414", "Karlovy Vary", 603},
-    {"0-20000-0-11433", "Kopisty", 240},
-    {"0-20000-0-11464", "Milešovka", 833},
-    {"0-20000-0-11487", "Kocelovice", 519},
-    {"0-20000-0-11546", "České Budějovice", 388},
-    {"0-20000-0-11636", "Churáňov", 1118},
-    {"0-20000-0-11603", "Liberec", 398},
-    {"0-20000-0-11723", "Brno-Tuřany", 241},
-    {"0-20000-0-11698", "Kuchařovice", 334},
-    {"0-20000-0-11782", "Ostrava-Mošnov", 251},
-    {"0-20000-0-11787", "Lysá hora", 1322},
+    {"0-20000-0-11518", "Praha-Ruzyně", 364, 50.101, 14.258},
+    {"0-20000-0-11520", "Praha-Libuš", 302, 50.008, 14.447},
+    {"0-20000-0-11406", "Cheb", 471, 50.068, 12.392},
+    {"0-20000-0-11414", "Karlovy Vary", 603, 50.202, 12.914},
+    {"0-20000-0-11433", "Kopisty", 240, 50.544, 13.623},
+    {"0-20000-0-11464", "Milešovka", 833, 50.555, 13.931},
+    {"0-20000-0-11487", "Kocelovice", 519, 49.467, 13.838},
+    {"0-20000-0-11546", "České Budějovice", 388, 48.952, 14.469},
+    {"0-20000-0-11636", "Churáňov", 1118, 49.068, 13.615},
+    {"0-20000-0-11603", "Liberec", 398, 50.770, 15.024},
+    {"0-20000-0-11723", "Brno-Tuřany", 241, 49.153, 16.689},
+    {"0-20000-0-11698", "Kuchařovice", 334, 48.881, 16.086},
+    {"0-20000-0-11782", "Ostrava-Mošnov", 251, 49.692, 18.112},
+    {"0-20000-0-11787", "Lysá hora", 1322, 49.546, 18.448},
 };
 static const int NUM_STATIONS = sizeof(STATIONS) / sizeof(STATIONS[0]);
 
@@ -93,6 +94,9 @@ static String esc(const String& s) {
 static const char PAGE_HEAD[] PROGMEM = R"HTML(<!doctype html><html lang="cs"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nastavení – Letadla</title><style>
+#map{height:300px;border-radius:8px;margin-top:8px}.srch{display:flex;gap:8px}.srch input{flex:1;min-width:0}
+.sbtn{width:auto!important;margin:0!important;padding:10px 14px!important;font-size:1em!important;background:#1f6feb!important}
+#near{display:block;margin-top:6px;color:#3fb950}
 body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:16px}
 main{max-width:460px;margin:auto}h1{font-size:1.4em;margin:.2em 0 .8em}
 fieldset{border:1px solid #30363d;border-radius:10px;margin:0 0 16px;padding:12px 14px}
@@ -112,6 +116,31 @@ var s=document.getElementById('st'),c=document.getElementById('custom');
 function u(){c.className=s.value=='-1'?'':'hide'}s.onchange=u;u();
 var n=document.getElementById('ssid_sel'),m=document.getElementById('ssid');
 n.onchange=function(){if(n.value)m.value=n.value;};
+(function(){
+var la=document.querySelector('[name=lat]'),lo=document.querySelector('[name=lon]'),near=document.getElementById('near');
+function num(v){return parseFloat(String(v).replace(',','.'))}
+function pick(lat,lon){var b=-1,bd=1e9;ST.forEach(function(p,i){var dy=(p[0]-lat)*111.2,dx=(p[1]-lon)*111.2*Math.cos(lat*Math.PI/180),d=Math.sqrt(dx*dx+dy*dy);if(d<bd){bd=d;b=i}});
+ if(b>=0){s.value=b;u();near.textContent='Nejbližší stanice ČHMI: '+s.options[s.selectedIndex].text+' ('+Math.round(bd)+' km) – vybrána níže.'}}
+var css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);
+var js=document.createElement('script');js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+js.onload=function(){if(!window.L)return;
+ document.getElementById('mapbox').className='';document.getElementById('nomap').className='hide';
+ var p=[num(la.value)||50.08,num(lo.value)||14.43],map=L.map('map').setView(p,10);
+ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap'}).addTo(map);
+ var mk=L.marker(p,{draggable:true}).addTo(map),ci=L.circle(p,{radius:RK*1000,color:'#58a6ff',weight:1,fillOpacity:.06}).addTo(map);
+ function set(ll,zoom){la.value=ll.lat.toFixed(5);lo.value=ll.lng.toFixed(5);mk.setLatLng(ll);ci.setLatLng(ll);if(zoom)map.setView(ll,11);pick(ll.lat,ll.lng)}
+ map.on('click',function(e){set(e.latlng)});mk.on('dragend',function(){set(mk.getLatLng())});
+ la.onchange=lo.onchange=function(){var a=num(la.value),b=num(lo.value);if(!isNaN(a)&&!isNaN(b)){var ll=L.latLng(a,b);mk.setLatLng(ll);ci.setLatLng(ll);map.panTo(ll);pick(a,b)}};
+ var q=document.getElementById('q'),qb=document.getElementById('qb');
+ qb.onclick=function(){if(!q.value)return;qb.textContent='…';
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cz,sk,de,at,pl&q='+encodeURIComponent(q.value))
+  .then(function(r){return r.json()}).then(function(j){qb.textContent='Hledat';if(j[0])set(L.latLng(+j[0].lat,+j[0].lon),true);else near.textContent='Místo „'+q.value+'“ nenalezeno.'})
+  .catch(function(){qb.textContent='Hledat'})};
+ q.onkeydown=function(e){if(e.key=='Enter'){e.preventDefault();qb.onclick()}};
+ setTimeout(function(){map.invalidateSize()},200);
+};
+document.head.appendChild(js);
+})();
 </script></body></html>)HTML";
 
 static const char PAGE_SYS[] PROGMEM = R"HTML(<!doctype html><html lang="cs"><head>
@@ -227,7 +256,12 @@ static void handleRoot() {
   h += String(gCfg.lat, 5);
   h += F("'></div><div><label>Zeměpisná délka</label><input name='lon' inputmode='decimal' required value='");
   h += String(gCfg.lon, 5);
-  h += F("'></div></div><small>Např. na mapy.cz: pravé tlačítko na místo → souřadnice (50.0755N, 14.4378E).</small>"
+  h += F("'></div></div>"
+         "<div id='mapbox' class='hide'><label>Mapa – klikni na místo nebo přetáhni značku</label>"
+         "<div class='srch'><input id='q' placeholder='Vyhledat obec nebo adresu'>"
+         "<button type='button' id='qb' class='sbtn'>Hledat</button></div><div id='map'></div></div>"
+         "<small id='nomap'>Mapa se zobrazí, když je telefon připojený k internetu (v domácí síti). "
+         "Jinak: na mapy.cz pravé tlačítko na místo → souřadnice.</small><small id='near'></small>"
          "</fieldset>");
 
   // --- ČHMI ---
@@ -276,6 +310,17 @@ static void handleRoot() {
     h += F("<button type='submit' formaction='/update' formnovalidate style='background:#1f6feb'>"
            "Zkontrolovat a nainstalovat nejnovější verzi</button>");
   h += F("</fieldset>");
+
+  // data pro mapu: polohy stanic a dosah radaru
+  static const int RANGES[] = {10, 25, 50, 100};
+  h += F("<script>var ST=[");
+  for (int i = 0; i < NUM_STATIONS; i++) {
+    if (i) h += ',';
+    h += '[' + String(STATIONS[i].lat, 3) + ',' + String(STATIONS[i].lon, 3) + ']';
+  }
+  h += F("],RK=");
+  h += RANGES[constrain(gCfg.rangeIdx, 0, 3)];
+  h += F(";</script>");
 
   h += FPSTR(PAGE_TAIL);
   server.send(200, "text/html; charset=utf-8", h);

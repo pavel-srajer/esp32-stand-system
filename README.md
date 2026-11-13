@@ -23,7 +23,8 @@ Barvy letadel podle výšky: zelená < 900 m, žlutá < 3 km, oranžová < 6 km,
 
 1. Po prvním zapnutí zařízení vytvoří **otevřenou WiFi `Letadla-XXXX`**. Na displeji je QR kód, kterým se k ní telefon připojí.
 2. Telefon by měl sám otevřít stránku s nastavením. Když ne, otevři **http://192.168.4.1**.
-3. Vyber svou WiFi a zadej heslo, souřadnice domova (střed radaru) a meteostanici ČHMI. Pak dej **Uložit**.
+3. Vyber svou WiFi a zadej heslo. Polohu domova (střed radaru) zadej souřadnicemi, nebo ji klikni do mapy. Nakonec vyber meteostanici ČHMI a dej **Uložit**.
+   Mapa (OpenStreetMap) a vyhledávání adresy fungují, když je telefon připojený k internetu, typicky při změně nastavení v domácí síti. Při kliknutí do mapy se sama vybere nejbližší stanice ČHMI.
 4. Zařízení se restartuje a připojí k síti.
 
 Nastavení se ukládá do flash paměti a aktualizace firmwaru ho nesmažou. Později ho změníš dvěma způsoby:
