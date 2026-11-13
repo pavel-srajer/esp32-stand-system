@@ -30,6 +30,10 @@ static float sRadius = 0;
 static char sErr[96] = "";
 static uint32_t sUpdatedMs = 0;
 static SemaphoreHandle_t sMutex = nullptr;
+// Pracovní buffer 120×120 alokovaný natrvalo: za běhu (během TLS spojení) by se
+// souvislých 14 kB nemuselo najít. Používá ho dekódování snímku i vyhodnocení,
+// obojí běží jen v síťové úloze jedno po druhém.
+static uint8_t sWork[RADAR_N * RADAR_N];
 
 static void lock() {
   if (!sMutex) sMutex = xSemaphoreCreateMutex();
@@ -180,7 +184,8 @@ static bool radarReady(PNG& png, void* user) {
   c->nextRow = 0;
   // paměť až teď – po navázání TLS spojení (to potřebuje největší souvislé bloky)
   c->line = (uint16_t*)malloc(W * 2);
-  c->frame = (uint8_t*)calloc(RADAR_N * RADAR_N, 1);
+  c->frame = sWork;
+  memset(sWork, 0, sizeof sWork);
   if (!c->line || !c->frame) return false;
   float cosLat = cosf(gCfg.lat * DEG_TO_RAD);
   float yT = mercY(LAT_TOP), yB = mercY(LAT_BOTTOM);
@@ -210,7 +215,6 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
   free(c->line);
   free(c);
   if (!ok) {
-    free(frame);
     snprintf(sErr, sizeof sErr, "snímek: %s", pngNetError());
     Serial.printf("[Radar] %s\n", sErr);
     return false;
@@ -235,7 +239,6 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
     if (pass == 1) {
       f.rle = (uint8_t*)malloc(o);
       if (!f.rle) {
-        free(frame);
         return false;
       }
       f.len = o;
@@ -253,7 +256,6 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
       i += n;
     }
   }
-  free(frame);
   strlcpy(f.ts, ts, sizeof f.ts);
   f.t = tsToUtc(ts);
   Serial.printf("[Radar] %s: %d B RLE, heap %u\n", ts, o, (unsigned)ESP.getFreeHeap());
@@ -444,13 +446,9 @@ static void denoise(uint8_t* F) {
 void radarAnalyze(float tempC) {
   RadarInfo info;
   // jeden obraz intenzit (14 kB) + bitová maska starého snímku (1,8 kB)
-  uint8_t* L = (uint8_t*)malloc(RADAR_N * RADAR_N);
+  uint8_t* L = sWork;
   uint8_t* O = (uint8_t*)calloc(RADAR_N * RADAR_N / 8, 1);
-  if (!L || !O) {
-    free(L);
-    free(O);
-    return;
-  }
+  if (!O) return;
   lock();
   int n = sCount;
   float R = sRadius;
@@ -464,7 +462,6 @@ void radarAnalyze(float tempC) {
   }
   unlock();
   if (!n) {
-    free(L);
     free(O);
     return;
   }
@@ -557,7 +554,6 @@ void radarAnalyze(float tempC) {
   else if (info.moving && (info.here || info.nearKm >= 0)) strlcpy(info.line2, "srážky skoro stojí", sizeof info.line2);
 
   Serial.printf("[Radar] %s | %s\n", info.line1, info.line2);
-  free(L);
   free(O);
   lock();
   sInfo = info;
