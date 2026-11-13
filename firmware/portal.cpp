@@ -197,7 +197,7 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
  var a=j.app;rows('app',[['Letadla v dosahu',a.planes+' (dosah '+a.range+' km)'],['ADS-B data',age(a.planes_age)+(a.planes_err?' · chyba: '+esc(a.planes_err):'')],
   ['Počasí ČHMI (stanice)',age(a.weather_age)+(a.weather_err?' · chyba: '+esc(a.weather_err):'')],
   ['Předpověď Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · upozornění: '+a.fc_alerts:'')+(a.fc_err?' · chyba: '+esc(a.fc_err):'')],
-  ['Meteoradar ČHMI',a.rain_frames+' snímků, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['Radar u tebe',esc(a.rain_info||'–')],['Stanice',esc(a.station)],
+  ['Meteoradar ČHMI',a.rain_frames+' snímků, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['Radar u tebe',esc(a.rain_info||'–')],['Loga společností',esc(a.logo||'–')],['Stanice',esc(a.station)],
   ['Jas displeje',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['Aktualizace',esc(a.ota)],['Volný zásobník',a.stack_net+' B (síť), '+a.stack_loop+' B (displej)']]);
  t('st','aktualizováno '+new Date().toLocaleTimeString('cs-CZ'));
 }).catch(function(){t('st','zařízení neodpovídá')})}

@@ -12,4 +12,7 @@
 typedef bool (*PngReadyFn)(PNG& png, void* user);
 
 // Vrací true, když se obrázek dekódoval. httpCode = výsledek HTTP (pro hlášení chyb).
+// Text poslední chyby (TLS chyba, velikost volné paměti...) pro zobrazení uživateli.
+const char* pngNetError();
+
 bool pngDecodeUrl(const char* url, PNG_DRAW_CALLBACK* draw, PngReadyFn ready, void* user, int& httpCode);

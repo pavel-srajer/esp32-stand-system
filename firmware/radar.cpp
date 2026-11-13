@@ -27,7 +27,7 @@ struct Frame {
 static Frame sFrames[RADAR_FRAMES];
 static int sCount = 0;
 static float sRadius = 0;
-static char sErr[40] = "";
+static char sErr[96] = "";
 static uint32_t sUpdatedMs = 0;
 static SemaphoreHandle_t sMutex = nullptr;
 
@@ -178,8 +178,10 @@ static bool radarReady(PNG& png, void* user) {
   int W = png.getWidth(), H = png.getHeight();
   c->png = &png;
   c->nextRow = 0;
+  // paměť až teď – po navázání TLS spojení (to potřebuje největší souvislé bloky)
   c->line = (uint16_t*)malloc(W * 2);
-  if (!c->line) return false;
+  c->frame = (uint8_t*)calloc(RADAR_N * RADAR_N, 1);
+  if (!c->line || !c->frame) return false;
   float cosLat = cosf(gCfg.lat * DEG_TO_RAD);
   float yT = mercY(LAT_TOP), yB = mercY(LAT_BOTTOM);
   for (int i = 0; i < RADAR_N; i++) {
@@ -200,23 +202,17 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
 
   // PNG se dekóduje přímo ze sítě (sdílený statický dekodér, viz png_net.cpp)
   DecodeCtx* c = (DecodeCtx*)calloc(1, sizeof(DecodeCtx));
-  uint8_t* frame = (uint8_t*)calloc(RADAR_N * RADAR_N, 1);
-  if (!c || !frame) {
-    free(c);
-    free(frame);
-    snprintf(sErr, sizeof sErr, "málo RAM (%d kB)", (int)(ESP.getMaxAllocHeap() / 1024));
-    return false;
-  }
-  c->frame = frame;
+  if (!c) return false;
   c->radiusKm = radiusKm;
   int code = 0;
   bool ok = pngDecodeUrl(url, drawCb, radarReady, c, code);
+  uint8_t* frame = c->frame;
   free(c->line);
   free(c);
   if (!ok) {
     free(frame);
-    if (code != 200) snprintf(sErr, sizeof sErr, "radar PNG HTTP %d", code);
-    else strlcpy(sErr, "radar: chyba PNG", sizeof sErr);
+    snprintf(sErr, sizeof sErr, "snímek: %s", pngNetError());
+    Serial.printf("[Radar] %s\n", sErr);
     return false;
   }
 

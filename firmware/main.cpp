@@ -1221,20 +1221,41 @@ static void buildLut(int pct) {
   gLutPct = pct;
 }
 
-static void pushFrame() {
+// Obraz se kreslí po polovinách (240×120) do jednoho 28kB bufferu – celý snímek
+// 240×240 by zabral 57 kB, které chybí pro TLS spojení. Sprite si pro každou
+// polovinu "myslí", že má 240×240, ale ořez povolí kreslit jen do jeho poloviny.
+static const int HALF = 120;
+static uint8_t* gFb = nullptr;  // 240 × HALF, RGB332
+
+static void beginHalf(int half) {
+  spr.setBuffer(gFb - half * 240 * HALF, 240, 240, 8);
+  spr.setClipRect(0, half * HALF, 240, HALF);
+}
+
+static void pushHalf(int half) {
   int soft = gPwm ? 100 : gCurPct;
   if (soft != gLutPct) buildLut(soft);
   static uint16_t line[240 * 12];
-  const uint8_t* src = (const uint8_t*)spr.getBuffer();
-  if (!src) return;
   tft.startWrite();
-  for (int y = 0; y < 240; y += 12) {
-    const uint8_t* row = src + y * 240;
+  for (int y = 0; y < HALF; y += 12) {
+    const uint8_t* row = gFb + y * 240;
     for (int i = 0; i < 240 * 12; i++) line[i] = gLut[row[i]];
-    tft.setAddrWindow(0, y, 240, 12);
+    tft.setAddrWindow(0, half * HALF + y, 240, 12);
     tft.writePixels(line, 240 * 12, true);
   }
   tft.endWrite();
+}
+
+// nakreslí celou obrazovku: draw() se zavolá dvakrát (pro horní a dolní polovinu)
+template <typename F>
+static void renderFrame(F draw) {
+  if (!gFb) return;
+  for (int half = 0; half < 2; half++) {
+    beginHalf(half);
+    spr.fillScreen(TFT_BLACK);
+    draw();
+    pushHalf(half);
+  }
 }
 
 // jas podle denní doby
@@ -1342,6 +1363,7 @@ void appStatusJson(JsonObject o) {
   o["rain_frames"] = radarFrameCount();
   o["rain_age"] = radarUpdatedMs() ? (long)((millis() - radarUpdatedMs()) / 1000) : -1;
   o["rain_err"] = radarError();
+  o["logo"] = logoStatus();
   {
     RadarInfo ri;
     radarInfoGet(ri);
@@ -1483,12 +1505,12 @@ static void drawOta() {
 }
 
 static void showBoot(const char* a, const char* b) {
-  spr.fillScreen(TFT_BLACK);
-  drawCenteredMsg(a, b);
-  spr.setFont(&fontCZ_12);
-  spr.setTextColor(rgb(90, 90, 90));
-  spr.drawString("verze " FW_VERSION, CX, 206);
-  pushFrame();
+  renderFrame([&] {
+    drawCenteredMsg(a, b);
+    spr.setFont(&fontCZ_12);
+    spr.setTextColor(rgb(90, 90, 90));
+    spr.drawString("verze " FW_VERSION, CX, 206);
+  });
 }
 
 void setup() {
@@ -1499,8 +1521,9 @@ void setup() {
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
-  spr.setColorDepth(8);  // 240x240x8 bit = 57 kB (16 bit by nenechalo dost RAM pro TLS)
-  if (!spr.createSprite(240, 240)) Serial.println("Sprite: málo paměti!");
+  spr.setColorDepth(8);  // RGB332, kreslí se po polovinách (viz renderFrame)
+  gFb = (uint8_t*)malloc(240 * HALF);
+  if (!gFb) Serial.println("Obrazový buffer: málo paměti!");
 
   settingsLoad();
   brightnessBegin();
@@ -1549,27 +1572,29 @@ void loop() {
   lastDraw = now;
   updateBrightness();
 
-  spr.fillScreen(TFT_BLACK);
-  if (gPortalMode) {
-    drawPortal();
-  } else if (gOta.state == OTA_DOWNLOADING) {
-    drawOta();
-  } else {
+  if (!gPortalMode && gOta.state != OTA_DOWNLOADING) {
     xSemaphoreTake(gMutex, portMAX_DELAY);
     pd = gPlanes;
     w = gWeather;
     xSemaphoreGive(gMutex);
     forecastGet(fc);
-    switch (gScreen) {
-      case SCR_RADAR: drawRadar(pd, now); break;
-      case SCR_DETAIL: drawDetail(pd); break;
-      case SCR_WEATHER: drawWeather(w); break;
-      case SCR_CLOCK: drawClock(pd, w, fc); break;
-      case SCR_FORECAST: drawForecast(fc); break;
-      case SCR_RAIN: drawRain(fc, now); break;
-    }
-    drawWifiDot();
-    drawHoldIndicator();
   }
-  pushFrame();
+  renderFrame([&] {
+    if (gPortalMode) {
+      drawPortal();
+    } else if (gOta.state == OTA_DOWNLOADING) {
+      drawOta();
+    } else {
+      switch (gScreen) {
+        case SCR_RADAR: drawRadar(pd, now); break;
+        case SCR_DETAIL: drawDetail(pd); break;
+        case SCR_WEATHER: drawWeather(w); break;
+        case SCR_CLOCK: drawClock(pd, w, fc); break;
+        case SCR_FORECAST: drawForecast(fc); break;
+        case SCR_RAIN: drawRain(fc, now); break;
+      }
+      drawWifiDot();
+      drawHoldIndicator();
+    }
+  });
 }

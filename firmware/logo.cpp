@@ -17,6 +17,8 @@ struct Entry {
 static Entry sCache[CACHE];
 static char sPending[4] = "";
 static uint32_t sRetryAt = 0;  // po chybě sítě chvíli nezkoušet
+static char sStatus[96] = "zatím žádné";
+const char* logoStatus() { return sStatus; }
 static SemaphoreHandle_t sMutex = nullptr;
 
 static void lock() {
@@ -119,7 +121,10 @@ void logoService() {
   uint8_t* px = (uint8_t*)malloc(LOGO_SIZE * LOGO_SIZE);
   if (!px) return;
   int r = fetch(icao, px);
-  Serial.printf("[Logo] %s: %s\n", icao, r > 0 ? "OK" : r == 0 ? "neexistuje" : "chyba");
+  if (r > 0) snprintf(sStatus, sizeof sStatus, "%s: OK", icao);
+  else if (r == 0) snprintf(sStatus, sizeof sStatus, "%s: logo neexistuje", icao);
+  else snprintf(sStatus, sizeof sStatus, "%s: %s", icao, pngNetError());
+  Serial.printf("[Logo] %s\n", sStatus);
   if (r < 0) {  // síťová chyba: zkusí se znovu za 30 s
     free(px);
     sRetryAt = millis() + 30000;

@@ -16,3 +16,6 @@ bool logoGet(const char* icao, uint8_t* out);
 
 // Síťová úloha: stáhne požadované logo (pokud nějaké čeká).
 void logoService();
+
+// stav pro stránku Systém (poslední pokus)
+const char* logoStatus();
