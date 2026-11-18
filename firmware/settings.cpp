@@ -32,6 +32,7 @@ void settingsLoad() {
   gCfg.ntp2 = prefs.getString("ntp2", d.ntp2);
   gCfg.lang = prefs.getInt("lang", d.lang);
   gCfg.detailMask = prefs.getInt("detail", d.detailMask);
+  gCfg.speedUnit = prefs.getInt("spdu", d.speedUnit);
   prefs.end();
 }
 
@@ -62,6 +63,7 @@ void settingsSave() {
   prefs.putString("ntp2", gCfg.ntp2);
   prefs.putInt("lang", gCfg.lang);
   prefs.putInt("detail", gCfg.detailMask);
+  prefs.putInt("spdu", gCfg.speedUnit);
   prefs.end();
 }
 

@@ -542,6 +542,22 @@ static void handleRoot() {
             "Das Rufzeichen wird immer angezeigt. Aktive Angaben werden untereinander zentriert.",
             "Il nominativo è sempre mostrato. Le voci attive vengono impilate e centrate.");
     h += F("</small>");
+    h += F("<label>");
+    h += tr("Jednotky rychlosti", "Speed units", "Geschwindigkeitseinheit", "Unità di velocità");
+    h += F("</label><select name='spdu'>");
+    {
+      const char* SU[] = {"km/h", tr("uzly (kt)", "knots (kt)", "Knoten (kt)", "nodi (kt)"), "mph"};
+      for (int i = 0; i < 3; i++) {
+        h += F("<option value='");
+        h += i;
+        h += "'";
+        if (i == gCfg.speedUnit) h += F(" selected");
+        h += ">";
+        h += SU[i];
+        h += F("</option>");
+      }
+    }
+    h += F("</select>");
     for (int i = 0; i < 8; i++) {
       h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='det");
       h += i;
@@ -770,6 +786,7 @@ static void handleSave() {
     for (int i = 0; i < 8; i++)
       if (server.hasArg("det" + String(i))) dm |= 1 << i;
     gCfg.detailMask = dm;
+    if (server.hasArg("spdu")) gCfg.speedUnit = constrain(server.arg("spdu").toInt(), 0, 2);
     if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);
     if (server.hasArg("rmap")) gCfg.rainMap = constrain(server.arg("rmap").toInt(), 0, 2);
     if (server.hasArg("pmap")) gCfg.planeMap = constrain(server.arg("pmap").toInt(), 0, 2);

@@ -881,8 +881,14 @@ static void drawDetail(const PlaneData& pd) {
       case I_SPEED:
         spr.setFont(&fontCZ_16);
         spr.setTextColor(rgb(255, 230, 120));
-        if (!isnan(pl.gs)) snprintf(b, sizeof b, "%ld km/h", lroundf(pl.gs * 1.852f));
-        else strlcpy(b, "– km/h", sizeof b);
+        {
+          // ADS-B posílá rychlost vůči zemi v uzlech
+          static const char* const UNIT[] = {"km/h", "kt", "mph"};
+          static const float K[] = {1.852f, 1.0f, 1.150779f};
+          int u = constrain(gCfg.speedUnit, 0, 2);
+          if (!isnan(pl.gs)) snprintf(b, sizeof b, "%ld %s", lroundf(pl.gs * K[u]), UNIT[u]);
+          else snprintf(b, sizeof b, "– %s", UNIT[u]);
+        }
         if (!isnan(pl.track)) {
           size_t l = strlen(b);
           snprintf(b + l, sizeof b - l, " · %ld°", lroundf(pl.track));
