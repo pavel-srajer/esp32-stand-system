@@ -523,6 +523,37 @@ static void handleRoot() {
     h += F("</small></fieldset>");
   }
 
+  // --- Detail letadla ---
+  {
+    const char* DN[] = {tr("Logo společnosti", "Airline logo", "Airline-Logo", "Logo compagnia"),
+                        tr("Trasa (PRG → LHR)", "Route (PRG → LHR)", "Route (PRG → LHR)", "Rotta (PRG → LHR)"),
+                        tr("Typ a registrace", "Type and registration", "Typ und Kennzeichen", "Tipo e immatricolazione"),
+                        tr("Výška v metrech (se šipkou stoupání/klesání)", "Altitude in metres (with climb/descent arrow)",
+                           "Höhe in Metern (mit Steig-/Sinkpfeil)", "Quota in metri (con freccia salita/discesa)"),
+                        tr("Výška ve stopách a letová hladina", "Altitude in feet and flight level", "Höhe in Fuß und Flugfläche", "Quota in piedi e livello di volo"),
+                        tr("Rychlost a kurz", "Speed and track", "Geschwindigkeit und Kurs", "Velocità e rotta"),
+                        tr("Vzdálenost a směr", "Distance and direction", "Entfernung und Richtung", "Distanza e direzione"),
+                        tr("Pořadí letadla (3 / 17)", "Aircraft number (3 / 17)", "Flugzeugnummer (3 / 17)", "Numero aereo (3 / 17)")};
+    h += F("<fieldset><legend>");
+    h += tr("Detail letadla", "Aircraft detail", "Flugzeugdetail", "Dettaglio aereo");
+    h += F("</legend><small>");
+    h += tr("Volací znak se zobrazuje vždy. Zapnuté údaje se seřadí pod sebe a vystředí.",
+            "The callsign is always shown. Enabled items are stacked and centred.",
+            "Das Rufzeichen wird immer angezeigt. Aktive Angaben werden untereinander zentriert.",
+            "Il nominativo è sempre mostrato. Le voci attive vengono impilate e centrate.");
+    h += F("</small>");
+    for (int i = 0; i < 8; i++) {
+      h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='det");
+      h += i;
+      h += "'";
+      if (gCfg.detailMask & (1 << i)) h += F(" checked");
+      h += "> ";
+      h += DN[i];
+      h += F("</label>");
+    }
+    h += F("</fieldset>");
+  }
+
   // --- ČHMI ---
   int sel = -1;
   for (int i = 0; i < NUM_STATIONS; i++)
@@ -735,6 +766,10 @@ static void handleSave() {
     for (int i = 0; i < 6; i++)
       if (server.hasArg("scr" + String(i))) m |= 1 << i;
     gCfg.screens = m ? m : 1;
+    int dm = 0;
+    for (int i = 0; i < 8; i++)
+      if (server.hasArg("det" + String(i))) dm |= 1 << i;
+    gCfg.detailMask = dm;
     if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);
     if (server.hasArg("rmap")) gCfg.rainMap = constrain(server.arg("rmap").toInt(), 0, 2);
     if (server.hasArg("pmap")) gCfg.planeMap = constrain(server.arg("pmap").toInt(), 0, 2);

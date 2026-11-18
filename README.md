@@ -43,6 +43,10 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 
 Ve webovém nastavení v sekci **Obrazovky** zaškrtneš, co se má zobrazovat: třeba jen letadla, jen meteoradar, nebo všechno. Tam se nastavuje i dosah radaru letadel (10–100 km) a poloměr výřezu meteoradaru (25–200 km).
 
+## Detail letadla
+
+Ve webovém nastavení v sekci **Detail letadla** zaškrtneš, co se na obrazovce Detail zobrazuje: logo, trasa, typ a registrace, výška v metrech, výška ve stopách a FL, rychlost a kurz, vzdálenost a směr, pořadí letadla. Volací znak je vždy. Zapnuté řádky se seřadí pod sebe a vystředí.
+
 ## Mapa a automatické přepínání
 
 V sekci **Obrazovky** ve webovém nastavení dále najdeš:

@@ -806,75 +806,105 @@ static void drawDetail(const PlaneData& pd) {
   float a = pl.brg * DEG_TO_RAD;
   drawPlaneIcon(CX + (int)(108 * sinf(a)), CY - (int)(108 * cosf(a)), pl.track, col, 8);
 
-  // logo společnosti (stahuje se na pozadí; dokud není, rozložení bez loga)
+  // Co se zobrazuje, se volí ve webovém nastavení (gCfg.detailMask). Zapnuté řádky
+  // se skládají pod sebe a celý blok se vystředí – při méně údajích je víc místa.
+  const int M = gCfg.detailMask;
   static uint8_t logoPx[LOGO_SIZE * LOGO_SIZE];
   char icao[4];
   bool airline = logoIcaoFromCallsign(pl.flight, icao);
-  bool logo = airline && logoGet(icao, logoPx);
-  // trasa (odkud → kam) – jen u letů společností, dohledává se na pozadí
+  bool logo = (M & DET_LOGO) && airline && logoGet(icao, logoPx);  // stahuje se na pozadí
   RouteInfo route;
-  bool hasRoute = airline && routeGet(pl.flight, pl.lat, pl.lon, route);
-  // svislé pozice: index, volací znak, typ, výška, FL, rychlost, vzdálenost, trasa
-  const int* Y;
-  static const int Y_LOGO[] = {214, 86, 124, 144, 162, 179, 197, 106};
-  static const int Y_PLAIN[] = {26, 52, 96, 120, 140, 162, 184, 76};
-  Y = logo ? Y_LOGO : Y_PLAIN;
-  if (logo) spr.pushImage(CX - LOGO_SIZE / 2, 9, LOGO_SIZE, LOGO_SIZE, (const lgfx::rgb332_t*)logoPx);
+  bool hasRoute = (M & DET_ROUTE) && airline && routeGet(pl.flight, pl.lat, pl.lon, route);
+  bool altOk = pl.alt != ALT_GROUND && pl.alt != ALT_UNKNOWN;
+
+  enum { I_LOGO, I_CALL, I_ROUTE, I_TYPE, I_ALT, I_FT, I_SPEED, I_DIST, I_INDEX };
+  struct Item {
+    int id, h;
+  } items[9];
+  int ni = 0, total = 0;
+  auto add = [&](int id, int h) {
+    items[ni++] = {id, h};
+    total += h;
+  };
+  if (logo) add(I_LOGO, 60);
+  add(I_CALL, 30);
+  if (hasRoute) add(I_ROUTE, 20);
+  if ((M & DET_TYPE) && (pl.type[0] || pl.reg[0])) add(I_TYPE, 20);
+  if (M & DET_ALT) add(I_ALT, 26);
+  if ((M & DET_FT) && altOk) add(I_FT, 16);
+  if (M & DET_SPEED) add(I_SPEED, 19);
+  if (M & DET_DIST) add(I_DIST, 19);
+  if (M & DET_INDEX) add(I_INDEX, 17);
 
   spr.setTextDatum(textdatum_t::middle_center);
-  spr.setFont(&fontCZ_12);
-  spr.setTextColor(rgb(150, 150, 150));
-  snprintf(b, sizeof b, "%d / %d", gDetailIdx + 1, n);
-  spr.drawString(b, CX, Y[0]);
-
-  spr.setFont(&fonts::FreeSansBold18pt7b);
-  spr.setTextColor(col);
-  spr.drawString(pl.flight, CX, Y[1]);
-
-  if (hasRoute) {
-    snprintf(b, sizeof b, "%s%s → %s", route.plausible ? "" : "? ", route.from, route.to);
-    spr.setFont(&fontCZ_16);
-    spr.setTextColor(rgb(255, 205, 90));
-    spr.drawString(b, CX, Y[7]);
-  }
-
-  spr.setFont(&fontCZ_16);
-  spr.setTextColor(rgb(200, 200, 200));
-  snprintf(b, sizeof b, "%s  %s", pl.type[0] ? pl.type : "", pl.reg);
-  spr.drawString(b, CX, Y[2]);
-
-  // výška
-  spr.setFont(&fontCZ_24);
-  spr.setTextColor(rgb(255, 255, 255));
-  altText(t, sizeof t, pl.alt);
-  spr.drawString(t, CX, Y[3]);
-  if (pl.alt != ALT_GROUND && pl.alt != ALT_UNKNOWN) {
-    spr.setFont(&fontCZ_12);
-    spr.setTextColor(rgb(150, 150, 150));
-    snprintf(b, sizeof b, "%ld ft · FL%03ld", (long)pl.alt, lroundf(pl.alt / 100.0f));
-    spr.drawString(b, CX, Y[4]);
-    // stoupání / klesání
-    if (abs(pl.vrate) > 300) {
-      int x = CX + 80, y = Y[3];
-      if (pl.vrate > 0) spr.fillTriangle(x, y - 8, x - 6, y + 4, x + 6, y + 4, rgb(0, 255, 80));
-      else spr.fillTriangle(x, y + 8, x - 6, y - 4, x + 6, y - 4, rgb(255, 120, 0));
+  int y = CY - total / 2;
+  for (int k = 0; k < ni; k++) {
+    int cy = y + items[k].h / 2;
+    switch (items[k].id) {
+      case I_LOGO:
+        spr.pushImage(CX - LOGO_SIZE / 2, y + 2, LOGO_SIZE, LOGO_SIZE, (const lgfx::rgb332_t*)logoPx);
+        break;
+      case I_CALL:
+        spr.setFont(&fonts::FreeSansBold18pt7b);
+        spr.setTextColor(col);
+        spr.drawString(pl.flight, CX, cy);
+        break;
+      case I_ROUTE:
+        snprintf(b, sizeof b, "%s%s → %s", route.plausible ? "" : "? ", route.from, route.to);
+        spr.setFont(&fontCZ_16);
+        spr.setTextColor(rgb(255, 205, 90));
+        spr.drawString(b, CX, cy);
+        break;
+      case I_TYPE:
+        snprintf(b, sizeof b, "%s  %s", pl.type, pl.reg);
+        spr.setFont(&fontCZ_16);
+        spr.setTextColor(rgb(200, 200, 200));
+        spr.drawString(b, CX, cy);
+        break;
+      case I_ALT:
+        spr.setFont(&fontCZ_24);
+        spr.setTextColor(rgb(255, 255, 255));
+        altText(t, sizeof t, pl.alt);
+        spr.drawString(t, CX, cy);
+        if (altOk && abs(pl.vrate) > 300) {  // stoupání / klesání
+          int x = CX + 80;
+          if (pl.vrate > 0) spr.fillTriangle(x, cy - 8, x - 6, cy + 4, x + 6, cy + 4, rgb(0, 255, 80));
+          else spr.fillTriangle(x, cy + 8, x - 6, cy - 4, x + 6, cy - 4, rgb(255, 120, 0));
+        }
+        break;
+      case I_FT:
+        spr.setFont(&fontCZ_12);
+        spr.setTextColor(rgb(150, 150, 150));
+        snprintf(b, sizeof b, "%ld ft · FL%03ld", (long)pl.alt, lroundf(pl.alt / 100.0f));
+        spr.drawString(b, CX, cy);
+        break;
+      case I_SPEED:
+        spr.setFont(&fontCZ_16);
+        spr.setTextColor(rgb(255, 230, 120));
+        if (!isnan(pl.gs)) snprintf(b, sizeof b, "%ld km/h", lroundf(pl.gs * 1.852f));
+        else strlcpy(b, "– km/h", sizeof b);
+        if (!isnan(pl.track)) {
+          size_t l = strlen(b);
+          snprintf(b + l, sizeof b - l, " · %ld°", lroundf(pl.track));
+        }
+        spr.drawString(b, CX, cy);
+        break;
+      case I_DIST:
+        spr.setFont(&fontCZ_16);
+        spr.setTextColor(rgb(120, 200, 255));
+        fmtDec(t, sizeof t, pl.distKm, 1);
+        snprintf(b, sizeof b, "%s km %s", t, compass8(pl.brg));
+        spr.drawString(b, CX, cy);
+        break;
+      case I_INDEX:
+        spr.setFont(&fontCZ_12);
+        spr.setTextColor(rgb(150, 150, 150));
+        snprintf(b, sizeof b, "%d / %d", gDetailIdx + 1, n);
+        spr.drawString(b, CX, cy);
+        break;
     }
+    y += items[k].h;
   }
-
-  // rychlost, kurz, vzdálenost
-  spr.setFont(&fontCZ_16);
-  spr.setTextColor(rgb(255, 230, 120));
-  if (!isnan(pl.gs)) snprintf(b, sizeof b, "%ld km/h", lroundf(pl.gs * 1.852f));
-  else strlcpy(b, "– km/h", sizeof b);
-  if (!isnan(pl.track)) {
-    size_t l = strlen(b);
-    snprintf(b + l, sizeof b - l, " · %ld°", lroundf(pl.track));
-  }
-  spr.drawString(b, CX, Y[5]);
-  fmtDec(t, sizeof t, pl.distKm, 1);
-  snprintf(b, sizeof b, "%s km %s", t, compass8(pl.brg));
-  spr.setTextColor(rgb(120, 200, 255));
-  spr.drawString(b, CX, Y[6]);
 }
 
 // ---------------- Obrazovka 3: počasí ----------------

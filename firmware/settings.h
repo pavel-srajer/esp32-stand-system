@@ -2,6 +2,18 @@
 #include <Arduino.h>
 
 // Nastavení uložené v NVS (flash). Mění se přes webové rozhraní.
+// údaje na obrazovce Detail letadla (volací znak se zobrazuje vždy)
+enum DetailBits {
+  DET_LOGO = 1 << 0,
+  DET_ROUTE = 1 << 1,
+  DET_TYPE = 1 << 2,
+  DET_ALT = 1 << 3,
+  DET_FT = 1 << 4,
+  DET_SPEED = 1 << 5,
+  DET_DIST = 1 << 6,
+  DET_INDEX = 1 << 7,
+};
+
 struct Settings {
   String ssid;
   String pass;
@@ -27,6 +39,7 @@ struct Settings {
   String ntp1 = "pool.ntp.org";     // hlavní NTP server
   String ntp2 = "time.google.com";  // záložní NTP server
   int lang = 0;  // jazyk: 0 čeština, 1 English, 2 Deutsch, 3 Italiano
+  int detailMask = 0xFF;  // údaje na obrazovce Detail letadla (bity DET_*)
 };
 
 extern Settings gCfg;

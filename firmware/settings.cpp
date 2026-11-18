@@ -31,6 +31,7 @@ void settingsLoad() {
   gCfg.ntp1 = prefs.getString("ntp1", d.ntp1);
   gCfg.ntp2 = prefs.getString("ntp2", d.ntp2);
   gCfg.lang = prefs.getInt("lang", d.lang);
+  gCfg.detailMask = prefs.getInt("detail", d.detailMask);
   prefs.end();
 }
 
@@ -60,6 +61,7 @@ void settingsSave() {
   prefs.putString("ntp1", gCfg.ntp1);
   prefs.putString("ntp2", gCfg.ntp2);
   prefs.putInt("lang", gCfg.lang);
+  prefs.putInt("detail", gCfg.detailMask);
   prefs.end();
 }
 
