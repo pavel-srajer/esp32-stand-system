@@ -788,6 +788,20 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
 // ---------------- Obrazovka 2: detail letadla ----------------
 static int gDetailIdx = 0;
 
+// zkrátí text (UTF-8) tak, aby se s "…" vešel do šířky maxW px aktuálním písmem
+static void fitText(char* l, size_t cap, int maxW) {
+  if (spr.textWidth(l) <= maxW) return;
+  char tmp[64];
+  size_t n = strlen(l);
+  while (n > 1) {
+    n--;
+    while (n > 0 && (l[n] & 0xC0) == 0x80) n--;  // na začátek UTF-8 znaku
+    snprintf(tmp, sizeof tmp, "%.*s…", (int)n, l);
+    if (spr.textWidth(tmp) <= maxW) break;
+  }
+  strlcpy(l, tmp, cap);
+}
+
 static void drawDetail(const PlaneData& pd) {
   float range = RANGES_KM[gRangeIdx];
   int n = 0;
@@ -828,7 +842,7 @@ static void drawDetail(const PlaneData& pd) {
   };
   if (logo) add(I_LOGO, 60);
   add(I_CALL, 30);
-  if (hasRoute) add(I_ROUTE, 20);
+  if (hasRoute) add(I_ROUTE, gCfg.routeFmt == 3 ? 30 : 20);
   if ((M & DET_TYPE) && (pl.type[0] || pl.reg[0])) add(I_TYPE, 20);
   if (M & DET_ALT) add(I_ALT, 26);
   if ((M & DET_FT) && altOk) add(I_FT, 16);
@@ -849,12 +863,36 @@ static void drawDetail(const PlaneData& pd) {
         spr.setTextColor(col);
         spr.drawString(pl.flight, CX, cy);
         break;
-      case I_ROUTE:
-        snprintf(b, sizeof b, "%s%s → %s", route.plausible ? "" : "? ", route.from, route.to);
-        spr.setFont(&fontCZ_16);
+      case I_ROUTE: {
+        // formát dle nastavení; když údaj chybí, použije se jednodušší (název -> město -> IATA)
+        auto pick = [](const Airport& a, int fmt) -> const char* {
+          if (fmt == 3 && a.name[0]) return a.name;
+          if (fmt >= 2 && a.city[0]) return a.city;
+          if (fmt == 1 && a.icao[0]) return a.icao;
+          return a.iata[0] ? a.iata : a.icao;
+        };
+        const char* q = route.plausible ? "" : "? ";
+        const char* f1 = pick(route.from, gCfg.routeFmt);
+        const char* f2 = pick(route.to, gCfg.routeFmt);
         spr.setTextColor(rgb(255, 205, 90));
-        spr.drawString(b, CX, cy);
+        int maxW = 2 * (int)sqrtf(max(0.0f, 116.0f * 116 - (float)(cy - CY) * (cy - CY))) - 16;  // šířka displeje v této výšce
+        if (gCfg.routeFmt == 3) {  // názvy letišť na dva řádky
+          spr.setFont(&fontCZ_12);
+          char l1[56], l2[56];
+          snprintf(l1, sizeof l1, "%s%s", q, f1);
+          snprintf(l2, sizeof l2, "→ %s", f2);
+          fitText(l1, sizeof l1, maxW);
+          fitText(l2, sizeof l2, maxW);
+          spr.drawString(l1, CX, cy - 7);
+          spr.drawString(l2, CX, cy + 7);
+        } else {
+          snprintf(b, sizeof b, "%s%s → %s", q, f1, f2);
+          spr.setFont(&fontCZ_16);
+          if (spr.textWidth(b) > maxW) spr.setFont(&fontCZ_12);  // dlouhá města menším písmem
+          spr.drawString(b, CX, cy);
+        }
         break;
+      }
       case I_TYPE:
         snprintf(b, sizeof b, "%s  %s", pl.type, pl.reg);
         spr.setFont(&fontCZ_16);

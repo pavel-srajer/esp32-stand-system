@@ -45,7 +45,7 @@ Ve webovém nastavení v sekci **Obrazovky** zaškrtneš, co se má zobrazovat: 
 
 ## Detail letadla
 
-Ve webovém nastavení v sekci **Detail letadla** zaškrtneš, co se na obrazovce Detail zobrazuje: logo, trasa, typ a registrace, výška v metrech, výška ve stopách a FL, rychlost a kurz, vzdálenost a směr, pořadí letadla. Volací znak je vždy. Zapnuté řádky se seřadí pod sebe a vystředí. Tamtéž se volí **jednotky rychlosti**: km/h, uzly (kt) nebo mph.
+Ve webovém nastavení v sekci **Detail letadla** zaškrtneš, co se na obrazovce Detail zobrazuje: logo, trasa, typ a registrace, výška v metrech, výška ve stopách a FL, rychlost a kurz, vzdálenost a směr, pořadí letadla. Volací znak je vždy. Zapnuté řádky se seřadí pod sebe a vystředí. Tamtéž se volí **jednotky rychlosti**: km/h, uzly (kt) nebo mph. Volí se tam i **zobrazení trasy**: IATA (PRG → LHR), ICAO (LKPR → EGLL), město (Prague → London) nebo název letiště na dva řádky. Názvy jsou anglicky podle databází, a když nějaký údaj chybí, použije se jednodušší.
 
 ## Mapa a automatické přepínání
 

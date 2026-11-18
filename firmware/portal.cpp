@@ -557,6 +557,23 @@ static void handleRoot() {
         h += F("</option>");
       }
     }
+    h += F("</select><label>");
+    h += tr("Zobrazení trasy", "Route format", "Routenanzeige", "Formato rotta");
+    h += F("</label><select name='rfmt'>");
+    {
+      const char* RF[] = {"IATA (PRG → LHR)", "ICAO (LKPR → EGLL)",
+                          tr("město (Prague → London)", "city (Prague → London)", "Stadt (Prague → London)", "città (Prague → London)"),
+                          tr("název letiště", "airport name", "Flughafenname", "nome aeroporto")};
+      for (int i = 0; i < 4; i++) {
+        h += F("<option value='");
+        h += i;
+        h += "'";
+        if (i == gCfg.routeFmt) h += F(" selected");
+        h += ">";
+        h += RF[i];
+        h += F("</option>");
+      }
+    }
     h += F("</select>");
     for (int i = 0; i < 8; i++) {
       h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='det");
@@ -786,6 +803,7 @@ static void handleSave() {
     for (int i = 0; i < 8; i++)
       if (server.hasArg("det" + String(i))) dm |= 1 << i;
     gCfg.detailMask = dm;
+    if (server.hasArg("rfmt")) gCfg.routeFmt = constrain(server.arg("rfmt").toInt(), 0, 3);
     if (server.hasArg("spdu")) gCfg.speedUnit = constrain(server.arg("spdu").toInt(), 0, 2);
     if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);
     if (server.hasArg("rmap")) gCfg.rainMap = constrain(server.arg("rmap").toInt(), 0, 2);

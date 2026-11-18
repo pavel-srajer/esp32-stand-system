@@ -33,6 +33,7 @@ void settingsLoad() {
   gCfg.lang = prefs.getInt("lang", d.lang);
   gCfg.detailMask = prefs.getInt("detail", d.detailMask);
   gCfg.speedUnit = prefs.getInt("spdu", d.speedUnit);
+  gCfg.routeFmt = prefs.getInt("rfmt", d.routeFmt);
   prefs.end();
 }
 
@@ -64,6 +65,7 @@ void settingsSave() {
   prefs.putInt("lang", gCfg.lang);
   prefs.putInt("detail", gCfg.detailMask);
   prefs.putInt("spdu", gCfg.speedUnit);
+  prefs.putInt("rfmt", gCfg.routeFmt);
   prefs.end();
 }
 

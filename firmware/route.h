@@ -6,9 +6,15 @@
 //   1) adsb.lol routeset (POST, ověří trasu proti poloze letadla – "plausible")
 //   2) adsbdb.com /v0/callsign/<znak> (záloha)
 
+struct Airport {
+  char iata[5] = "";   // "PRG"
+  char icao[5] = "";   // "LKPR"
+  char city[24] = "";  // "Prague"
+  char name[44] = "";  // "Václav Havel Airport Prague"
+};
+
 struct RouteInfo {
-  char from[5] = "";   // IATA, např. "PRG"
-  char to[5] = "";
+  Airport from, to;
   bool plausible = true;  // false = trasa nesedí k poloze (může být zastaralá)
 };
 

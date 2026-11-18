@@ -16,7 +16,7 @@ static Entry sCache[CACHE];
 static char sPending[10] = "";
 static float sPendLat = 0, sPendLon = 0;
 static uint32_t sRetryAt = 0;
-static char sStatus[80] = "–";
+static char sStatus[120] = "–";
 static SemaphoreHandle_t sMutex = nullptr;
 
 static void lock() {
@@ -73,7 +73,7 @@ static int fromAdsbLol(const char* cs, float lat, float lon, RouteInfo& r) {
     return code < 0 ? -1 : 0;
   }
   JsonDocument filter;
-  filter[0]["_airports"][0]["iata"] = true;
+  for (const char* k : {"iata", "icao", "location", "name"}) filter[0]["_airports"][0][k] = true;
   filter[0]["plausible"] = true;
   JsonDocument doc;
   BodyStream s(http.getStreamPtr(), BodyStream::isChunked(http));
@@ -82,11 +82,17 @@ static int fromAdsbLol(const char* cs, float lat, float lon, RouteInfo& r) {
   if (err) return -1;
   JsonArray aps = doc[0]["_airports"];
   if (aps.size() < 2) return 0;
-  strlcpy(r.from, aps[0]["iata"] | "", sizeof r.from);
-  strlcpy(r.to, aps[aps.size() - 1]["iata"] | "", sizeof r.to);
+  auto fill = [](Airport& a, JsonObject o) {
+    strlcpy(a.iata, o["iata"] | "", sizeof a.iata);
+    strlcpy(a.icao, o["icao"] | "", sizeof a.icao);
+    strlcpy(a.city, o["location"] | "", sizeof a.city);
+    strlcpy(a.name, o["name"] | "", sizeof a.name);
+  };
+  fill(r.from, aps[0]);
+  fill(r.to, aps[aps.size() - 1]);
   JsonVariant pl = doc[0]["plausible"];
   r.plausible = pl.isNull() || pl.as<bool>() || pl.as<int>() != 0;
-  return (r.from[0] && r.to[0] && strcmp(r.from, r.to)) ? 1 : 0;
+  return (r.from.icao[0] && r.to.icao[0] && strcmp(r.from.icao, r.to.icao)) ? 1 : 0;
 }
 
 static int fromAdsbdb(const char* cs, RouteInfo& r) {
@@ -108,18 +114,24 @@ static int fromAdsbdb(const char* cs, RouteInfo& r) {
     return -1;
   }
   JsonDocument filter;
-  filter["response"]["flightroute"]["origin"]["iata_code"] = true;
-  filter["response"]["flightroute"]["destination"]["iata_code"] = true;
+  for (const char* side : {"origin", "destination"})
+    for (const char* k : {"iata_code", "icao_code", "municipality", "name"}) filter["response"]["flightroute"][side][k] = true;
   JsonDocument doc;
   BodyStream s(http.getStreamPtr(), BodyStream::isChunked(http));
   DeserializationError err = deserializeJson(doc, s, DeserializationOption::Filter(filter));
   http.end();
   if (err) return -1;
   JsonObject fr = doc["response"]["flightroute"];
-  strlcpy(r.from, fr["origin"]["iata_code"] | "", sizeof r.from);
-  strlcpy(r.to, fr["destination"]["iata_code"] | "", sizeof r.to);
+  auto fill = [](Airport& a, JsonObject o) {
+    strlcpy(a.iata, o["iata_code"] | "", sizeof a.iata);
+    strlcpy(a.icao, o["icao_code"] | "", sizeof a.icao);
+    strlcpy(a.city, o["municipality"] | "", sizeof a.city);
+    strlcpy(a.name, o["name"] | "", sizeof a.name);
+  };
+  fill(r.from, fr["origin"]);
+  fill(r.to, fr["destination"]);
   r.plausible = true;
-  return (r.from[0] && r.to[0] && strcmp(r.from, r.to)) ? 1 : 0;
+  return (r.from.icao[0] && r.to.icao[0] && strcmp(r.from.icao, r.to.icao)) ? 1 : 0;
 }
 
 void routeService() {
@@ -153,7 +165,9 @@ void routeService() {
     Serial.printf("[Trasa] %s\n", sStatus);
     return;
   }
-  if (res > 0) snprintf(sStatus, sizeof sStatus, "%s: %s → %s%s", cs, r.from, r.to, r.plausible ? "" : " (?)");
+  if (res > 0)
+    snprintf(sStatus, sizeof sStatus, "%s: %s → %s (%s → %s)%s", cs, r.from.iata, r.to.iata, r.from.city, r.to.city,
+             r.plausible ? "" : " (?)");
   else snprintf(sStatus, sizeof sStatus, "%s: –", cs);
   Serial.printf("[Trasa] %s\n", sStatus);
 
