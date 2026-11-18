@@ -30,6 +30,7 @@
 #include "radar.h"
 #include "forecast.h"
 #include "logo.h"
+#include "route.h"
 #include "namedays.h"
 #include "mapdata.h"
 #include "i18n.h"
@@ -536,7 +537,8 @@ static void netTask(void*) {
         weatherInterval = ok ? WEATHER_REFRESH_MS : 60000;  // při chybě zkus za minutu
         lastWeather = millis();
       }
-      logoService();  // logo pro obrazovku Detail (jen když nějaké čeká)
+      logoService();   // logo pro obrazovku Detail (jen když nějaké čeká)
+      routeService();  // trasa letu pro obrazovku Detail
       // předpověď (Open-Meteo) – pro předpověď, meteoradar i hodiny
       static uint32_t lastFc = 0, fcInterval = FORECAST_REFRESH_MS;
       static bool fcDone = false;
@@ -807,13 +809,17 @@ static void drawDetail(const PlaneData& pd) {
   // logo společnosti (stahuje se na pozadí; dokud není, rozložení bez loga)
   static uint8_t logoPx[LOGO_SIZE * LOGO_SIZE];
   char icao[4];
-  bool logo = logoIcaoFromCallsign(pl.flight, icao) && logoGet(icao, logoPx);
-  // svislé pozice: index, volací znak, typ, výška, FL, rychlost, vzdálenost
+  bool airline = logoIcaoFromCallsign(pl.flight, icao);
+  bool logo = airline && logoGet(icao, logoPx);
+  // trasa (odkud → kam) – jen u letů společností, dohledává se na pozadí
+  RouteInfo route;
+  bool hasRoute = airline && routeGet(pl.flight, pl.lat, pl.lon, route);
+  // svislé pozice: index, volací znak, typ, výška, FL, rychlost, vzdálenost, trasa
   const int* Y;
-  static const int Y_LOGO[] = {216, 88, 114, 138, 158, 178, 198};
-  static const int Y_PLAIN[] = {30, 60, 90, 120, 142, 166, 188};
+  static const int Y_LOGO[] = {214, 86, 124, 144, 162, 179, 197, 106};
+  static const int Y_PLAIN[] = {26, 52, 96, 120, 140, 162, 184, 76};
   Y = logo ? Y_LOGO : Y_PLAIN;
-  if (logo) spr.pushImage(CX - LOGO_SIZE / 2, 16, LOGO_SIZE, LOGO_SIZE, (const lgfx::rgb332_t*)logoPx);
+  if (logo) spr.pushImage(CX - LOGO_SIZE / 2, 9, LOGO_SIZE, LOGO_SIZE, (const lgfx::rgb332_t*)logoPx);
 
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setFont(&fontCZ_12);
@@ -824,6 +830,13 @@ static void drawDetail(const PlaneData& pd) {
   spr.setFont(&fonts::FreeSansBold18pt7b);
   spr.setTextColor(col);
   spr.drawString(pl.flight, CX, Y[1]);
+
+  if (hasRoute) {
+    snprintf(b, sizeof b, "%s%s → %s", route.plausible ? "" : "? ", route.from, route.to);
+    spr.setFont(&fontCZ_16);
+    spr.setTextColor(rgb(255, 205, 90));
+    spr.drawString(b, CX, Y[7]);
+  }
 
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(200, 200, 200));
@@ -1476,6 +1489,7 @@ void appStatusJson(JsonObject o) {
   o["rain_age"] = radarUpdatedMs() ? (long)((millis() - radarUpdatedMs()) / 1000) : -1;
   o["rain_err"] = radarError();
   o["logo"] = logoStatus();
+  o["route"] = routeStatus();
   {
     RadarInfo ri;
     radarInfoGet(ri);

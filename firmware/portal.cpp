@@ -197,7 +197,7 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
  var a=j.app;rows('app',[['{{planes}}',a.planes+' ({{range}} '+a.range+' km)'],['ADS-B',age(a.planes_age)+(a.planes_err?' · {{error}}: '+esc(a.planes_err):'')],
   ['{{station_w}}',age(a.weather_age)+(a.weather_err?' · {{error}}: '+esc(a.weather_err):'')],
   ['{{forecast}} Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · {{alerts}}: '+a.fc_alerts:'')+(a.fc_err?' · {{error}}: '+esc(a.fc_err):'')],
-  ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{station}}',esc(a.station)],
+  ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{route}}',esc(a.route||'–')],['{{station}}',esc(a.station)],
   ['{{bright}}',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['{{time}}',esc(a.ntp)],['{{update}}',esc(a.ota)],['{{stack}}',a.stack_net+' B (net), '+a.stack_loop+' B (UI)']]);
  t('st','{{updated}} '+new Date().toLocaleTimeString('{{locale}}'));
 }).catch(function(){t('st','{{noresp}}')})}
@@ -261,6 +261,7 @@ static const Tok TOKS[] = {
     {"frames", {"snímků", "images", "Bilder", "immagini"}},
     {"radarhere", {"Radar u tebe", "Radar near you", "Radar bei dir", "Radar vicino a te"}},
     {"logos", {"Loga společností", "Airline logos", "Airline-Logos", "Loghi compagnie"}},
+    {"route", {"Trasa letu", "Flight route", "Flugroute", "Rotta del volo"}},
     {"station", {"Stanice", "Station", "Station", "Stazione"}},
     {"bright", {"Jas displeje", "Display brightness", "Displayhelligkeit", "Luminosità display"}},
     {"time", {"Čas (NTP)", "Time (NTP)", "Zeit (NTP)", "Ora (NTP)"}},
