@@ -34,6 +34,8 @@ void settingsLoad() {
   gCfg.detailMask = prefs.getInt("detail", d.detailMask);
   gCfg.speedUnit = prefs.getInt("spdu", d.speedUnit);
   gCfg.routeFmt = prefs.getInt("rfmt", d.routeFmt);
+  gCfg.priceFee = prefs.getFloat("pfee", d.priceFee);
+  gCfg.priceVat = prefs.getFloat("pvat", d.priceVat);
   prefs.end();
 }
 
@@ -66,6 +68,8 @@ void settingsSave() {
   prefs.putInt("detail", gCfg.detailMask);
   prefs.putInt("spdu", gCfg.speedUnit);
   prefs.putInt("rfmt", gCfg.routeFmt);
+  prefs.putFloat("pfee", gCfg.priceFee);
+  prefs.putFloat("pvat", gCfg.priceVat);
   prefs.end();
 }
 

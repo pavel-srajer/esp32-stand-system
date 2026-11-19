@@ -31,6 +31,7 @@
 #include "forecast.h"
 #include "logo.h"
 #include "route.h"
+#include "price.h"
 #include "namedays.h"
 #include "mapdata.h"
 #include "i18n.h"
@@ -41,7 +42,7 @@
 static const int PIN_BUTTON = 9;  // tlačítko BOOT
 
 // obrazovky (pořadí = bity v gCfg.screens)
-enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_COUNT };
+enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_PRICE, SCR_COUNT };
 static const float RAIN_RADII[] = {25, 50, 100, 200};
 static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
 static const uint32_t RAIN_REFRESH_MS = 300000;      // ČHMI radar každých 5 min
@@ -536,6 +537,17 @@ static void netTask(void*) {
         bool ok = fetchWeather();
         weatherInterval = ok ? WEATHER_REFRESH_MS : 60000;  // při chybě zkus za minutu
         lastWeather = millis();
+      }
+      // spotová cena elektřiny (ceny se mění jednou denně; zítřek OTE zveřejní kolem 13:00)
+      static uint32_t lastPrice = 0, priceInterval = 1800000;
+      static bool priceDone = false;
+      if (scrOn(SCR_PRICE) && timeValid()) {
+        priceTick();
+        if (!priceDone || millis() - lastPrice >= priceInterval) {
+          priceDone = true;
+          priceInterval = priceUpdate() ? 1800000 : 120000;
+          lastPrice = millis();
+        }
       }
       logoService();   // logo pro obrazovku Detail (jen když nějaké čeká)
       routeService();  // trasa letu pro obrazovku Detail
@@ -1373,6 +1385,139 @@ static void drawRain(const Forecast& fc, uint32_t now) {
   }
 }
 
+// ---------------- Obrazovka: spotová cena elektřiny ----------------
+static uint32_t gPriceTomorrowUntil = 0;  // dlouhý stisk: na chvíli graf zítřka
+
+static void drawPrice(uint32_t now) {
+  static PriceData p;
+  priceGet(p);
+  char b[64], t[16];
+  const char* title = tr("Spotová cena elektřiny", "Spot electricity price", "Strom-Spotpreis", "Prezzo spot elettricità");
+  if (!p.todayOk || !timeValid()) {
+    drawCenteredMsg(title, p.err[0] ? p.err : tr("načítám…", "loading…", "lädt…", "caricamento…"));
+    return;
+  }
+  if (gPriceTomorrowUntil && (int32_t)(gPriceTomorrowUntil - now) <= 0) gPriceTomorrowUntil = 0;
+  bool showTom = gPriceTomorrowUntil && p.tomorrowOk;
+  const float* day = showTom ? p.tomorrow : p.today;
+
+  time_t tt = time(nullptr);
+  struct tm lt;
+  localtime_r(&tt, &lt);
+  int slot = lt.tm_hour * 4 + lt.tm_min / 15;
+
+  // rozsah dne (konečné ceny) pro barvy a graf
+  float mn = 1e9, mx = -1e9;
+  int iMn = 0, iMx = 0;
+  for (int i = 0; i < PRICE_SLOTS; i++) {
+    float v = priceFinal(day[i]);
+    if (isnan(v)) continue;
+    if (v < mn) { mn = v; iMn = i; }
+    if (v > mx) { mx = v; iMx = i; }
+  }
+  auto colOf = [&](float v) -> uint16_t {
+    if (v < 0) return rgb(80, 180, 255);                 // záporná cena
+    float r = mx > mn ? (v - mn) / (mx - mn) : 0.5f;
+    return r < 0.33f ? rgb(60, 220, 100) : r < 0.66f ? rgb(255, 200, 0) : rgb(255, 80, 60);
+  };
+  auto price2 = [&](char* out, size_t n, float v) { fmtDec(out, n, v, 2); };
+
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(150, 150, 150));
+  bool extra = gCfg.priceFee != 0 || gCfg.priceVat != 0;
+  spr.drawString(extra ? tr("Cena vč. poplatků", "Price incl. fees", "Preis inkl. Gebühren", "Prezzo con oneri")
+                       : tr("Spotová cena", "Spot price", "Spotpreis", "Prezzo spot"),
+                 CX, 24);
+
+  if (!showTom) {
+    float cur = priceFinal(p.today[slot]);
+    int h2 = (slot + 1) / 4, m2 = ((slot + 1) % 4) * 15;
+    snprintf(b, sizeof b, "%02d:%02d–%02d:%02d", lt.tm_hour, (lt.tm_min / 15) * 15, h2 % 24, m2);
+    spr.setFont(&fontCZ_16);
+    spr.setTextColor(rgb(200, 200, 200));
+    spr.drawString(b, CX, 44);
+    // velká aktuální cena
+    if (!isnan(cur)) {
+      price2(t, sizeof t, cur);
+      spr.setFont(&fonts::FreeSansBold24pt7b);
+      int tw = spr.textWidth(t);
+      spr.setFont(&fontCZ_12);
+      const char* unit = tr("Kč/kWh", "CZK/kWh", "CZK/kWh", "CZK/kWh");
+      int uw = spr.textWidth(unit);
+      int x0 = CX - (tw + 4 + uw) / 2;
+      spr.setTextDatum(textdatum_t::middle_left);
+      spr.setFont(&fonts::FreeSansBold24pt7b);
+      spr.setTextColor(colOf(cur));
+      spr.drawString(t, x0, 77);
+      spr.setFont(&fontCZ_12);
+      spr.setTextColor(rgb(170, 170, 170));
+      spr.drawString(unit, x0 + tw + 4, 86);
+      spr.setTextDatum(textdatum_t::middle_center);
+    }
+    // další čtvrthodina
+    float nxt = slot + 1 < PRICE_SLOTS ? priceFinal(p.today[slot + 1]) : (p.tomorrowOk ? priceFinal(p.tomorrow[0]) : NAN);
+    if (!isnan(nxt) && !isnan(cur)) {
+      price2(t, sizeof t, nxt);
+      snprintf(b, sizeof b, "%s %s %s", tr("další 15 min:", "next 15 min:", "nächste 15 min:", "prossimi 15 min:"), t,
+               nxt > cur + 0.005f ? "↑" : nxt < cur - 0.005f ? "↓" : "→");
+      spr.setFont(&fontCZ_12);
+      spr.setTextColor(colOf(nxt));
+      spr.drawString(b, CX, 108);
+    }
+  } else {
+    spr.setFont(&fontCZ_16);
+    spr.setTextColor(rgb(120, 200, 255));
+    spr.drawString(tr("zítra", "tomorrow", "morgen", "domani"), CX, 52);
+    if (mx > -1e8) {
+      float avg = 0;
+      int n = 0;
+      for (int i = 0; i < PRICE_SLOTS; i++)
+        if (!isnan(day[i])) { avg += priceFinal(day[i]); n++; }
+      price2(t, sizeof t, n ? avg / n : 0);
+      snprintf(b, sizeof b, "%s %s %s", tr("průměr", "average", "Durchschnitt", "media"), t, tr("Kč/kWh", "CZK/kWh", "CZK/kWh", "CZK/kWh"));
+      spr.setFont(&fontCZ_16);
+      spr.setTextColor(rgb(230, 230, 230));
+      spr.drawString(b, CX, 82);
+    }
+  }
+
+  // graf dne po čtvrthodinách (2 px na čtvrthodinu)
+  const int gx = 24, gy0 = 122, gh = 56;
+  float top = max(mx, 0.0f), bot = min(mn, 0.0f);
+  if (top - bot < 0.01f) top = bot + 0.01f;
+  auto yOf = [&](float v) { return gy0 + (int)lroundf((top - v) / (top - bot) * gh); };
+  int y0 = yOf(0);
+  for (int i = 0; i < PRICE_SLOTS; i++) {
+    float v = priceFinal(day[i]);
+    if (isnan(v)) continue;
+    int yv = yOf(v);
+    uint16_t c = colOf(v);
+    if (!showTom && i == slot) c = rgb(255, 255, 255);
+    else if (!showTom && i < slot) c = lgfx::color565(((c >> 11) & 31) * 3, ((c >> 5) & 63) * 1, (c & 31) * 3);  // minulost tlumeně
+    int ya = min(yv, y0), yb = max(yv, y0);
+    spr.fillRect(gx + i * 2, ya, 2, max(1, yb - ya), c);
+  }
+  spr.drawFastHLine(gx, y0, PRICE_SLOTS * 2, rgb(90, 90, 90));
+  spr.setFont(&fontCZ_10);
+  spr.setTextColor(rgb(120, 120, 120));
+  for (int hh = 6; hh <= 18; hh += 6) {  // 0 a 24 by na kulatém displeji ořízl okraj
+    snprintf(t, sizeof t, "%d", hh);
+    spr.drawString(t, gx + hh * 8, gy0 + gh + 9);
+  }
+
+  // nejlevnější a nejdražší čtvrthodina dne
+  if (mx > -1e8) {
+    char a1[12], a2[12];
+    price2(a1, sizeof a1, mn);
+    price2(a2, sizeof a2, mx);
+    snprintf(b, sizeof b, "↓%s %02d:%02d  ↑%s %02d:%02d", a1, iMn / 4, (iMn % 4) * 15, a2, iMx / 4, (iMx % 4) * 15);
+    spr.setFont(&fontCZ_12);
+    spr.setTextColor(rgb(170, 170, 170));
+    spr.drawString(b, CX, 202);
+  }
+}
+
 // ===================================================================
 //  Jas displeje
 // ===================================================================
@@ -1565,6 +1710,13 @@ void appStatusJson(JsonObject o) {
   o["logo"] = logoStatus();
   o["route"] = routeStatus();
   {
+    PriceData pr;
+    priceGet(pr);
+    o["price_age"] = pr.updatedMs ? (long)((millis() - pr.updatedMs) / 1000) : -1;
+    o["price_tom"] = pr.tomorrowOk;
+    o["price_err"] = pr.err;
+  }
+  {
     RadarInfo ri;
     radarInfoGet(ri);
     o["rain_info"] = ri.valid ? String(ri.line1) + (ri.line2[0] ? String(" · ") + ri.line2 : String("")) : String("");
@@ -1619,6 +1771,9 @@ static void onLongPress() {
       break;
     case SCR_FORECAST:
       gForceForecast = true;
+      break;
+    case SCR_PRICE:
+      gPriceTomorrowUntil = gPriceTomorrowUntil ? 0 : millis() + 30000;  // graf zítřka na 30 s
       break;
     default:
       gForceWeather = true;
@@ -1879,6 +2034,7 @@ void loop() {
         case SCR_WEATHER: drawWeather(w); break;
         case SCR_CLOCK: drawClock(pd, w, fc); break;
         case SCR_FORECAST: drawForecast(fc); break;
+        case SCR_PRICE: drawPrice(now); break;
         case SCR_RAIN: drawRain(fc, now); break;
       }
       drawWifiDot();

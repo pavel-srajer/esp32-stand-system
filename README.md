@@ -14,6 +14,7 @@ Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 | **Předpověď**: aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko). Dole je výhled na 2–8 h | obnovit |
 | **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova. Dole je vyhodnocení, třeba „Déšť 12 km Z, dorazí asi za 25 min“ nebo „Bouřka u tebe, skončí asi za 20 min“, a pod ním rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI**: teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
+| **Spotová cena elektřiny**: aktuální čtvrthodina v Kč/kWh (barva podle toho, jak je levná nebo drahá v rámci dne), další čtvrthodina, graf dne po 15 min a nejlevnější a nejdražší čas | zítřek na 30 s |
 | **Hodiny**: čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
 
 Krátký stisk přepne na další zapnutou obrazovku. Které obrazovky se zobrazují, se nastavuje ve webovém rozhraní.
@@ -132,6 +133,7 @@ Pokud se deska nechce nahrávat, podrž BOOT, stiskni RESET a BOOT pusť.
 - **Letadla:** [airplanes.live](https://airplanes.live) API (`/v2/point/lat/lon/radius`), při výpadku [adsb.lol](https://adsb.lol). Obě jsou zdarma, bez klíče, pro nekomerční použití. Dotaz jde jednou za 10 s.
 - **Loga leteckých společností:** [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos) (`flightaware_logos`, 90×90 PNG podle ICAO kódu). Kód se vezme ze začátku volacího znaku (CSA123 → CSA). Logo se stáhne až při prvním zobrazení a v paměti zůstává posledních 6. Loga jsou majetkem příslušných společností.
 - **Trasa letu (odkud → kam):** ADS-B trasu nevysílá, proto se dohledává podle volacího znaku. Hlavní zdroj je [adsb.lol routeset](https://api.adsb.lol), který trasu ověří proti poloze letadla (u nevěrohodné se zobrazí „?“). Záložní zdroj je [adsbdb.com](https://www.adsbdb.com). Trasa se zobrazuje jako IATA kódy (PRG → LHR) jen u letů leteckých společností a v paměti se drží posledních 6.
+- **Cena elektřiny:** výsledky denního trhu [OTE](https://www.ote-cr.cz) po 15 min, přepočtené na CZK, převzaté ze [spotovaelektrina.cz](https://spotovaelektrina.cz) (zdarma, bez klíče). Dnešek i zítřek přijdou v jedné odpovědi, zítřek OTE zveřejňuje kolem 13:00. Ve webovém nastavení se dá zadat přirážka (Kč/kWh) a DPH, výchozí je holá burzovní cena.
 - **Předpověď:** [Open-Meteo](https://open-meteo.com) (zdarma, bez klíče): aktuální stav, 15minutové srážky na 2 h dopředu, hodinová a denní předpověď. Obnovuje se každých 15 min.
 - **Meteoradar:** ČHMI, kompozit maximální odrazivosti `maxz/png_masked` (PNG každých 5 min). Zařízení stáhne posledních 6 snímků, ořízne je na okolí domova a uloží komprimované (RLE), aby se vešly do RAM.
 - **Vyhodnocení radaru:** v nejnovějším snímku se najdou nejbližší srážky (vzdálenost, směr, intenzita podle barvy). Porovnáním nejstaršího a nejnovějšího snímku se určí, kam a jak rychle se srážky posouvají. Pak se z domova díváme proti směru pohybu, co a kdy k nám dorazí, případně kdy přestane. Výsledek je i na prvním řádku upozornění na obrazovce Předpověď, kde nahrazuje modelový odhad.

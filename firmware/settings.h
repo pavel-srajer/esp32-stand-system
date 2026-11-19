@@ -42,6 +42,8 @@ struct Settings {
   int detailMask = 0xFF;  // údaje na obrazovce Detail letadla (bity DET_*)
   int speedUnit = 0;      // rychlost letadla: 0 km/h, 1 uzly (kt), 2 mph
   int routeFmt = 0;       // trasa: 0 IATA, 1 ICAO, 2 město, 3 název letiště
+  float priceFee = 0;     // cena elektřiny: přirážka Kč/kWh (distribuce, poplatky)
+  float priceVat = 0;     // cena elektřiny: DPH v %
 };
 
 extern Settings gCfg;
