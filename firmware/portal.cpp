@@ -103,7 +103,8 @@ static const char PAGE_HEAD[] PROGMEM = R"HTML(<!doctype html><html lang="{{lang
 input[type=range]{padding:0;border:0;background:none;height:38px;accent-color:#58a6ff}.pct{color:#e6edf3;font-weight:600}
 .so{display:flex;align-items:center;gap:6px;border-bottom:1px solid #21262d;padding:2px 0}
 .so label{flex:1;display:flex;gap:8px;align-items:center;margin:8px 0}.so input{width:auto}
-.mv{width:auto!important;margin:0!important;padding:6px 11px!important;font-size:.85em!important;background:#21262d!important;border:1px solid #30363d!important}
+.hd{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:8px 10px;color:#7d8590;font-size:1.25em;line-height:1}
+.so.drag{background:#1f2a37;border-radius:8px;box-shadow:0 2px 10px #0008}.so.drag .hd{cursor:grabbing;color:#58a6ff}
 body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:16px}
 main{max-width:460px;margin:auto}h1{font-size:1.4em;margin:.2em 0 .8em}
 fieldset{border:1px solid #30363d;border-radius:10px;margin:0 0 16px;padding:12px 14px}
@@ -122,8 +123,17 @@ var s=document.getElementById('st'),c=document.getElementById('custom');
 function u(){c.className=s.value=='-1'?'':'hide'}s.onchange=u;u();
 var n=document.getElementById('ssid_sel'),m=document.getElementById('ssid');
 n.onchange=function(){if(n.value)m.value=n.value;};
-function mv(b,d){var r=b.parentNode,p=r.parentNode;if(d<0&&r.previousElementSibling)p.insertBefore(r,r.previousElementSibling);
- else if(d>0&&r.nextElementSibling)p.insertBefore(r.nextElementSibling,r);so()}
+// řazení obrazovek přetažením za úchyt ☰ (Pointer Events: myš i dotyk)
+(function(){var box=document.getElementById('sord');if(!box)return;var drag=null;
+ box.addEventListener('pointerdown',function(e){var h=e.target.closest('.hd');if(!h)return;
+  drag=h.parentNode;drag.classList.add('drag');h.setPointerCapture(e.pointerId);e.preventDefault()});
+ box.addEventListener('pointermove',function(e){if(!drag)return;e.preventDefault();
+  var rows=[].slice.call(box.children);
+  for(var i=0;i<rows.length;i++){var r=rows[i];if(r===drag)continue;var b=r.getBoundingClientRect();
+   if(e.clientY<b.top+b.height/2){if(drag.nextElementSibling!==r)box.insertBefore(drag,r);so();return}}
+  if(box.lastElementChild!==drag)box.appendChild(drag);so()});
+ function end(){if(drag){drag.classList.remove('drag');drag=null;so()}}
+ box.addEventListener('pointerup',end);box.addEventListener('pointercancel',end)})();
 function so(){var o=document.getElementById('order');if(o)o.value=[].map.call(document.querySelectorAll('#sord .so'),function(e){return e.dataset.i}).join('')}
 so();
 var bt=0;document.querySelectorAll('.br').forEach(function(r){r.oninput=function(){
@@ -510,10 +520,10 @@ static void handleRoot() {
     h += F("<fieldset><legend>");
     h += tr("Obrazovky", "Screens", "Bildschirme", "Schermate");
     h += F("</legend><small>");
-    h += tr("Krátký stisk tlačítka přepíná mezi zapnutými obrazovkami v tomto pořadí. Šipkami ▲▼ pořadí změníš.",
-            "A short button press switches between enabled screens in this order. Change the order with ▲▼.",
-            "Kurzer Tastendruck wechselt die aktiven Bildschirme in dieser Reihenfolge. Mit ▲▼ änderst du sie.",
-            "Una breve pressione passa tra le schermate attive in quest’ordine. Cambia l’ordine con ▲▼.");
+    h += tr("Krátký stisk tlačítka přepíná mezi zapnutými obrazovkami v tomto pořadí. Pořadí změníš přetažením za úchyt ☰.",
+            "A short button press switches between enabled screens in this order. Drag a row by its ☰ handle to reorder.",
+            "Kurzer Tastendruck wechselt die aktiven Bildschirme in dieser Reihenfolge. Zum Umsortieren am Griff ☰ ziehen.",
+            "Una breve pressione passa tra le schermate attive in quest’ordine. Trascina una riga dalla maniglia ☰ per riordinare.");
     h += F("</small>");
     // seznam v uloženém pořadí; šipky mění pořadí, skryté pole 'order' ho odešle
     {
@@ -533,14 +543,13 @@ static void handleRoot() {
         int i = ord[k];
         h += F("<div class='so' data-i='");
         h += i;
-        h += F("'><label><input type='checkbox' name='scr");
+        h += F("'><span class='hd' aria-hidden='true'>☰</span><label><input type='checkbox' name='scr");
         h += i;
         h += "'";
         if (gCfg.screens & (1 << i)) h += F(" checked");
         h += "> ";
         h += NAMES[i];
-        h += F("</label><button type='button' class='mv' onclick='mv(this,-1)' aria-label='▲'>▲</button>"
-               "<button type='button' class='mv' onclick='mv(this,1)' aria-label='▼'>▼</button></div>");
+        h += F("</label></div>");
       }
       h += F("</div><input type='hidden' name='order' id='order'>");
     }

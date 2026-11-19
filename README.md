@@ -51,7 +51,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 | **Jazyk** | čeština / English / Deutsch / Italiano (displej i web). Jmeniny jsou jen česky, státní svátky se překládají |
 | **WiFi** | síť ze seznamu nalezených, heslo |
 | **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
-| **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (šipky ▲▼), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
+| **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
 | **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
 | **Spotová cena elektřiny** | přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
