@@ -419,6 +419,17 @@ static void handleBright() {
 
 static void handleRoot() {
   gLastActivity = millis();
+  if (gOtaBootMode || gOta.state == OTA_DOWNLOADING) {  // během aktualizace jen krátká stránka (šetří RAM)
+    String pg = F("<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width'>"
+                  "<meta http-equiv='refresh' content='30'>"
+                  "<body style='font-family:sans-serif;background:#0d1117;color:#e6edf3;padding:24px'><h2>");
+    pg += tr("Aktualizuji firmware…", "Updating firmware…", "Firmware wird aktualisiert…", "Aggiornamento firmware…");
+    pg += "</h2><p>";
+    pg += tr("Stránka se za chvíli sama obnoví.", "This page will reload shortly.", "Die Seite lädt gleich neu.", "La pagina si ricaricherà a breve.");
+    pg += "</p></body>";
+    server.send(200, "text/html; charset=utf-8", pg);
+    return;
+  }
   if (server.hasArg("rescan")) scan();
 
   String h;
@@ -694,7 +705,16 @@ static void handleRoot() {
       }
     }
     h += F("</select>");
-    for (int i = 0; i < 9; i++) {
+    // pořadí jako na displeji (shora dolů); -1 = volací znak, který je vždy zobrazen
+    static const int ORDER[] = {0, -1, 8, 1, 2, 3, 4, 5, 6, 7};
+    for (int i : ORDER) {
+      if (i < 0) {
+        h += F("<label style='display:flex;gap:8px;align-items:center;color:#7d8590'>"
+               "<input type='checkbox' style='width:auto' checked disabled> ");
+        h += tr("Volací znak (vždy)", "Callsign (always)", "Rufzeichen (immer)", "Nominativo (sempre)");
+        h += F("</label>");
+        continue;
+      }
       h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='det");
       h += i;
       h += "'";
