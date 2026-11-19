@@ -129,3 +129,17 @@ bool settingsTakeOtaFlag() {
   prefs.end();
   return f;
 }
+
+void settingsSetOtaUrl(const String& url) {
+  prefs.begin("cfg", false);
+  prefs.putString("otaurl", url);
+  prefs.end();
+}
+
+String settingsTakeOtaUrl() {
+  prefs.begin("cfg", false);
+  String u = prefs.getString("otaurl", "");
+  if (u.length()) prefs.remove("otaurl");
+  prefs.end();
+  return u;
+}

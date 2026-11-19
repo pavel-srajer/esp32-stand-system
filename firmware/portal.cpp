@@ -378,6 +378,10 @@ static void handleSystem() {
 
 static void handleStatus() {
   gLastActivity = millis();
+  if (gOtaBootMode || gOta.state == OTA_DOWNLOADING) {  // během aktualizace šetřit paměť
+    server.send(503, "text/plain", "updating");
+    return;
+  }
   JsonDocument doc;
   sysinfoJson(doc.to<JsonObject>());
   String out;

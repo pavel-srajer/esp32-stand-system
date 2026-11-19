@@ -68,4 +68,6 @@ bool settingsTakePortalFlag();  // přečte a smaže
 
 // Příznak "po restartu hned instalovat aktualizaci" (dokud je paměť volná)
 void settingsSetOtaFlag(bool on);
+void settingsSetOtaUrl(const String& url);  // adresa firmware.bin pro instalaci po restartu
+String settingsTakeOtaUrl();                 // přečte a smaže
 bool settingsTakeOtaFlag();

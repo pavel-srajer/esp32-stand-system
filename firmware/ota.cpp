@@ -78,28 +78,67 @@ void otaCheck(bool install) {
     return;
   }
   if (!gOtaBootMode) {
-    // Za běhu je RAM rozdrobená a druhé TLS spojení (GitHub přesměrovává na CDN) by
-    // nemuselo projít. Restart a stažení hned po startu, kdy je paměť volná.
+    // Za běhu je RAM rozdrobená. Adresu si uložíme a stáhneme hned po restartu,
+    // kdy je paměť volná a nemusí se znovu volat GitHub API.
     Serial.println("[OTA] nová verze – restart a instalace po startu");
+    settingsSetOtaUrl(url);
     settingsSetOtaFlag(true);
     delay(200);
     ESP.restart();
   }
+  otaInstall(url);
+}
 
-  Serial.printf("[OTA] stahuji %s\n", url.c_str());
-  gOta.state = OTA_DOWNLOADING;
-  gOta.progress = 0;
-  WiFiClientSecure dl;
-  dl.setInsecure();
-  httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);  // GitHub přesměrovává na CDN
-  httpUpdate.rebootOnUpdate(true);
-  httpUpdate.onProgress([](int cur, int total) {
-    if (total > 0) gOta.progress = (int)(100LL * cur / total);
-  });
-  t_httpUpdate_return r = httpUpdate.update(dl, url);
-  // při úspěchu se zařízení restartuje a sem se nedostane
+// Zjistí cíl přesměrování (GitHub -> release-assets.githubusercontent.com) a spojení
+// ÚPLNĚ zavře. HTTPClient by při přesměrování na jiný server nechal první spojení
+// otevřené a otevřel druhé – dvě TLS spojení (~90 kB) se do RAM ESP32-C3 nevejdou.
+static String resolveRedirect(const String& url) {
+  // GET bez následování přesměrování; čteme jen hlavičky (tělo odpovědi 302 je prázdné).
+  // Pozn.: HEAD nejde – GitHub na něj vrací jinou adresu, kterou CDN pro stažení odmítne.
+  WiFiClientSecure c;
+  c.setInsecure();
+  HTTPClient h;
+  h.setReuse(false);
+  h.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  h.setConnectTimeout(8000);
+  h.setTimeout(10000);
+  h.setUserAgent("esp32-stand-system/" FW_VERSION);
+  static const char* hdrs[] = {"Location"};
+  h.collectHeaders(hdrs, 1);
+  String target = url;
+  if (h.begin(c, url)) {
+    int code = h.GET();
+    String loc = h.header("Location");
+    if (code / 100 == 3 && loc.length()) target = loc;
+    Serial.printf("[OTA] GitHub %d%s\n", code, target != url ? " -> přesměrování" : "");
+    h.end();  // setReuse(false): spojení se opravdu zavře a uvolní paměť
+  }
+  return target;
+}
+
+void otaInstall(const String& url) {
+  for (int attempt = 1; attempt <= 3; attempt++) {
+    gOta.state = OTA_DOWNLOADING;
+    gOta.progress = 0;
+    String target = resolveRedirect(url);
+    Serial.printf("[OTA] pokus %d, stahuji (%u znaků adresy), volná RAM %u kB, blok %u kB\n", attempt,
+                  target.length(), (unsigned)(ESP.getFreeHeap() / 1024), (unsigned)(ESP.getMaxAllocHeap() / 1024));
+    WiFiClientSecure dl;
+    dl.setInsecure();
+    httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    httpUpdate.rebootOnUpdate(true);
+    httpUpdate.onProgress([](int cur, int total) {
+      if (total > 0) gOta.progress = (int)(100LL * cur / total);
+    });
+    t_httpUpdate_return r = httpUpdate.update(dl, target);
+    // při úspěchu se zařízení restartuje a sem se nedostane
+    char tls[40] = "";
+    dl.lastError(tls, sizeof tls);
+    snprintf(gOta.msg, sizeof gOta.msg, "%s%s%s (blok %u kB)",
+             r == HTTP_UPDATE_NO_UPDATES ? "žádná aktualizace" : httpUpdate.getLastErrorString().c_str(),
+             tls[0] ? ", TLS: " : "", tls, (unsigned)(ESP.getMaxAllocHeap() / 1024));
+    Serial.printf("[OTA] pokus %d selhal: %s\n", attempt, gOta.msg);
+    delay(3000);
+  }
   gOta.state = OTA_FAILED;
-  snprintf(gOta.msg, sizeof gOta.msg, "%s", r == HTTP_UPDATE_NO_UPDATES ? "žádná aktualizace"
-                                                : httpUpdate.getLastErrorString().c_str());
-  Serial.printf("[OTA] chyba: %s\n", gOta.msg);
 }

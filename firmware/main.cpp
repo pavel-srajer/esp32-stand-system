@@ -525,7 +525,9 @@ static void netTask(void*) {
     ensureWiFi();
     if (WiFi.status() == WL_CONNECTED && gOtaBootMode) {
       // restart kvůli aktualizaci: stáhnout hned, dokud je paměť volná
-      otaCheck(true);           // při úspěchu se zařízení restartuje
+      String url = settingsTakeOtaUrl();
+      if (url.length()) otaInstall(url);  // adresa uložená před restartem – bez dotazu na GitHub API
+      else otaCheck(true);                // při úspěchu se zařízení restartuje
       gOtaBootMode = false;     // nepovedlo se -> normální provoz (zkusí se zase za den)
     }
     if (WiFi.status() == WL_CONNECTED) {

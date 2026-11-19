@@ -22,7 +22,7 @@ struct OtaStatus {
   volatile int state = OTA_IDLE;
   volatile int progress = 0;  // 0-100 %
   char latest[24] = "";       // poslední verze na GitHubu
-  char msg[48] = "";
+  char msg[96] = "";
 };
 
 extern OtaStatus gOta;
@@ -30,6 +30,10 @@ extern volatile bool gOtaRequest;  // požadavek z webu: zkontrolovat a nainstal
 
 // Zjistí poslední verzi; pokud je novější a install==true, nainstaluje ji (a restartuje).
 void otaCheck(bool install);
+
+// Stažení a instalace firmware.bin z dané adresy (po restartu, viz gOtaBootMode).
+// Přesměrování GitHubu řeší sama, aby bylo otevřené vždy jen jedno TLS spojení.
+void otaInstall(const String& url);
 
 // true = zařízení bylo restartováno kvůli aktualizaci; stahuje se hned po startu,
 // než se paměť zaplní radarem, předpovědí a dalšími daty
