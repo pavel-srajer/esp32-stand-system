@@ -44,7 +44,7 @@
 static const int PIN_BUTTON = 9;  // tlačítko BOOT
 
 // obrazovky (pořadí = bity v gCfg.screens)
-enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_PRICE, SCR_COUNT };
+enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_PRICE, SCR_NOTE, SCR_COUNT };
 static int gScreen = SCR_RADAR;  // právě zobrazená obrazovka
 static const float RAIN_RADII[] = {25, 50, 100, 200};
 static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
@@ -1414,6 +1414,69 @@ static void drawRain(const Forecast& fc, uint32_t now) {
   }
 }
 
+// ---------------- Obrazovka: poznámka ----------------
+// Text z webu, zalomený po slovech do kruhu. Písmo se zvolí co největší, aby se vešel.
+static void drawNote() {
+  const char* text = gCfg.note.c_str();
+  if (!*text) {
+    drawCenteredMsg(tr("Poznámka", "Note", "Notiz", "Nota"),
+                    tr("napiš ji na stránce Systém", "write it on the System page", "auf der Seite System eingeben", "scrivila nella pagina Sistema"));
+    return;
+  }
+  struct F {
+    const lgfx::IFont* f;
+    int lh;
+  } fonts[] = {{&fontCZ_24, 28}, {&fontCZ_16, 19}, {&fontCZ_12, 15}};
+  static char lines[16][64];
+  int nl = 0, fi = 0;
+  for (fi = 0; fi < 3; fi++) {
+    spr.setFont(fonts[fi].f);
+    int lh = fonts[fi].lh;
+    nl = 0;
+    bool ok = true;
+    const char* p = text;
+    // počet řádků odhadneme a pak zkontrolujeme šířky v kruhu
+    while (*p && ok) {
+      if (nl >= 16) { ok = false; break; }
+      // šířka řádku podle jeho polohy (zatím při vystředění pro odhad 8 řádků max)
+      int maxW = 196;
+      char cur[64] = "";
+      while (*p && *p != '\n') {
+        const char* w = p;
+        while (*p && *p != ' ' && *p != '\n') p++;
+        char word[64];
+        snprintf(word, sizeof word, "%.*s", (int)(p - w), w);
+        char test[128];
+        snprintf(test, sizeof test, "%s%s%s", cur, cur[0] ? " " : "", word);
+        if (spr.textWidth(test) <= maxW || !cur[0]) {
+          strlcpy(cur, test, sizeof cur);
+          while (*p == ' ') p++;
+          if (spr.textWidth(cur) > maxW) fitText(cur, sizeof cur, maxW);  // jedno dlouhé slovo
+        } else {
+          p = w;  // slovo na další řádek
+          break;
+        }
+      }
+      strlcpy(lines[nl++], cur, sizeof lines[0]);
+      if (*p == '\n') p++;
+    }
+    // vejde se výška a šířky v kruhu?
+    int top = CY - nl * lh / 2;
+    for (int i = 0; ok && i < nl; i++) {
+      int y = top + i * lh + lh / 2, dy = abs(y - CY) + lh / 2;
+      int w = dy < 112 ? 2 * (int)sqrtf(112.0f * 112 - dy * dy) : 0;
+      if (spr.textWidth(lines[i]) > w) ok = false;
+    }
+    if (ok) break;
+  }
+  if (fi == 3) fi = 2;  // nejmenší písmo, co se nevejde, ořízne kruh
+  spr.setFont(fonts[fi].f);
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setTextColor(rgb(255, 255, 255));
+  int lh = fonts[fi].lh, top = CY - nl * lh / 2;
+  for (int i = 0; i < nl; i++) spr.drawString(lines[i], CX, top + i * lh + lh / 2);
+}
+
 // ---------------- Obrazovka: spotová cena elektřiny ----------------
 static uint32_t gPriceTomorrowUntil = 0;  // dlouhý stisk: na chvíli graf zítřka
 
@@ -1739,6 +1802,7 @@ void appStatusJson(JsonObject o) {
   o["logo"] = logoStatus();
   o["route"] = routeStatus();
   o["screen"] = gPortalMode ? -1 : gScreen;
+  o["note"] = gCfg.note;
   {
     JsonArray sc = o["screens"].to<JsonArray>();
     for (int i = 0; i < SCR_COUNT; i++) {
@@ -1773,13 +1837,33 @@ static uint32_t gLastPress = 0;     // kdy byl naposledy stisk (pauza automatiky
 static const uint32_t CYCLE_PAUSE_MS = 60000;
 static const uint32_t PORTAL_HOLD_MS = 5000;
 
+// pořadí obrazovek podle nastavení; chybějící (např. nové ve vyšší verzi) se doplní na konec
+static int screenOrderList(int* out) {
+  int n = 0;
+  bool seen[SCR_COUNT] = {};
+  for (char c : gCfg.screenOrder) {
+    int i = c - '0';
+    if (i >= 0 && i < SCR_COUNT && !seen[i]) {
+      out[n++] = i;
+      seen[i] = true;
+    }
+  }
+  for (int i = 0; i < SCR_COUNT; i++)
+    if (!seen[i]) out[n++] = i;
+  return n;
+}
+
 static void onShortPress() {
   if (gPortalMode) {  // v portálu: krátký stisk = zpět do normálního režimu
     if (settingsHasWifi()) ESP.restart();
     return;
   }
-  for (int k = 1; k <= SCR_COUNT; k++) {
-    int sc = (gScreen + k) % SCR_COUNT;
+  int ord[SCR_COUNT];
+  int n = screenOrderList(ord), pos = -1;
+  for (int k = 0; k < n; k++)
+    if (ord[k] == gScreen) pos = k;
+  for (int k = 1; k <= n; k++) {  // další zapnutá v pořadí
+    int sc = ord[(pos + k + n) % n];
     if (scrOn(sc)) {
       gScreen = sc;
       break;
@@ -1834,9 +1918,43 @@ const char* screenName(int i) {
     case SCR_WEATHER: return tr("Měření ČHMI", "ČHMI station", "ČHMI-Station", "Stazione ČHMI");
     case SCR_CLOCK: return tr("Hodiny", "Clock", "Uhr", "Orologio");
     case SCR_PRICE: return tr("Cena elektřiny", "Electricity price", "Strompreis", "Prezzo elettricità");
+    case SCR_NOTE: return tr("Poznámka", "Note", "Notiz", "Nota");
     default: return "?";
   }
 }
+// ponechá jen znaky, které umí písmo na displeji (latinka, čeština, ä ö ü ß à è…, – … ← →)
+static String displayableText(const String& in) {
+  String out;
+  const uint8_t* p = (const uint8_t*)in.c_str();
+  while (*p) {
+    uint32_t cp;
+    int n;
+    if (*p < 0x80) cp = *p, n = 1;
+    else if ((*p & 0xE0) == 0xC0 && p[1]) cp = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F), n = 2;
+    else if ((*p & 0xF0) == 0xE0 && p[1] && p[2]) cp = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F), n = 3;
+    else {  // 4bajtové znaky (emoji) a poškozené sekvence přeskočit
+      n = 1;
+      while (p[n] && (p[n] & 0xC0) == 0x80) n++;
+      p += n;
+      continue;
+    }
+    bool ok = (cp >= 0x20 && cp < 0x7F) || cp == '\n' || (cp >= 0xA0 && cp < 0x180) || cp == 0x2013 || cp == 0x2014 ||
+              cp == 0x2022 || cp == 0x2026 || (cp >= 0x2190 && cp <= 0x2193);
+    if (ok) out.concat((const char*)p, n);
+    p += n;
+  }
+  return out;
+}
+
+void noteSetAndShow(const String& text) {
+  String t = displayableText(text);
+  t.trim();
+  if (t.length() > 300) t = t.substring(0, 300);
+  gCfg.note = t;
+  settingsSaveNote();
+  screenSet(SCR_NOTE);
+}
+
 void screenSet(int i) {
   if (i < 0 || i >= SCR_COUNT || gPortalMode) return;
   gScreen = i;
@@ -2032,7 +2150,15 @@ void setup() {
     return;
   }
 
-  if (!scrOn(gScreen)) onShortPress();
+  {  // po zapnutí první zapnutá obrazovka v pořadí
+    int ord[SCR_COUNT];
+    int n = screenOrderList(ord);
+    for (int k = 0; k < n; k++)
+      if (scrOn(ord[k])) {
+        gScreen = ord[k];
+        break;
+      }
+  }
   showBoot(gOtaBootMode ? tr("Aktualizace…", "Updating…", "Update…", "Aggiornamento…")
                         : tr("Připojuji WiFi…", "Connecting WiFi…", "Verbinde WLAN…", "Connessione WiFi…"),
            gCfg.ssid.c_str());
@@ -2095,6 +2221,7 @@ void loop() {
         case SCR_CLOCK: drawClock(pd, w, fc); break;
         case SCR_FORECAST: drawForecast(fc); break;
         case SCR_PRICE: drawPrice(now); break;
+        case SCR_NOTE: drawNote(); break;
         case SCR_RAIN: drawRain(fc, now); break;
       }
       drawWifiDot();

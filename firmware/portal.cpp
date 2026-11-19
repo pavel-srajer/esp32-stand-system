@@ -101,6 +101,9 @@ static const char PAGE_HEAD[] PROGMEM = R"HTML(<!doctype html><html lang="{{lang
 .sbtn{width:auto!important;margin:0!important;padding:10px 14px!important;font-size:1em!important;background:#1f6feb!important}
 #near{display:block;margin-top:6px;color:#3fb950}
 input[type=range]{padding:0;border:0;background:none;height:38px;accent-color:#58a6ff}.pct{color:#e6edf3;font-weight:600}
+.so{display:flex;align-items:center;gap:6px;border-bottom:1px solid #21262d;padding:2px 0}
+.so label{flex:1;display:flex;gap:8px;align-items:center;margin:8px 0}.so input{width:auto}
+.mv{width:auto!important;margin:0!important;padding:6px 11px!important;font-size:.85em!important;background:#21262d!important;border:1px solid #30363d!important}
 body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:16px}
 main{max-width:460px;margin:auto}h1{font-size:1.4em;margin:.2em 0 .8em}
 fieldset{border:1px solid #30363d;border-radius:10px;margin:0 0 16px;padding:12px 14px}
@@ -119,6 +122,10 @@ var s=document.getElementById('st'),c=document.getElementById('custom');
 function u(){c.className=s.value=='-1'?'':'hide'}s.onchange=u;u();
 var n=document.getElementById('ssid_sel'),m=document.getElementById('ssid');
 n.onchange=function(){if(n.value)m.value=n.value;};
+function mv(b,d){var r=b.parentNode,p=r.parentNode;if(d<0&&r.previousElementSibling)p.insertBefore(r,r.previousElementSibling);
+ else if(d>0&&r.nextElementSibling)p.insertBefore(r.nextElementSibling,r);so()}
+function so(){var o=document.getElementById('order');if(o)o.value=[].map.call(document.querySelectorAll('#sord .so'),function(e){return e.dataset.i}).join('')}
+so();
 var bt=0;document.querySelectorAll('.br').forEach(function(r){r.oninput=function(){
  document.getElementById('v'+r.name).textContent=r.value;clearTimeout(bt);
  bt=setTimeout(function(){fetch('/api/bright?p='+r.value).catch(function(){})},150)}});
@@ -168,9 +175,13 @@ td:first-child{color:#9da7b3;width:42%}h2{font-size:1.05em;margin:18px 0 6px;col
 #scr{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
 #scr button{padding:9px 14px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-size:.95em;cursor:pointer}
 #scr button.cur{background:#1f6feb;border-color:#1f6feb;color:#fff}
-#scr button:disabled{opacity:.45;cursor:default}</style></head><body><main>
+#scr button:disabled{opacity:.45;cursor:default}
+textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font:inherit;font-size:1em}
+.nb{margin-top:6px;padding:9px 14px;border-radius:8px;border:0;background:#238636;color:#fff;font-size:.95em;cursor:pointer}</style></head><body><main>
 <p><a href="/">← {{settings}}</a></p><h1>{{sysinfo}}</h1><div id="st">{{loading}}</div>
 <h2>{{screen}}</h2><div id="scr"></div><div class="sub" id="scrs"></div>
+<h2>{{note}}</h2><textarea id="note" rows="3" maxlength="300" placeholder="{{note_ph}}"></textarea>
+<button type="button" class="nb" onclick="saveNote()">{{note_btn}}</button> <span class="sub" id="nst"></span>
 <div class="grid">
 <div class="card"><div class="lbl">{{chiptemp}}</div><div class="big" id="temp">–</div><div class="bar"><i id="tempb"></i></div><div class="sub">{{sensor}}</div></div>
 <div class="card"><div class="lbl">{{cpuload}}</div><div class="big" id="cpu">–</div><div class="bar"><i id="cpub"></i></div><div class="sub" id="cpus"></div></div>
@@ -189,11 +200,16 @@ function rows(id,r){document.getElementById(id).innerHTML=r.map(function(x){retu
 function t(id,v){document.getElementById(id).textContent=v}
 function esc(v){return String(v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function setScr(i){fetch('/api/screen?s='+i).then(load).catch(function(){})}
+var noteInit=false;
+function saveNote(){var v=document.getElementById('note').value;
+ fetch('/api/note',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'note='+encodeURIComponent(v)})
+ .then(function(){t('nst','{{note_ok}}');load()}).catch(function(){t('nst','{{noresp}}')})}
 function scr(a){var e=document.getElementById('scr');if(!a||a.screen<0||!a.screens){e.innerHTML='';return}var j=a;
  e.innerHTML=j.screens.map(function(s,i){return s.on?'<button type="button" class="'+(i==j.screen?'cur':'')+'" onclick="setScr('+i+')">'+esc(s.name)+'</button>':''}).join('');
  var c=j.screens[j.screen];t('scrs',c?'{{onscreen}}: '+c.name:'')}
 function load(){fetch('/api/status').then(function(r){return r.json()}).then(function(j){
  scr(j.app);
+ if(!noteInit&&j.app&&j.app.note!==undefined){document.getElementById('note').value=j.app.note;noteInit=true}
  t('temp',j.temp==null?'–':String(j.temp).replace('.',',')+' °C');bar('tempb',(j.temp||0)/90*100,60,75);
  t('cpu',j.cpu<0?'–':j.cpu+' %');bar('cpub',j.cpu,60,85);t('cpus',j.mhz+' MHz, {{core}} (RISC-V)');
  var h=j.heap,used=h.total-h.free;t('ram',Math.round(used/h.total*100)+' %');bar('ramb',used/h.total*100,75,90);
@@ -275,6 +291,10 @@ static const Tok TOKS[] = {
     {"route", {"Trasa letu", "Flight route", "Flugroute", "Rotta del volo"}},
     {"screen", {"Obrazovka", "Screen", "Bildschirm", "Schermata"}},
     {"onscreen", {"na displeji", "on display", "angezeigt", "sul display"}},
+    {"note", {"Poznámka", "Note", "Notiz", "Nota"}},
+    {"note_ph", {"Text na displej (nový řádek = Enter)", "Text for the display (Enter = new line)", "Text für das Display (Enter = neue Zeile)", "Testo per il display (Invio = nuova riga)"}},
+    {"note_btn", {"Uložit a zobrazit", "Save and show", "Speichern und anzeigen", "Salva e mostra"}},
+    {"note_ok", {"uloženo, je na displeji", "saved, shown on display", "gespeichert, wird angezeigt", "salvata, sul display"}},
     {"price", {"Cena elektřiny", "Electricity price", "Strompreis", "Prezzo elettricità"}},
     {"tomorrow", {"zítra", "tomorrow", "morgen", "domani"}},
     {"station", {"Stanice", "Station", "Station", "Stazione"}},
@@ -329,6 +349,12 @@ static void handleStatus() {
   serializeJson(doc, out);
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", out);
+}
+
+static void handleNote() {
+  gLastActivity = millis();
+  noteSetAndShow(server.arg("note"));
+  server.send(204);
 }
 
 static void handleScreen() {
@@ -445,21 +471,44 @@ static void handleRoot() {
                            tr("Meteoradar ČHMI (animace)", "ČHMI weather radar (animated)", "ČHMI-Wetterradar (animiert)", "Radar meteo ČHMI (animato)"),
                            tr("Měření ze stanice ČHMI", "ČHMI station measurements", "ČHMI-Stationsmessung", "Misure stazione ČHMI"),
                            tr("Hodiny", "Clock", "Uhr", "Orologio"),
-                           tr("Spotová cena elektřiny", "Spot electricity price", "Strom-Spotpreis", "Prezzo spot elettricità")};
+                           tr("Spotová cena elektřiny", "Spot electricity price", "Strom-Spotpreis", "Prezzo spot elettricità"),
+                           tr("Poznámka (text ze stránky Systém)", "Note (text from the System page)", "Notiz (Text von der Seite System)", "Nota (testo dalla pagina Sistema)")};
     h += F("<fieldset><legend>");
     h += tr("Obrazovky", "Screens", "Bildschirme", "Schermate");
     h += F("</legend><small>");
-    h += tr("Krátký stisk tlačítka přepíná mezi zapnutými obrazovkami.", "A short button press switches between enabled screens.",
-            "Kurzer Tastendruck wechselt zwischen aktiven Bildschirmen.", "Una breve pressione del tasto passa tra le schermate attive.");
+    h += tr("Krátký stisk tlačítka přepíná mezi zapnutými obrazovkami v tomto pořadí. Šipkami ▲▼ pořadí změníš.",
+            "A short button press switches between enabled screens in this order. Change the order with ▲▼.",
+            "Kurzer Tastendruck wechselt die aktiven Bildschirme in dieser Reihenfolge. Mit ▲▼ änderst du sie.",
+            "Una breve pressione passa tra le schermate attive in quest’ordine. Cambia l’ordine con ▲▼.");
     h += F("</small>");
-    for (int i = 0; i < 7; i++) {
-      h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='scr");
-      h += i;
-      h += "'";
-      if (gCfg.screens & (1 << i)) h += F(" checked");
-      h += "> ";
-      h += NAMES[i];
-      h += F("</label>");
+    // seznam v uloženém pořadí; šipky mění pořadí, skryté pole 'order' ho odešle
+    {
+      int ord[8], n = 0;
+      bool seen[8] = {};
+      for (char c : gCfg.screenOrder) {
+        int i = c - '0';
+        if (i >= 0 && i < 8 && !seen[i]) {
+          ord[n++] = i;
+          seen[i] = true;
+        }
+      }
+      for (int i = 0; i < 8; i++)
+        if (!seen[i]) ord[n++] = i;
+      h += F("<div id='sord'>");
+      for (int k = 0; k < n; k++) {
+        int i = ord[k];
+        h += F("<div class='so' data-i='");
+        h += i;
+        h += F("'><label><input type='checkbox' name='scr");
+        h += i;
+        h += "'";
+        if (gCfg.screens & (1 << i)) h += F(" checked");
+        h += "> ";
+        h += NAMES[i];
+        h += F("</label><button type='button' class='mv' onclick='mv(this,-1)' aria-label='▲'>▲</button>"
+               "<button type='button' class='mv' onclick='mv(this,1)' aria-label='▼'>▼</button></div>");
+      }
+      h += F("</div><input type='hidden' name='order' id='order'>");
     }
     static const int PR[] = {10, 25, 50, 100};
     h += F("<label>");
@@ -837,9 +886,15 @@ static void handleSave() {
   }
   {
     int m = 0;
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < 8; i++)
       if (server.hasArg("scr" + String(i))) m |= 1 << i;
     gCfg.screens = m ? m : 1;
+    {  // pořadí: platná permutace číslic 0–6
+      String o = server.arg("order");
+      bool ok = o.length() == 8;
+      for (int i = 0; ok && i < 8; i++) ok = o.indexOf(char('0' + i)) >= 0;
+      if (ok) gCfg.screenOrder = o;
+    }
     int dm = 0;
     for (int i = 0; i < 9; i++)
       if (server.hasArg("det" + String(i))) dm |= 1 << i;
@@ -939,6 +994,7 @@ void webBegin(bool apMode) {
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/bright", HTTP_GET, handleBright);
   server.on("/api/screen", HTTP_GET, handleScreen);
+  server.on("/api/note", HTTP_POST, handleNote);
   server.onNotFound(handleNotFound);
   server.begin();
   gLastActivity = millis();

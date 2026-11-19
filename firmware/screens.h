@@ -5,3 +5,4 @@ int screenCurrent();
 bool screenEnabled(int i);
 const char* screenName(int i);  // ve zvoleném jazyce
 void screenSet(int i);          // přepne displej (a na minutu pozastaví automatické přepínání)
+void noteSetAndShow(const String& text);  // uloží poznámku a ukáže ji na displeji

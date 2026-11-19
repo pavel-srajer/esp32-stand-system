@@ -32,6 +32,8 @@ struct Settings {
   int bDay = 100, bEve = 60, bNight = 15;
   // zapnuté obrazovky (bit = pořadí: radar letadel, detail, předpověď, meteoradar, stanice ČHMI, hodiny)
   int screens = 0x2F;   // vše kromě měření ze stanice ČHMI
+  String screenOrder = "01234567";  // pořadí obrazovek (číslice = index obrazovky)
+  String note;                       // text pro obrazovku Poznámka
   int rainRadiusIdx = 1;  // meteoradar: index do {25, 50, 100, 200} km
   // podklad map: 0 žádný, 1 hranice a města, 2 hranice, řeky a města
   int rainMap = 2;    // meteoradar
@@ -52,6 +54,7 @@ extern Settings gCfg;
 void settingsLoad();
 void settingsSave();
 void settingsSaveRange();
+void settingsSaveNote();  // uloží jen poznámku (bez restartu)
 bool settingsHasWifi();
 
 // Příznak "po restartu spustit konfigurační portál"

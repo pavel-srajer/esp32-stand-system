@@ -24,6 +24,8 @@ void settingsLoad() {
   gCfg.bEve = prefs.getInt("beve", d.bEve);
   gCfg.bNight = prefs.getInt("bnight", d.bNight);
   gCfg.screens = prefs.getInt("screens", d.screens);
+  gCfg.screenOrder = prefs.getString("sorder", d.screenOrder);
+  gCfg.note = prefs.getString("note", "");
   gCfg.rainRadiusIdx = prefs.getInt("rrad", d.rainRadiusIdx);
   gCfg.rainMap = prefs.getInt("rmap", d.rainMap);
   gCfg.planeMap = prefs.getInt("pmap", d.planeMap);
@@ -60,6 +62,7 @@ void settingsSave() {
   prefs.putInt("beve", gCfg.bEve);
   prefs.putInt("bnight", gCfg.bNight);
   prefs.putInt("screens", gCfg.screens);
+  prefs.putString("sorder", gCfg.screenOrder);
   prefs.putInt("rrad", gCfg.rainRadiusIdx);
   prefs.putInt("rmap", gCfg.rainMap);
   prefs.putInt("pmap", gCfg.planeMap);
@@ -72,6 +75,12 @@ void settingsSave() {
   prefs.putInt("rfmt", gCfg.routeFmt);
   prefs.putFloat("pfee", gCfg.priceFee);
   prefs.putFloat("pvat", gCfg.priceVat);
+  prefs.end();
+}
+
+void settingsSaveNote() {
+  prefs.begin("cfg", false);
+  prefs.putString("note", gCfg.note);
   prefs.end();
 }
 
