@@ -26,6 +26,11 @@ void settingsLoad() {
   gCfg.screens = prefs.getInt("screens", d.screens);
   gCfg.screenOrder = prefs.getString("sorder", d.screenOrder);
   gCfg.note = prefs.getString("note", "");
+  gCfg.noteFg = prefs.getUInt("nfg", d.noteFg);
+  gCfg.noteBg = prefs.getUInt("nbg", d.noteBg);
+  gCfg.noteSize = prefs.getInt("nsize", d.noteSize);
+  gCfg.noteStyle = prefs.getInt("nstyle", d.noteStyle);
+  gCfg.noteBlink = prefs.getInt("nblink", d.noteBlink);
   gCfg.rainRadiusIdx = prefs.getInt("rrad", d.rainRadiusIdx);
   gCfg.rainMap = prefs.getInt("rmap", d.rainMap);
   gCfg.planeMap = prefs.getInt("pmap", d.planeMap);
@@ -81,6 +86,11 @@ void settingsSave() {
 void settingsSaveNote() {
   prefs.begin("cfg", false);
   prefs.putString("note", gCfg.note);
+  prefs.putUInt("nfg", gCfg.noteFg);
+  prefs.putUInt("nbg", gCfg.noteBg);
+  prefs.putInt("nsize", gCfg.noteSize);
+  prefs.putInt("nstyle", gCfg.noteStyle);
+  prefs.putInt("nblink", gCfg.noteBlink);
   prefs.end();
 }
 

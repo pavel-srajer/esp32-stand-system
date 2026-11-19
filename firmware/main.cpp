@@ -1415,9 +1415,15 @@ static void drawRain(const Forecast& fc, uint32_t now) {
 }
 
 // ---------------- Obrazovka: poznámka ----------------
+static bool gNoteAck = true;  // blikání potvrzené tlačítkem
+static bool noteBlinking() { return gCfg.noteBlink > 0 && !gNoteAck && gCfg.note.length() > 0; }
 // Text z webu, zalomený po slovech do kruhu. Písmo se zvolí co největší, aby se vešel.
 static void drawNote() {
   const char* text = gCfg.note.c_str();
+  // pozadí přes celý displej (kruh 240 px); barvy se zaokrouhlí na 256barevnou paletu displeje
+  uint32_t bgc = gCfg.noteBg, fgc = gCfg.noteFg;
+  if (noteBlinking() && (millis() / (gCfg.noteBlink == 2 ? 300 : 700)) % 2) std::swap(bgc, fgc);  // blikání = prohození barev
+  if (bgc) spr.fillScreen(lgfx::color565((bgc >> 16) & 255, (bgc >> 8) & 255, bgc & 255));
   if (!*text) {
     drawCenteredMsg(tr("Poznámka", "Note", "Notiz", "Nota"),
                     tr("napiš ji na stránce Systém", "write it on the System page", "auf der Seite System eingeben", "scrivila nella pagina Sistema"));
@@ -1426,10 +1432,17 @@ static void drawNote() {
   struct F {
     const lgfx::IFont* f;
     int lh;
-  } fonts[] = {{&fontCZ_24, 28}, {&fontCZ_16, 19}, {&fontCZ_12, 15}};
+  };
+  // řez písma: 0 obyčejné, 1 tučné, 2 kurzíva, 3 tučná kurzíva
+  int cut = gCfg.noteStyle & 3;
+  static const lgfx::IFont* const F24[] = {&fontCZ_24, &fontCZ_24_b, &fontCZ_24_i, &fontCZ_24_bi};
+  static const lgfx::IFont* const F16[] = {&fontCZ_16, &fontCZ_16_b, &fontCZ_16_i, &fontCZ_16_bi};
+  static const lgfx::IFont* const F12[] = {&fontCZ_12, &fontCZ_12_b, &fontCZ_12_i, &fontCZ_12_bi};
+  F fonts[] = {{F24[cut], 28}, {F16[cut], 19}, {F12[cut], 15}};
   static char lines[16][64];
   int nl = 0, fi = 0;
-  for (fi = 0; fi < 3; fi++) {
+  int first = constrain(gCfg.noteSize, 0, 2);  // nastavená maximální velikost
+  for (fi = first; fi < 3; fi++) {
     spr.setFont(fonts[fi].f);
     int lh = fonts[fi].lh;
     nl = 0;
@@ -1472,9 +1485,17 @@ static void drawNote() {
   if (fi == 3) fi = 2;  // nejmenší písmo, co se nevejde, ořízne kruh
   spr.setFont(fonts[fi].f);
   spr.setTextDatum(textdatum_t::middle_center);
-  spr.setTextColor(rgb(255, 255, 255));
+  uint16_t fg = lgfx::color565((fgc >> 16) & 255, (fgc >> 8) & 255, fgc & 255);
+  spr.setTextColor(fg);
   int lh = fonts[fi].lh, top = CY - nl * lh / 2;
-  for (int i = 0; i < nl; i++) spr.drawString(lines[i], CX, top + i * lh + lh / 2);
+  for (int i = 0; i < nl; i++) {
+    int y = top + i * lh + lh / 2;
+    spr.drawString(lines[i], CX, y);
+    if ((gCfg.noteStyle & 4) && lines[i][0]) {  // podtržení
+      int w = spr.textWidth(lines[i]), uy = y + (lh * 4) / 10;
+      spr.fillRect(CX - w / 2, uy, w, fi == 0 ? 2 : 1, fg);
+    }
+  }
 }
 
 // ---------------- Obrazovka: spotová cena elektřiny ----------------
@@ -1804,6 +1825,16 @@ void appStatusJson(JsonObject o) {
   o["screen"] = gPortalMode ? -1 : gScreen;
   o["note"] = gCfg.note;
   {
+    char c[8];
+    snprintf(c, sizeof c, "#%06lX", (unsigned long)(gCfg.noteFg & 0xFFFFFF));
+    o["note_fg"] = c;
+    snprintf(c, sizeof c, "#%06lX", (unsigned long)(gCfg.noteBg & 0xFFFFFF));
+    o["note_bg"] = c;
+  }
+  o["note_size"] = gCfg.noteSize;
+  o["note_style"] = gCfg.noteStyle;
+  o["note_blink"] = gCfg.noteBlink;
+  {
     JsonArray sc = o["screens"].to<JsonArray>();
     for (int i = 0; i < SCR_COUNT; i++) {
       JsonObject e = sc.add<JsonObject>();
@@ -1856,6 +1887,10 @@ static int screenOrderList(int* out) {
 static void onShortPress() {
   if (gPortalMode) {  // v portálu: krátký stisk = zpět do normálního režimu
     if (settingsHasWifi()) ESP.restart();
+    return;
+  }
+  if (gScreen == SCR_NOTE && noteBlinking()) {  // první stisk jen potvrdí (ukončí blikání)
+    gNoteAck = true;
     return;
   }
   int ord[SCR_COUNT];
@@ -1952,6 +1987,7 @@ void noteSetAndShow(const String& text) {
   if (t.length() > 300) t = t.substring(0, 300);
   gCfg.note = t;
   settingsSaveNote();
+  gNoteAck = false;  // nová poznámka -> bliká (je-li zapnuto), dokud ji nepotvrdíš
   screenSet(SCR_NOTE);
 }
 
@@ -2190,10 +2226,11 @@ void loop() {
 
   // automatické přepínání obrazovek (po stisku tlačítka minutu pauza)
   if (!gPortalMode && gCfg.cycleSec > 0 && !gBtnHeldMs && now - gLastSwitch >= (uint32_t)gCfg.cycleSec * 1000 &&
+      !(gScreen == SCR_NOTE && noteBlinking()) &&  // blikající poznámka zůstává do potvrzení
       (gLastPress == 0 || now - gLastPress >= CYCLE_PAUSE_MS))
     onShortPress();
 
-  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs) ? 100 : 250;
+  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs || (gScreen == SCR_NOTE && noteBlinking())) ? 100 : 250;
   if (now - lastDraw < frame) {
     delay(5);
     return;

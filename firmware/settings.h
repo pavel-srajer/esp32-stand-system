@@ -34,6 +34,11 @@ struct Settings {
   int screens = 0x2F;   // vše kromě měření ze stanice ČHMI
   String screenOrder = "01234567";  // pořadí obrazovek (číslice = index obrazovky)
   String note;                       // text pro obrazovku Poznámka
+  uint32_t noteFg = 0xFFFFFF;        // barva textu poznámky (RGB)
+  uint32_t noteBg = 0x000000;        // barva pozadí poznámky
+  int noteSize = 0;                  // max. velikost: 0 velká, 1 střední, 2 malá (zmenší se, když se nevejde)
+  int noteStyle = 0;                 // bity: 1 tučné, 2 kurzíva, 4 podtržené
+  int noteBlink = 0;                 // blikání: 0 ne, 1 pomalé, 2 rychlé (do potvrzení tlačítkem)
   int rainRadiusIdx = 1;  // meteoradar: index do {25, 50, 100, 200} km
   // podklad map: 0 žádný, 1 hranice a města, 2 hranice, řeky a města
   int rainMap = 2;    // meteoradar

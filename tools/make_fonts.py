@@ -8,11 +8,13 @@ díky čemuž se firmware vejde do OTA oddílů.
 import re, sys, os
 
 SIZES = ["10", "12", "16", "24"]
+# tučné / kurzíva / tučná kurzíva (pro obrazovku Poznámka)
+STYLED = [sz + st for sz in ["12", "16", "24"] for st in ["_b", "_i", "_bi"]]
 EXTRA = list(range(0x100, 0x180)) + [0x2013, 0x2014, 0x2022, 0x2026, 0x2190, 0x2191, 0x2192, 0x2193]
 
 def load(src):
     fonts = {}
-    pat = r'const uint8_t (lgfx_efont_ja_(\d+))\[\d*\][^=]*=\s*"((?:[^"\\]|\\.|"\s*")*)"'
+    pat = r'const uint8_t (lgfx_efont_ja_(\d+(?:_b|_i|_bi)?))\[\d*\][^=]*=\s*"((?:[^"\\]|\\.|"\s*")*)"'
     for m in re.finditer(pat, src):
         s = re.sub(r'"\s*"', '', m.group(3))
         fonts[m.group(2)] = s.encode('latin1').decode('unicode_escape').encode('latin1')
@@ -50,7 +52,7 @@ def main():
     with open(dst, 'w') as f:
         f.write('#pragma once\n// Vygenerováno tools/make_fonts.py z efontJA (LovyanGFX), licence viz efont COPYRIGHT.\n')
         f.write('#include <LovyanGFX.hpp>\n\n')
-        for s in SIZES:
+        for s in SIZES + STYLED:
             d = subset(fonts[s])
             f.write(f'static const uint8_t font_cz_{s}_data[{len(d)}] = {{\n')
             for i in range(0, len(d), 24):

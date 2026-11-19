@@ -68,7 +68,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 - WiFi (signál, kanál, IP), dobu běhu a důvod posledního restartu,
 - stav všech zdrojů dat (ADS-B, předpověď, meteoradar, loga, trasy, cena elektřiny), NTP a aktualizací.
 
-Nahoře je sekce **Obrazovka**: ukazuje, co je právě na displeji, a tlačítky přepneš na kteroukoli zapnutou obrazovku. Pod ní je pole **Poznámka**: tlačítkem „Uložit a zobrazit“ se text uloží (bez restartu) a hned se ukáže na displeji. Znaky, které písmo neumí (emoji), se vynechají. Automatické přepínání se pak na minutu pozastaví. Totéž ve formátu JSON vrací `/api/status`, přepnout jde i přes `/api/screen?s=<číslo>`.
+Nahoře je sekce **Obrazovka**: ukazuje, co je právě na displeji, a tlačítky přepneš na kteroukoli zapnutou obrazovku. Pod ní je pole **Poznámka**: tlačítkem „Uložit a zobrazit“ se text uloží (bez restartu) a hned se ukáže na displeji. Nastavit jde barva textu a pozadí, maximální velikost (velká / střední / malá; když se text nevejde, zmenší se), **tučné**, *kurzíva*, podtržení a **blikání** (pomalé nebo rychlé, střídají se barvy). Blikající poznámka zůstane na displeji, dokud ji nepotvrdíš stiskem tlačítka. Barvy se zaokrouhlí na 256barevnou paletu displeje. Znaky, které písmo neumí (emoji), se vynechají. Automatické přepínání se pak na minutu pozastaví. Totéž ve formátu JSON vrací `/api/status`, přepnout jde i přes `/api/screen?s=<číslo>`.
 
 ## Aktualizace firmwaru (OTA z GitHubu)
 

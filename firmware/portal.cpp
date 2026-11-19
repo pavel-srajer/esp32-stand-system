@@ -177,10 +177,19 @@ td:first-child{color:#9da7b3;width:42%}h2{font-size:1.05em;margin:18px 0 6px;col
 #scr button.cur{background:#1f6feb;border-color:#1f6feb;color:#fff}
 #scr button:disabled{opacity:.45;cursor:default}
 textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font:inherit;font-size:1em}
+.nrow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:8px 0;font-size:.9em;color:#9da7b3}
+.nrow label{display:flex;gap:6px;align-items:center}.nrow input[type=color]{width:38px;height:28px;border:0;background:none;padding:0}
+.nrow select{padding:5px;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#e6edf3}
+.nst{display:flex;gap:10px}.nst label{gap:3px;color:#e6edf3;font-size:1.05em}
 .nb{margin-top:6px;padding:9px 14px;border-radius:8px;border:0;background:#238636;color:#fff;font-size:.95em;cursor:pointer}</style></head><body><main>
 <p><a href="/">← {{settings}}</a></p><h1>{{sysinfo}}</h1><div id="st">{{loading}}</div>
 <h2>{{screen}}</h2><div id="scr"></div><div class="sub" id="scrs"></div>
 <h2>{{note}}</h2><textarea id="note" rows="3" maxlength="300" placeholder="{{note_ph}}"></textarea>
+<div class="nrow"><label>{{n_fg}} <input type="color" id="nfg" value="#ffffff"></label>
+<label>{{n_bg}} <input type="color" id="nbg" value="#000000"></label>
+<label>{{n_size}} <select id="nsize"><option value="0">{{n_big}}</option><option value="1">{{n_mid}}</option><option value="2">{{n_small}}</option></select></label>
+<label>{{n_blink}} <select id="nblink"><option value="0">{{n_off}}</option><option value="1">{{n_slow}}</option><option value="2">{{n_fast}}</option></select></label>
+<span class="nst"><label title="{{n_b}}"><input type="checkbox" id="nb1"><b>B</b></label><label title="{{n_i}}"><input type="checkbox" id="nb2"><i>I</i></label><label title="{{n_u}}"><input type="checkbox" id="nb4"><u>U</u></label></span></div>
 <button type="button" class="nb" onclick="saveNote()">{{note_btn}}</button> <span class="sub" id="nst"></span>
 <div class="grid">
 <div class="card"><div class="lbl">{{chiptemp}}</div><div class="big" id="temp">–</div><div class="bar"><i id="tempb"></i></div><div class="sub">{{sensor}}</div></div>
@@ -201,15 +210,18 @@ function t(id,v){document.getElementById(id).textContent=v}
 function esc(v){return String(v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function setScr(i){fetch('/api/screen?s='+i).then(load).catch(function(){})}
 var noteInit=false;
-function saveNote(){var v=document.getElementById('note').value;
- fetch('/api/note',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'note='+encodeURIComponent(v)})
+function g(id){return document.getElementById(id)}
+function saveNote(){var v=g('note').value,st=(g('nb1').checked?1:0)|(g('nb2').checked?2:0)|(g('nb4').checked?4:0);
+ var body='note='+encodeURIComponent(v)+'&fg='+encodeURIComponent(g('nfg').value)+'&bg='+encodeURIComponent(g('nbg').value)+'&size='+g('nsize').value+'&style='+st+'&blink='+g('nblink').value;
+ fetch('/api/note',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
  .then(function(){t('nst','{{note_ok}}');load()}).catch(function(){t('nst','{{noresp}}')})}
 function scr(a){var e=document.getElementById('scr');if(!a||a.screen<0||!a.screens){e.innerHTML='';return}var j=a;
  e.innerHTML=j.screens.map(function(s,i){return s.on?'<button type="button" class="'+(i==j.screen?'cur':'')+'" onclick="setScr('+i+')">'+esc(s.name)+'</button>':''}).join('');
  var c=j.screens[j.screen];t('scrs',c?'{{onscreen}}: '+c.name:'')}
 function load(){fetch('/api/status').then(function(r){return r.json()}).then(function(j){
  scr(j.app);
- if(!noteInit&&j.app&&j.app.note!==undefined){document.getElementById('note').value=j.app.note;noteInit=true}
+ if(!noteInit&&j.app&&j.app.note!==undefined){var a=j.app;g('note').value=a.note;g('nfg').value=a.note_fg||'#ffffff';g('nbg').value=a.note_bg||'#000000';
+  g('nsize').value=a.note_size||0;g('nb1').checked=a.note_style&1;g('nb2').checked=a.note_style&2;g('nb4').checked=a.note_style&4;g('nblink').value=a.note_blink||0;noteInit=true}
  t('temp',j.temp==null?'–':String(j.temp).replace('.',',')+' °C');bar('tempb',(j.temp||0)/90*100,60,75);
  t('cpu',j.cpu<0?'–':j.cpu+' %');bar('cpub',j.cpu,60,85);t('cpus',j.mhz+' MHz, {{core}} (RISC-V)');
  var h=j.heap,used=h.total-h.free;t('ram',Math.round(used/h.total*100)+' %');bar('ramb',used/h.total*100,75,90);
@@ -292,8 +304,21 @@ static const Tok TOKS[] = {
     {"screen", {"Obrazovka", "Screen", "Bildschirm", "Schermata"}},
     {"onscreen", {"na displeji", "on display", "angezeigt", "sul display"}},
     {"note", {"Poznámka", "Note", "Notiz", "Nota"}},
-    {"note_ph", {"Text na displej (nový řádek = Enter)", "Text for the display (Enter = new line)", "Text für das Display (Enter = neue Zeile)", "Testo per il display (Invio = nuova riga)"}},
+    {"note_ph", {"Text na displej (nový řádek = Enter). Blikání ukončíš stiskem tlačítka.", "Text for the display (Enter = new line). A button press stops the blinking.", "Text für das Display (Enter = neue Zeile). Tastendruck beendet das Blinken.", "Testo per il display (Invio = nuova riga). Il tasto ferma il lampeggio."}},
     {"note_btn", {"Uložit a zobrazit", "Save and show", "Speichern und anzeigen", "Salva e mostra"}},
+    {"n_fg", {"Text", "Text", "Text", "Testo"}},
+    {"n_bg", {"Pozadí", "Background", "Hintergrund", "Sfondo"}},
+    {"n_size", {"Velikost", "Size", "Größe", "Dimensione"}},
+    {"n_big", {"velká", "large", "groß", "grande"}},
+    {"n_mid", {"střední", "medium", "mittel", "media"}},
+    {"n_small", {"malá", "small", "klein", "piccola"}},
+    {"n_b", {"tučné", "bold", "fett", "grassetto"}},
+    {"n_i", {"kurzíva", "italic", "kursiv", "corsivo"}},
+    {"n_u", {"podtržené", "underline", "unterstrichen", "sottolineato"}},
+    {"n_blink", {"Blikání", "Blink", "Blinken", "Lampeggio"}},
+    {"n_off", {"vypnuto", "off", "aus", "spento"}},
+    {"n_slow", {"pomalé", "slow", "langsam", "lento"}},
+    {"n_fast", {"rychlé", "fast", "schnell", "veloce"}},
     {"note_ok", {"uloženo, je na displeji", "saved, shown on display", "gespeichert, wird angezeigt", "salvata, sul display"}},
     {"price", {"Cena elektřiny", "Electricity price", "Strompreis", "Prezzo elettricità"}},
     {"tomorrow", {"zítra", "tomorrow", "morgen", "domani"}},
@@ -353,6 +378,15 @@ static void handleStatus() {
 
 static void handleNote() {
   gLastActivity = millis();
+  auto col = [](const String& v, uint32_t def) -> uint32_t {  // "#RRGGBB"
+    if (v.length() == 7 && v[0] == '#') return strtoul(v.c_str() + 1, nullptr, 16);
+    return def;
+  };
+  if (server.hasArg("fg")) gCfg.noteFg = col(server.arg("fg"), gCfg.noteFg);
+  if (server.hasArg("bg")) gCfg.noteBg = col(server.arg("bg"), gCfg.noteBg);
+  if (server.hasArg("size")) gCfg.noteSize = constrain(server.arg("size").toInt(), 0, 2);
+  if (server.hasArg("style")) gCfg.noteStyle = server.arg("style").toInt() & 7;
+  if (server.hasArg("blink")) gCfg.noteBlink = constrain(server.arg("blink").toInt(), 0, 2);
   noteSetAndShow(server.arg("note"));
   server.send(204);
 }
