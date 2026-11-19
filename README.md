@@ -1,93 +1,93 @@
 # esp32-stand-system
 
-Stolní „radar" na **ESP32-C3 Super Mini** s kulatým displejem **GC9A01 1,28"** (240×240).
-Ukazuje letadla v okolí (ADS-B) a aktuální meteodata z ČHMI. Nastavuje se přes WiFi hotspot a umí se sám aktualizovat z GitHub Releases (OTA).
+Stolní displej na **ESP32-C3 Super Mini** s kulatým displejem **GC9A01 1,28"** (240×240):
+letadla v okolí (ADS-B) s logem a trasou, předpověď a upozornění na počasí, animovaný meteoradar ČHMI
+s vyhodnocením „kdy u tebe začne pršet“, spotová cena elektřiny a hodiny se jmeninami.
+Nastavuje se z telefonu přes WiFi hotspot a sám se aktualizuje z GitHub Releases (OTA).
+Rozhraní je **česky, anglicky, německy a italsky**.
 
 Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 
-## Ovládání tlačítkem BOOT (GPIO 9)
+## Obrazovky a ovládání
 
-| Obrazovka | Dlouhý stisk (0,7–5 s) |
-|---|---|
-| **Radar letadel**: letadla kolem domova, barva podle výšky | dosah 10 / 25 / 50 / 100 km |
-| **Detail letadla**: logo společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz | další letadlo |
-| **Předpověď**: aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko). Dole je výhled na 2–8 h | obnovit |
-| **Meteoradar ČHMI**: animace posledních 30 min srážek kolem domova. Dole je vyhodnocení, třeba „Déšť 12 km Z, dorazí asi za 25 min“ nebo „Bouřka u tebe, skončí asi za 20 min“, a pod ním rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
-| **Měření ze stanice ČHMI**: teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
-| **Spotová cena elektřiny**: aktuální čtvrthodina v Kč/kWh (barva podle toho, jak je levná nebo drahá v rámci dne), další čtvrthodina, graf dne po 15 min a nejlevnější a nejdražší čas | zítřek na 30 s |
-| **Hodiny**: čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
+Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 
-Krátký stisk přepne na další zapnutou obrazovku. Které obrazovky se zobrazují, se nastavuje ve webovém rozhraní.
+- **Krátký stisk:** další zapnutá obrazovka.
+- **Dlouhý stisk (0,7–5 s):** akce podle obrazovky, viz tabulka.
+- **Držet 5 s:** konfigurační hotspot. Během držení se po obvodu plní oranžový kruh.
 
-**Když tlačítko podržíš 5 s**, spustí se konfigurační hotspot. Během držení se po obvodu displeje plní oranžový kruh.
+| Obrazovka | Co ukazuje | Dlouhý stisk |
+|---|---|---|
+| **Radar letadel** | letadla kolem domova, barva podle výšky, dole nejbližší letadlo | dosah 10 / 25 / 50 / 100 km |
+| **Detail letadla** | logo společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz, vzdálenost. Co se zobrazí, se volí na webu | další letadlo |
+| **Předpověď** | aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko), výhled na 2–8 h | obnovit |
+| **Meteoradar ČHMI** | animace srážek za posledních 30 min na obrysové mapě. Dole je vyhodnocení, např. „Déšť 12 km Z, dorazí asi za 25 min“, a rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
+| **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
+| **Hodiny** | čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
+| **Spotová cena elektřiny** | aktuální čtvrthodina v Kč/kWh, další čtvrthodina, graf dne po 15 min, nejlevnější a nejdražší čas (ve výchozím stavu vypnutá) | zítřek na 30 s |
 
-Barvy letadel podle výšky: zelená < 900 m, žlutá < 3 km, oranžová < 6 km, růžová < 9 km, modrá výš, šedá = na zemi.
-Červená tečka nahoře znamená, že není připojená WiFi.
+- Po zapnutí se na 3 s ukáže **úvodní obrazovka** s verzí firmwaru. WiFi se mezitím už připojuje.
+- Barvy letadel podle výšky: zelená < 900 m, žlutá < 3 km, oranžová < 6 km, růžová < 9 km, modrá výš, šedá = na zemi.
+- **Červená tečka** nahoře znamená, že není připojená WiFi.
 
 ## První nastavení (hotspot)
 
 1. Po prvním zapnutí zařízení vytvoří **otevřenou WiFi `Letadla-XXXX`**. Na displeji je QR kód, kterým se k ní telefon připojí.
 2. Telefon by měl sám otevřít stránku s nastavením. Když ne, otevři **http://192.168.4.1**.
-3. Vyber svou WiFi a zadej heslo. Polohu domova (střed radaru) zadej souřadnicemi, nebo ji klikni do mapy. Nakonec vyber meteostanici ČHMI a dej **Uložit**.
-   Mapa (OpenStreetMap) a vyhledávání adresy fungují, když je telefon připojený k internetu, typicky při změně nastavení v domácí síti. Při kliknutí do mapy se sama vybere nejbližší stanice ČHMI.
+3. Nahoře vyber **jazyk**, pak svou WiFi a heslo, polohu domova (střed radaru) a meteostanici ČHMI. Dej **Uložit**.
 4. Zařízení se restartuje a připojí k síti.
 
-Nastavení se ukládá do flash paměti a aktualizace firmwaru ho nesmažou. Později ho změníš dvěma způsoby:
-- v prohlížeči na **IP adrese zařízení** (je vidět na obrazovce hodin),
-- podržením tlačítka 5 s, které znovu spustí hotspot.
-
-Na stránce **Systémové informace** (`http://<IP zařízení>/system`) jsou živé údaje, které se obnovují každé 2 s: teplota čipu, vytížení CPU, využití RAM a flash, síla WiFi signálu, doba běhu, důvod posledního restartu a stáří stažených dat. Totéž ve formátu JSON vrací `/api/status`.
+Nastavení se ukládá do flash paměti a aktualizace ho nesmažou. Později ho otevřeš:
+- v prohlížeči na **IP adrese zařízení** (je vidět dole na obrazovce Hodiny),
+- nebo podržením tlačítka 5 s, které znovu spustí hotspot.
 
 Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 min), přepne se samo do hotspotu. Pokud v hotspotu 5 minut nikdo nic nenastaví, zkusí znovu uloženou WiFi.
 
-## Volba obrazovek
+## Webové nastavení
 
-Ve webovém nastavení v sekci **Obrazovky** zaškrtneš, co se má zobrazovat: třeba jen letadla, jen meteoradar, nebo všechno. Tam se nastavuje i dosah radaru letadel (10–100 km) a poloměr výřezu meteoradaru (25–200 km).
+| Sekce | Co se tam nastavuje |
+|---|---|
+| **Jazyk** | čeština / English / Deutsch / Italiano (displej i web). Jmeniny jsou jen česky, státní svátky se překládají |
+| **WiFi** | síť ze seznamu nalezených, heslo |
+| **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
+| **Obrazovky** | které obrazovky se zobrazují, dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
+| **Detail letadla** | které údaje se zobrazí (logo, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
+| **Spotová cena elektřiny** | přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
+| **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
+| **Jas displeje** | den / večer / noc se začátkem a jasem v %, pin podsvícení. V noci pod 30 % první stisk tlačítka rozsvítí displej na 30 s |
+| **Čas (NTP)** | hlavní a záložní NTP server (výchozí `pool.ntp.org`, `time.google.com`) |
+| **Firmware** | verze, automatické aktualizace, tlačítko „Zkontrolovat a nainstalovat“ |
 
-## Detail letadla
-
-Ve webovém nastavení v sekci **Detail letadla** zaškrtneš, co se na obrazovce Detail zobrazuje: logo, trasa, typ a registrace, výška v metrech, výška ve stopách a FL, rychlost a kurz, vzdálenost a směr, pořadí letadla. Volací znak je vždy. Zapnuté řádky se seřadí pod sebe a vystředí. Tamtéž se volí **jednotky rychlosti**: km/h, uzly (kt) nebo mph. Volí se tam i **zobrazení trasy**: IATA (PRG → LHR), ICAO (LKPR → EGLL), město (Prague → London) nebo název letiště na dva řádky. Názvy jsou anglicky podle databází, a když nějaký údaj chybí, použije se jednodušší.
-
-## Mapa a automatické přepínání
-
-V sekci **Obrazovky** ve webovém nastavení dále najdeš:
-- **Podklad meteoradaru** a **podklad radaru letadel**: žádný / hranice a města / hranice, řeky a města. Mapa je uložená přímo ve firmwaru (asi 20 kB), takže nepotřebuje internet ani RAM navíc. Hustota měst se řídí poloměrem. Data generuje `tools/make_map.py`: hranice a řeky z Natural Earth (volné dílo), česká města z janpipek/cli-plotting-talk, města v okolí z Natural Earth s českými názvy.
-- **Automatické přepínání obrazovek**: vypnuto / 10 / 15 / 30 / 60 s. Po stisku tlačítka se automatika na minutu pozastaví.
-
-## Jazyk
-
-Rozhraní je k dispozici **česky, anglicky, německy a italsky**. Jazyk se volí nahoře ve webovém nastavení a platí pro displej i webové stránky. Jmeniny se zobrazují jen v češtině, státní svátky ČR se překládají. Texty jsou ve zdrojovém kódu přímo u sebe: `tr("česky", "English", "Deutsch", "Italiano")` (viz `firmware/i18n.h`), šablony webu používají značky `{{klíč}}` s překlady v `portal.cpp`.
-
-## Čas (NTP)
-
-Ve webovém nastavení v sekci **Čas (NTP)** se nastavuje hlavní a záložní NTP server. Výchozí jsou `pool.ntp.org` a `time.google.com`, jiná možnost je třeba `tik.cesnet.cz`, `ntp.nic.cz` nebo IP adresa routeru. Časová zóna je Praha a letní čas se přepíná sám. Stav synchronizace je vidět na stránce Systémové informace.
-
-## Jas displeje
-
-Ve webovém nastavení se nastavují tři období (den, večer, noc), každé se začátkem a jasem v %. Při posunu jezdce se jas na chvíli ukáže na displeji. Pokud je v noci displej ztlumený pod 30 %, první stisk tlačítka ho rozsvítí na 30 s.
-
+**Jas a pin podsvícení:**
 - **Modul s pinem BL/BLK:** připoj ho na volný GPIO (5, 6, 7, 20 nebo 21) a vyber ho v nastavení. Jas se pak řídí PWM podsvícením.
-- **Modul bez pinu BL** (většina 7pinových): podsvícení svítí stále, ztmavuje se jen obraz. Černé pozadí proto dál slabě prosvítá.
+- **Modul bez pinu BL** (většina 7pinových): podsvícení svítí stále a ztmavuje se jen obraz. Černé pozadí proto dál slabě prosvítá.
+
+**Systémové informace** (`http://<IP zařízení>/system`) se obnovují každé 2 s. Ukazují:
+- teplotu čipu, vytížení CPU, RAM (volno, minimum, největší blok) a flash,
+- WiFi (signál, kanál, IP), dobu běhu a důvod posledního restartu,
+- stav všech zdrojů dat (ADS-B, předpověď, meteoradar, loga, trasy, cena elektřiny), NTP a aktualizací.
+
+Totéž ve formátu JSON vrací `/api/status`.
 
 ## Aktualizace firmwaru (OTA z GitHubu)
 
-- Zařízení minutu po startu a pak jednou denně zkontroluje `releases/latest` tohoto repozitáře.
-  Je-li tam novější verze a v nastavení jsou zapnuté **automatické aktualizace** (výchozí stav), stáhne `firmware.bin`, nainstaluje ho a restartuje se. Na displeji se mezitím ukazuje průběh.
-- Ve webovém nastavení je tlačítko **„Zkontrolovat a nainstalovat nejnovější verzi"**.
-- Když zařízení najde novou verzi, nejdřív se restartuje a teprve hned po startu ji stáhne. Za běhu je RAM rozdrobená radarem, předpovědí a logy a šifrované spojení na server GitHubu by se nemuselo vejít. Když stažení selže, běží dál stará verze a další pokus přijde za den.
+- Zařízení minutu po startu a pak jednou denně zkontroluje `releases/latest` tohoto repozitáře. Ve webovém nastavení je i tlačítko **„Zkontrolovat a nainstalovat nejnovější verzi“**.
+- Když najde novější verzi a jsou zapnuté **automatické aktualizace** (výchozí stav), **restartuje se a stáhne ji hned po startu**. V tu chvíli je RAM volná pro šifrované spojení na server GitHubu. Na displeji je „Aktualizace“ s procenty.
+- Paměť má dva oddíly pro program. Když se stahování přeruší, běží dál stará verze a další pokus přijde za den.
 - Repozitář musí být **veřejný**, protože zařízení se ke GitHub API připojuje bez tokenu.
-- Lokálně sestavený firmware (verze `dev`) se automaticky nepřepisuje, ale tlačítko na webu funguje i u něj.
+- Lokálně sestavený firmware (verze `dev`) se automaticky nepřepisuje, tlačítko na webu ale funguje.
 
 ### Jak vydat novou verzi
 
-Změň číslo v souboru **`VERSION`** (např. `0.2.0`) a pushni do `main`. Stačí to udělat i přímo v editoru na GitHubu.
-GitHub Actions (`.github/workflows/firmware.yml`) pak vytvoří tag `v0.2.0` a Release se dvěma soubory:
-- `firmware.bin` stahují zařízení přes OTA,
-- `firmware-full.bin` je kompletní obraz pro první nahrání přes USB (adresa `0x0`).
+Změň číslo v souboru **`VERSION`** (např. `0.11.0`) a pushni do `main`. Jde to i v editoru na GitHubu. Číslo musí stoupat. GitHub Actions (`.github/workflows/firmware.yml`) pak vytvoří tag `v0.11.0` a Release se třemi soubory:
 
-Ruční push tagu `vX.Y.Z` funguje taky.
+| Soubor | K čemu |
+|---|---|
+| `firmware.bin` | aktualizace přes WiFi (OTA), stahují ho zařízení |
+| `firmware-full.bin` | kompletní obraz pro první nahrání přes USB (adresa `0x0`) |
+| `esp32-stand-system-arduino-vX.Y.Z.zip` | složka `firmware/` pro Arduino IDE s vloženým číslem verze a návodem |
 
-Číslo verze musí ve formátu `vX.Y.Z` stoupat.
+Ruční push tagu `vX.Y.Z` funguje taky. Každý push do `main` se automaticky zkusí přeložit.
 
 ## Zapojení
 
@@ -100,63 +100,84 @@ Ruční push tagu `vX.Y.Z` funguje taky.
 | DC | GPIO 10 |
 | SDA (MOSI) | GPIO 3 |
 | SCL (SCLK) | GPIO 4 |
+| BL (pokud je) | volitelně GPIO 5/6/7/20/21 |
 
-Piny jsou nastavené ve `firmware/display.h`.
+Piny displeje jsou nastavené ve `firmware/display.h`.
 
 ## První nahrání přes USB
 
-Nahrát jde jednou ze tří cest.
-
-**A) Hotový obraz z Release.** Stáhni `firmware-full.bin` a nahraj ho:
+**A) Hotový obraz z Release (nejjednodušší).** Stáhni `firmware-full.bin` a nahraj ho na adresu `0x0` v prohlížeči přes https://espressif.github.io/esptool-js/, nebo příkazem:
 
 ```bash
 esptool.py --chip esp32c3 write_flash 0x0 firmware-full.bin
 ```
 
-Případně použij webový flasher (např. https://espressif.github.io/esptool-js/) s adresou `0x0`.
+**B) Arduino IDE.** Stáhni z Release `esp32-stand-system-arduino-vX.Y.Z.zip`, rozbal ho a otevři `firmware/firmware.ino`. Kód je v `.cpp`/`.h` souborech ve stejné složce. Soubor `fw_version.h` nese číslo verze, takže fungují i automatické aktualizace.
+- Deska (esp32 od Espressif 2.0.17): **ESP32C3 Dev Module**, *USB CDC On Boot: Enabled*, *Partition Scheme: Minimal SPIFFS (1.9MB APP with OTA)*, *Flash Mode: DIO*.
+- Knihovny: **LovyanGFX 1.2.7**, **ArduinoJson 7.2.1**, **PNGdec 1.1.7**.
 
-**B) PlatformIO**
+**C) PlatformIO**
 
 ```bash
 pio run -t upload && pio device monitor
 ```
 
-**C) Arduino IDE**
-Nejjednodušší je stáhnout z Release soubor **`esp32-stand-system-arduino-vX.Y.Z.zip`**. Obsahuje složku `firmware/` s číslem verze (`fw_version.h`, díky kterému fungují automatické aktualizace) a návod `ARDUINO_IDE.txt`. Rozbal ho a otevři `firmware/firmware.ino`.
-- Otevři `firmware/firmware.ino` (kód je v `.cpp` souborech ve stejné složce).
-- Deska: **ESP32C3 Dev Module**, *USB CDC On Boot: Enabled*, *Partition Scheme: Minimal SPIFFS (1.9MB APP with OTA)*, *Flash Mode: DIO*.
-- Knihovny: **LovyanGFX** (1.2.x) a **ArduinoJson** (7.x).
-
 Pokud se deska nechce nahrávat, podrž BOOT, stiskni RESET a BOOT pusť.
 
 ## Zdroje dat
 
-- **Letadla:** [airplanes.live](https://airplanes.live) API (`/v2/point/lat/lon/radius`), při výpadku [adsb.lol](https://adsb.lol). Obě jsou zdarma, bez klíče, pro nekomerční použití. Dotaz jde jednou za 10 s.
-- **Loga leteckých společností:** [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos) (`flightaware_logos`, 90×90 PNG podle ICAO kódu). Kód se vezme ze začátku volacího znaku (CSA123 → CSA). Logo se stáhne až při prvním zobrazení a v paměti zůstává posledních 6. Loga jsou majetkem příslušných společností.
-- **Trasa letu (odkud → kam):** ADS-B trasu nevysílá, proto se dohledává podle volacího znaku. Hlavní zdroj je [adsb.lol routeset](https://api.adsb.lol), který trasu ověří proti poloze letadla (u nevěrohodné se zobrazí „?“). Záložní zdroj je [adsbdb.com](https://www.adsbdb.com). Trasa se zobrazuje jako IATA kódy (PRG → LHR) jen u letů leteckých společností a v paměti se drží posledních 6.
-- **Cena elektřiny:** výsledky denního trhu [OTE](https://www.ote-cr.cz) po 15 min, přepočtené na CZK, převzaté ze [spotovaelektrina.cz](https://spotovaelektrina.cz) (zdarma, bez klíče). Dnešek i zítřek přijdou v jedné odpovědi, zítřek OTE zveřejňuje kolem 13:00. Ve webovém nastavení se dá zadat přirážka (Kč/kWh) a DPH, výchozí je holá burzovní cena.
-- **Předpověď:** [Open-Meteo](https://open-meteo.com) (zdarma, bez klíče): aktuální stav, 15minutové srážky na 2 h dopředu, hodinová a denní předpověď. Obnovuje se každých 15 min.
-- **Meteoradar:** ČHMI, kompozit maximální odrazivosti `maxz/png_masked` (PNG každých 5 min). Zařízení stáhne posledních 6 snímků, ořízne je na okolí domova a uloží komprimované (RLE), aby se vešly do RAM.
-- **Vyhodnocení radaru:** v nejnovějším snímku se najdou nejbližší srážky (vzdálenost, směr, intenzita podle barvy). Porovnáním nejstaršího a nejnovějšího snímku se určí, kam a jak rychle se srážky posouvají. Pak se z domova díváme proti směru pohybu, co a kdy k nám dorazí, případně kdy přestane. Výsledek je i na prvním řádku upozornění na obrazovce Předpověď, kde nahrazuje modelový odhad.
-- **Měření ze stanice:** otevřená data ČHMI, 10minutová měření:
-  `https://opendata.chmi.cz/meteorology/climate/now/data/10m-<WSI>-<YYYYMMDD>.json`.
-  Soubor má stovky kB, proto se parsuje průběžně ze streamu a v paměti zůstane jen poslední hodnota každé veličiny. Stahuje se jednou za 10 min.
+Všechny jsou zdarma a bez registrace.
+
+| Data | Zdroj | Jak často |
+|---|---|---|
+| Letadla (ADS-B) | [airplanes.live](https://airplanes.live), záložně [adsb.lol](https://adsb.lol) | 10 s |
+| Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení, 3 v paměti |
+| Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |
+| Předpověď | [Open-Meteo](https://open-meteo.com): aktuální stav, srážky po 15 min na 2 h, hodinová a denní předpověď | 15 min |
+| Meteoradar | ČHMI, kompozit max. odrazivosti `maxz/png_masked`, posledních 6 snímků po 5 min | 5 min |
+| Měření ze stanice | ČHMI otevřená data, 10min měření `10m-<WSI>-<YYYYMMDD>.json` | 10 min |
+| Cena elektřiny | výsledky denního trhu [OTE](https://www.ote-cr.cz) v Kč po 15 min přes [spotovaelektrina.cz](https://spotovaelektrina.cz). Zítřek je k dispozici kolem 13:00 | 30 min |
+| Mapa | [Natural Earth](https://www.naturalearthdata.com) (hranice, řeky; volné dílo), česká města z janpipek/cli-plotting-talk. Uložená ve firmwaru | – |
+| Jmeniny | hermajan/timely, ověřeno proti xnekv03/nameday-api. Uložené ve firmwaru | – |
+
+**Vyhodnocení radaru:** v nejnovějším snímku se najdou nejbližší srážky (vzdálenost, směr, intenzita podle barvy). Porovnáním nejstaršího a nejnovějšího snímku se určí, kam a jak rychle se srážky posouvají. Z domova se pak díváme proti směru pohybu, co a kdy k nám dorazí, případně kdy přestane. Výsledek je i na prvním řádku upozornění na obrazovce Předpověď, kde nahrazuje modelový odhad.
 
 ## Struktura
 
 | Soubor | Obsah |
 |---|---|
-| `firmware/main.cpp` | stahování dat, vykreslování, tlačítko |
-| `firmware/portal.cpp` | hotspot, captive portál, webové nastavení, seznam stanic ČHMI |
+| `firmware/main.cpp` | stahování ADS-B a ČHMI stanice, vykreslování obrazovek, tlačítko, jas, úvodní obrazovka |
+| `firmware/portal.cpp` | hotspot, captive portál, webové nastavení, stránka Systém, překlady webu |
+| `firmware/radar.cpp` | meteoradar ČHMI: stažení, ořez, komprese a vyhodnocení pohybu srážek |
+| `firmware/forecast.cpp` | předpověď Open-Meteo a upozornění |
+| `firmware/price.cpp` | spotová cena elektřiny |
+| `firmware/logo.cpp`, `route.cpp` | loga společností, trasa letu |
+| `firmware/png_net.cpp` | dekódování PNG přímo ze sítě (sdílený statický dekodér) |
+| `firmware/http_body.h` | čtení HTTP/1.1 odpovědí včetně chunked |
 | `firmware/ota.cpp` | kontrola GitHub Releases a OTA |
+| `firmware/sysinfo.cpp` | data pro stránku Systém |
 | `firmware/settings.cpp` | nastavení v NVS |
+| `firmware/i18n.h` | jazyky: `tr("česky", "English", "Deutsch", "Italiano")` |
 | `firmware/display.h` | piny a konfigurace displeje |
 | `firmware/fonts_cz.h` | písmo s diakritikou, generuje `tools/make_fonts.py` |
+| `firmware/mapdata.h` | obrysová mapa, generuje `tools/make_map.py` |
+| `firmware/namedays.h` | česká jména v kalendáři |
 
-`fonts_cz.h` obsahuje z písma efont jen latinku a češtinu (14 kB místo 1,5 MB). Jen díky tomu se firmware vejde do OTA oddílů.
+## Paměť
+
+ESP32-C3 nemá PSRAM a každé šifrované spojení potřebuje asi 45 kB RAM. Proto:
+- se displej kreslí **po polovinách** do 28kB bufferu místo 57 kB,
+- dekodér PNG je **jeden a statický** a PNG se dekóduje rovnou při stahování,
+- letadla i ceny elektřiny se z JSON čtou **po jedné položce**,
+- radar má **trvalý pracovní buffer**,
+- aktualizace se stahuje **hned po restartu**.
+
+Na stránce Systém sleduj u RAM hodnotu **minimum**. Když zůstává nad ~15 kB, je vše v pořádku.
+
+`fonts_cz.h` obsahuje z písma efont jen latinku (včetně němčiny a italštiny) a češtinu: 17 kB místo 1,7 MB. Jen díky tomu se firmware vejde do OTA oddílů.
 
 ## Ladění
 
-Na sériové lince (115200) se vypisuje stav WiFi, OTA, počet letadel a **všechny veličiny ČHMI** (kód, čas, hodnota).
-Pokud se některá hodnota na displeji nezobrazuje, zkontroluj v tomto výpisu kód veličiny a případně ho uprav nahoře v `main.cpp` (`EL_TEMP`, `EL_HUM`, …).
-Pokud jsou barvy obrácené, přepni `cfg.invert` v `display.h`.
+- **Sériová linka (115200)** vypisuje stav WiFi, OTA, počet letadel, snímky radaru, trasy a loga a všechny veličiny ČHMI (kód, čas, hodnota).
+- **Chybí hodnota z ČHMI stanice:** zkontroluj ve výpisu kód veličiny a případně ho uprav nahoře v `main.cpp` (`EL_TEMP`, `EL_HUM`, …).
+- **Barvy jsou obrácené:** přepni `cfg.invert` v `display.h`.

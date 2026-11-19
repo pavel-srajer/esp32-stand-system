@@ -137,10 +137,10 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <header class="hero">
   <div>
-    <div class="eyebrow">ESP32-C3 · GC9A01 1,28″ · ADS-B · ČHMI</div>
-    <h1>Radar letadel a počasí na stole</h1>
-    <p class="lead">Malý kulatý displej ukazuje letadla, která právě letí kolem tvého domu, a aktuální měření nejbližší meteostanice ČHMI. Nastavuje se z telefonu a nové verze si stahuje sám z GitHubu.</p>
-    <div class="meta"><span>repo: pavel-srajer/esp32-stand-system</span><span>firmware ≈ 1,1 MB</span><span>displej 240 × 240 px</span></div>
+    <div class="eyebrow">ESP32-C3 · GC9A01 1,28″ · ADS-B · ČHMI · OTE</div>
+    <h1>Radar letadel, počasí a cena elektřiny na stole</h1>
+    <p class="lead">Malý kulatý displej ukazuje letadla, která právě letí kolem tvého domu, i s logem a trasou. Dál předpověď s upozorněním, že začne pršet, animovaný meteoradar ČHMI, spotovou cenu elektřiny a hodiny se jmeninami. Nastavuje se z telefonu, umí česky, anglicky, německy i italsky a nové verze si stahuje sám z GitHubu.</p>
+    <div class="meta"><span>repo: pavel-srajer/esp32-stand-system</span><span>firmware ≈ 1,3 MB</span><span>CZ · EN · DE · IT</span><span>displej 240 × 240 px</span></div>
   </div>
   <svg viewBox="0 0 260 260" role="img" aria-label="Náhled radaru na kulatém displeji">
     <circle cx="130" cy="130" r="126" fill="var(--screen)" stroke="var(--line)" stroke-width="4"/>
@@ -169,10 +169,11 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <a href="#hw"><span>1</span>Součástky a zapojení</a>
   <a href="#flash"><span>2</span>Nahrání firmwaru</a>
   <a href="#setup"><span>3</span>První nastavení</a>
-  <a href="#ovladani"><span>4</span>Ovládání</a>
-  <a href="#ota"><span>5</span>Aktualizace</a>
-  <a href="#vydani"><span>6</span>Vydání nové verze</a>
-  <a href="#problemy"><span>7</span>Řešení problémů</a>
+  <a href="#ovladani"><span>4</span>Ovládání a obrazovky</a>
+  <a href="#web"><span>5</span>Webové nastavení</a>
+  <a href="#ota"><span>6</span>Aktualizace</a>
+  <a href="#vydani"><span>7</span>Vydání nové verze</a>
+  <a href="#problemy"><span>8</span>Řešení problémů</a>
 </nav>
 
 <!-- ============================ A ============================ -->
@@ -180,9 +181,9 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <section>
   <header><h3>Celkový přehled</h3>
-  <p>Deska ESP32-C3 má vestavěnou WiFi. Přes internet se ptá tří služeb a výsledek kreslí na displej. Z telefonu se na ni dostaneš přes webovou stránku, kterou sama poskytuje.</p></header>
+  <p>Deska ESP32-C3 má vestavěnou WiFi. Přes internet se ptá několika bezplatných služeb a výsledek kreslí na displej. Z telefonu se na ni dostaneš přes webovou stránku, kterou sama poskytuje.</p></header>
   <figure class="fig">
-    <svg viewBox="0 0 900 400" role="img" aria-label="Schéma: ESP32 komunikuje s ADS-B API, ČHMI, GitHubem a NTP, ovládá displej a poskytuje webové nastavení telefonu">
+    <svg viewBox="0 0 900 400" role="img" aria-label="Schéma: ESP32 komunikuje s ADS-B API, Open-Meteo, ČHMI, spotovaelektrina.cz, GitHubem a NTP, ovládá displej a poskytuje webové nastavení telefonu">
       <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" class="s-muted"/></marker></defs>
       <!-- zařízení -->
       <rect x="300" y="130" width="230" height="140" rx="12" class="s-panel st-ink" stroke-width="2"/>
@@ -203,31 +204,39 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <line x1="152" y1="316" x2="300" y2="250" class="st-muted" stroke-width="1.6" marker-end="url(#ar)"/>
       <!-- služby -->
       <g font-size="13">
-        <rect x="640" y="20" width="240" height="64" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
-        <text x="656" y="46" class="s-blue" font-weight="600">airplanes.live / adsb.lol</text>
-        <text x="656" y="68" class="s-muted">letadla v okruhu · každých 10 s</text>
-        <rect x="640" y="104" width="240" height="64" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
-        <text x="656" y="130" class="s-blue" font-weight="600">opendata.chmi.cz</text>
-        <text x="656" y="152" class="s-muted">10min měření stanice · každých 10 min</text>
-        <rect x="640" y="188" width="240" height="64" rx="8" class="s-panel st-mag" stroke-width="1.5"/>
-        <text x="656" y="214" class="s-mag" font-weight="600">GitHub Releases</text>
-        <text x="656" y="236" class="s-muted">nová verze firmwaru · 1× denně</text>
-        <rect x="640" y="272" width="240" height="52" rx="8" class="s-panel st-line" stroke-width="1.5"/>
-        <text x="656" y="296" class="s-ink" font-weight="600">pool.ntp.org</text>
-        <text x="656" y="314" class="s-muted">přesný čas</text>
+        <rect x="640" y="8" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
+        <text x="654" y="30" class="s-blue" font-weight="600">airplanes.live · adsb.lol · adsbdb</text>
+        <text x="654" y="50" class="s-muted" font-size="12">letadla 10 s · trasy a loga</text>
+        <rect x="640" y="72" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
+        <text x="654" y="94" class="s-blue" font-weight="600">api.open-meteo.com</text>
+        <text x="654" y="114" class="s-muted" font-size="12">předpověď a upozornění · 15 min</text>
+        <rect x="640" y="136" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
+        <text x="654" y="158" class="s-blue" font-weight="600">opendata.chmi.cz</text>
+        <text x="654" y="178" class="s-muted" font-size="12">meteoradar 5 min · stanice 10 min</text>
+        <rect x="640" y="200" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
+        <text x="654" y="222" class="s-blue" font-weight="600">spotovaelektrina.cz (OTE)</text>
+        <text x="654" y="242" class="s-muted" font-size="12">cena elektřiny po 15 min · 30 min</text>
+        <rect x="640" y="264" width="250" height="54" rx="8" class="s-panel st-mag" stroke-width="1.5"/>
+        <text x="654" y="286" class="s-mag" font-weight="600">GitHub</text>
+        <text x="654" y="306" class="s-muted" font-size="12">nová verze firmwaru 1× denně · loga</text>
+        <rect x="640" y="328" width="250" height="54" rx="8" class="s-panel st-line" stroke-width="1.5"/>
+        <text x="654" y="350" class="s-ink" font-weight="600">NTP server</text>
+        <text x="654" y="370" class="s-muted" font-size="12">přesný čas</text>
       </g>
       <g class="st-muted" stroke-width="1.6" fill="none">
-        <path d="M530 160 C590 160 590 52 638 52" marker-end="url(#ar)"/>
-        <path d="M530 180 C590 180 590 136 638 136" marker-end="url(#ar)"/>
-        <path d="M530 210 C590 210 590 220 638 220" marker-end="url(#ar)"/>
-        <path d="M530 235 C590 235 590 298 638 298" marker-end="url(#ar)"/>
+        <path d="M530 150 C590 150 590 35 638 35" marker-end="url(#ar)"/>
+        <path d="M530 170 C590 170 590 99 638 99" marker-end="url(#ar)"/>
+        <path d="M530 190 C590 190 590 163 638 163" marker-end="url(#ar)"/>
+        <path d="M530 210 C590 210 590 227 638 227" marker-end="url(#ar)"/>
+        <path d="M530 230 C590 230 590 291 638 291" marker-end="url(#ar)"/>
+        <path d="M530 250 C590 250 590 355 638 355" marker-end="url(#ar)"/>
       </g>
-      <text x="586" y="114" class="mono s-muted" font-size="10" text-anchor="middle">HTTPS</text>
+      <text x="580" y="140" class="mono s-muted" font-size="10" text-anchor="middle">HTTPS</text>
       <!-- telefon -->
       <rect x="380" y="320" width="70" height="70" rx="10" class="s-panel st-ink" stroke-width="1.5"/>
       <rect x="390" y="330" width="50" height="40" rx="3" class="s-paper"/>
       <text x="470" y="350" class="s-ink" font-size="13" font-weight="600">Telefon</text>
-      <text x="470" y="368" class="s-muted" font-size="12">webové nastavení (WiFi, poloha, stanice)</text>
+      <text x="470" y="368" class="s-muted" font-size="12">webové nastavení</text>
       <line x1="415" y1="318" x2="415" y2="272" class="st-muted" stroke-width="1.6" marker-start="url(#ar)" marker-end="url(#ar)"/>
     </svg>
     <figcaption>Displej se překresluje několikrát za sekundu z posledních stažených dat. Stahování běží odděleně, takže displej nezamrzne ani během načítání.</figcaption>
@@ -285,6 +294,26 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <div class="eyebrow">Počasí · ČHMI</div>
       <p>ČHMI zveřejňuje <a href="https://opendata.chmi.cz/meteorology/climate/now/" target="_blank" rel="noopener">otevřená data</a>: pro každou stanici denní soubor se všemi 10minutovými měřeními. Má stovky kB, víc než volná paměť desky.</p>
       <p>Zařízení ho proto čte postupně. U každé veličiny si nechá jen nejnovější hodnotu a srážky za den sčítá. Tlak přepočítá na hladinu moře, aby odpovídal číslům z předpovědí.</p>
+    </div>
+    <div style="display:grid;gap:8px">
+      <div class="eyebrow">Meteoradar · ČHMI</div>
+      <p>Každých 5 minut stáhne posledních 6 snímků radaru, ořízne je na okolí domova a přehraje jako animaci na obrysové mapě (hranice, řeky, města).</p>
+      <p>Porovnáním snímků zjistí, kam a jak rychle se srážky posouvají, a spočítá, kdy dorazí k tobě nebo kdy přestane pršet. Radar ukazuje skutečnost, proto má přednost před modelovou předpovědí.</p>
+    </div>
+    <div style="display:grid;gap:8px">
+      <div class="eyebrow">Předpověď · Open-Meteo</div>
+      <p><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> zpřístupňuje výstupy předpovědních modelů (pro střední Evropu hlavně ICON německé DWD). Zařízení si bere aktuální stav, srážky po 15 minutách na 2 hodiny a hodinovou předpověď.</p>
+      <p>Z nich počítá upozornění: mráz, náledí, silný vítr, bouřky, sněžení a horko.</p>
+    </div>
+    <div style="display:grid;gap:8px">
+      <div class="eyebrow">Trasa a logo letu</div>
+      <p>ADS-B nevysílá, odkud a kam letadlo letí. Trasu proto zařízení dohledá podle volacího znaku v komunitních databázích <b>adsb.lol</b> (ověří ji proti poloze letadla) a <b>adsbdb.com</b>.</p>
+      <p>Logo společnosti podle ICAO kódu (CSA123 → ČSA) se stáhne z veřejné sbírky na GitHubu.</p>
+    </div>
+    <div style="display:grid;gap:8px">
+      <div class="eyebrow">Cena elektřiny · OTE</div>
+      <p>Výsledky denního trhu <a href="https://www.ote-cr.cz" target="_blank" rel="noopener">OTE</a> po 15 minutách, v korunách, přes <a href="https://spotovaelektrina.cz" target="_blank" rel="noopener">spotovaelektrina.cz</a>. Ceny na zítřek OTE zveřejňuje kolem 13:00.</p>
+      <p>Bez nastavení je to holá burzovní cena. Ve webovém nastavení můžeš přičíst poplatky a DPH.</p>
     </div>
   </div>
 </section>
@@ -350,14 +379,14 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <p class="muted">Ne <code>firmware.bin</code>. Ten je jen pro aktualizace přes WiFi a samotný nenastartuje.</p></div></li>
     <li><div><p>Připoj desku USB kabelem a otevři <a href="https://espressif.github.io/esptool-js/" target="_blank" rel="noopener">esptool-js</a>. Klikni na <b>Connect</b> a vyber port (např. „USB JTAG/serial debug unit“).</p></div></li>
     <li><div><p>Do pole <b>Flash Address</b> napiš <code>0x0</code>, vyber stažený <code>firmware-full.bin</code> a klikni na <b>Program</b>.</p></div></li>
-    <li><div><p>Po dokončení stiskni na desce <b>RESET</b> (nebo ji odpoj a znovu připoj). Na displeji se objeví QR kód.</p></div></li>
+    <li><div><p>Po dokončení stiskni na desce <b>RESET</b> (nebo ji odpoj a znovu připoj). Na 3 sekundy se ukáže úvodní obrazovka s verzí a pak QR kód.</p></div></li>
   </ol>
   <p class="note"><b>Deska se nepřipojí?</b> Podrž BOOT, krátce stiskni RESET a BOOT pusť. Deska je tím v režimu nahrávání a port se objeví.</p>
-  <details><summary>Pro vývojáře: PlatformIO nebo esptool z příkazové řádky</summary>
+  <details><summary>Pro vývojáře: Arduino IDE, PlatformIO nebo esptool z příkazové řádky</summary>
     <div style="display:grid;gap:10px">
       <div class="cmd"><pre>esptool.py --chip esp32c3 write_flash 0x0 firmware-full.bin</pre><button type="button" data-copy>Kopírovat</button></div>
       <div class="cmd"><pre>pio run -t upload &amp;&amp; pio device monitor</pre><button type="button" data-copy>Kopírovat</button></div>
-      <p class="muted">V Arduino IDE: deska <i>ESP32C3 Dev Module</i>, <i>USB CDC On Boot: Enabled</i>, <i>Partition Scheme: Minimal SPIFFS (1.9MB APP with OTA)</i>, <i>Flash Mode: DIO</i>; knihovny LovyanGFX 1.2.x a ArduinoJson 7.x.</p>
+      <p class="muted"><b>Arduino IDE:</b> stáhni z Release <code>esp32-stand-system-arduino-vX.Y.Z.zip</code>, rozbal ho a otevři <code>firmware/firmware.ino</code>. ZIP obsahuje i číslo verze, takže fungují automatické aktualizace, a návod <code>ARDUINO_IDE.txt</code>. Deska <i>ESP32C3 Dev Module</i>, <i>USB CDC On Boot: Enabled</i>, <i>Partition Scheme: Minimal SPIFFS (1.9MB APP with OTA)</i>, <i>Flash Mode: DIO</i>. Knihovny LovyanGFX 1.2.7, ArduinoJson 7.2.1 a PNGdec 1.1.7.</p>
     </div>
   </details>
 </section>
@@ -368,7 +397,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     <ol class="steps">
       <li><div><p>Naskenuj telefonem <b>QR kód</b> na displeji, nebo se ručně připoj k otevřené WiFi <code>Letadla-XXXX</code> (přesný název je pod QR kódem).</p></div></li>
       <li><div><p>Telefon by měl sám otevřít stránku s nastavením. Když ne, otevři v prohlížeči <code>http://192.168.4.1</code>. Displej mezitím ukáže druhý QR kód s touto adresou.</p></div></li>
-      <li><div><p>Vyber svou domácí <b>WiFi</b> a zadej heslo.</p></div></li>
+      <li><div><p>Nahoře vyber <b>jazyk</b> (čeština, English, Deutsch, Italiano). Pak vyber svou domácí <b>WiFi</b> a zadej heslo.</p></div></li>
       <li><div><p>Nastav <b>polohu</b>, tedy střed radaru. Když má telefon internet, klikni v mapě na svůj dům, nebo ho najdi přes vyhledávání adresy. Nejbližší stanice ČHMI se vybere sama. Bez internetu (v hotspotu) zadej souřadnice ručně: na mapy.cz klikni pravým tlačítkem na dům a zkopíruj je.</p></div></li>
       <li><div><p>Vyber nejbližší <b>stanici ČHMI</b>, nebo zadej kód jiné. Pak dej <b>Uložit a restartovat</b>.</p></div></li>
     </ol>
@@ -391,9 +420,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       </svg>
     </figure>
   </div>
-  <p>Tamtéž nastavíš <b>podklad mapy</b> pro meteoradar a radar letadel (hranice, řeky, města) a <b>automatické přepínání obrazovek</b> (vypnuto až 60 s; po stisku tlačítka se na minutu pozastaví).</p>
-  <p>V sekci <b>Obrazovky</b> si vybereš, co se má zobrazovat (jen letadla, jen meteoradar, obojí…). Tam nastavíš i dosah radaru letadel a poloměr výřezu meteoradaru.</p>
-  <p>Ve webovém rozhraní je i odkaz <b>Systémové informace</b> (<code>/system</code>). Ukazuje teplotu čipu, vytížení CPU, využití RAM a flash, sílu WiFi signálu, dobu běhu a stáří stažených dat. Údaje se obnovují každé 2 sekundy.</p>
+  <p>Všechno ostatní (obrazovky, detail letadla, jas, cenu elektřiny, čas…) najdeš ve stejném webovém nastavení. Přehled je v kapitole <a href="#web">Webové nastavení</a>.</p>
   <p>Nastavení se ukládá do paměti desky a vydrží vypnutí i aktualizace. Později ho změníš v prohlížeči na <b>IP adrese zařízení</b>, která je vidět dole na obrazovce hodin. Druhá možnost je podržet tlačítko 5 sekund, tím se hotspot spustí znovu.</p>
 </section>
 
@@ -402,7 +429,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <p>Všechno se ovládá jedním tlačítkem <b>BOOT</b>.</p></header>
   <div class="btnmap">
     <div><span class="press">Krátký stisk</span><p>Další zapnutá obrazovka. Které se zobrazují, nastavíš ve webovém rozhraní.</p></div>
-    <div><span class="press">Dlouhý stisk · 1–5 s</span><p>Na radaru letadel změní dosah 10–100 km, na meteoradaru poloměr 25–200 km. V detailu přepne na další letadlo. Jinde hned obnoví data.</p></div>
+    <div><span class="press">Dlouhý stisk · 1–5 s</span><p>Na radaru letadel změní dosah 10–100 km, na meteoradaru poloměr 25–200 km. V detailu přepne na další letadlo, u ceny elektřiny ukáže zítřek. Jinde hned obnoví data.</p></div>
     <div><span class="press">Držet 5 s</span><p>Spustí hotspot pro nastavení. Během držení se po obvodu plní oranžový kruh.</p></div>
   </div>
   <div class="screens">
@@ -420,12 +447,15 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka detail letadla"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
         <circle cx="80" cy="80" r="72" fill="none" stroke="#3c3c3c"/>
         <g transform="translate(130 46) rotate(60)"><path d="M0 -6 L-4.5 4.5 L0 2 L4.5 4.5 Z" fill="#ffe14d"/></g>
-        <text x="80" y="50" text-anchor="middle" fill="#ffe14d" font-size="17" font-weight="700">CSA2LK</text>
-        <text x="80" y="66" text-anchor="middle" fill="#c8c8c8" font-size="10">A320 · OK-NEO</text>
-        <text x="80" y="88" text-anchor="middle" fill="#fff" font-size="16">2 130 m</text>
-        <text x="80" y="108" text-anchor="middle" fill="#ffe678" font-size="10">520 km/h · 64°</text>
-        <text x="80" y="122" text-anchor="middle" fill="#78c8ff" font-size="10">6,4 km SV</text></svg>
-      <h3>Detail letadla</h3><p>Logo společnosti, volací znak, typ, registrace, výška, rychlost, kurz a vzdálenost.</p>
+        <rect x="66" y="12" width="28" height="22" rx="4" fill="#dc1e28"/>
+        <text x="80" y="52" text-anchor="middle" fill="#ffe14d" font-size="17" font-weight="700">CSA2LK</text>
+        <text x="80" y="66" text-anchor="middle" fill="#ffcd5a" font-size="10">PRG → LHR</text>
+        <text x="80" y="80" text-anchor="middle" fill="#c8c8c8" font-size="9">A320  OK-NEO</text>
+        <text x="80" y="98" text-anchor="middle" fill="#fff" font-size="15">2 130 m</text>
+        <text x="80" y="114" text-anchor="middle" fill="#ffe678" font-size="9">520 km/h · 64°</text>
+        <text x="80" y="127" text-anchor="middle" fill="#78c8ff" font-size="9">6,4 km SV</text>
+        <text x="80" y="140" text-anchor="middle" fill="#969696" font-size="8">3 / 17</text></svg>
+      <h3>Detail letadla</h3><p>Logo, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz a vzdálenost. Co se zobrazí, si vybereš na webu.</p>
     </div>
     <div class="screen">
       <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka počasí"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
@@ -438,7 +468,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <text x="80" y="106" text-anchor="middle" fill="#a0ffa0" font-size="9">vítr 3,2 (7) m/s JZ</text>
         <text x="80" y="120" text-anchor="middle" fill="#6496ff" font-size="9">srážky dnes 0,4 mm</text>
         <text x="80" y="138" text-anchor="middle" fill="#787878" font-size="8">měřeno 16:40</text></svg>
-      <h3>Počasí ČHMI</h3><p>Teplota s barevným obloukem, vlhkost, tlak, vítr, srážky a čas měření.</p>
+      <h3>Měření ČHMI</h3><p>Teplota s barevným obloukem, vlhkost, tlak, vítr, srážky a čas měření. Ve výchozím stavu je vypnutá.</p>
     </div>
     <div class="screen">
       <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka hodiny"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
@@ -472,12 +502,40 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <ellipse cx="50" cy="72" rx="13" ry="7" fill="#00c850" transform="rotate(-25 50 72)"/>
         <ellipse cx="48" cy="73" rx="5" ry="3" fill="#ffdc00"/>
         <ellipse cx="112" cy="112" rx="14" ry="8" fill="#1e64ff" opacity=".85"/>
+        <path d="M20 96 Q40 88 58 100 T96 92 T140 104" fill="none" stroke="#2c4f8c" stroke-width="1"/>
+        <path d="M30 40 L52 30 L78 36 L104 28 L130 44" fill="none" stroke="#55607a" stroke-width="1"/>
+        <circle cx="62" cy="58" r="1.6" fill="#aaa"/><text x="62" y="54" text-anchor="middle" fill="#aaa" font-size="6">Kladno</text>
         <circle cx="80" cy="80" r="38" fill="none" stroke="#5a5a5a"/><circle cx="80" cy="80" r="74" fill="none" stroke="#5a5a5a"/>
         <path d="M76 80h8M80 76v8" stroke="#fff"/>
         <text x="80" y="20" text-anchor="middle" fill="#fff" font-size="11">16:35</text>
         <g fill="#5a5a5a"><circle cx="65" cy="27" r="1.5"/><circle cx="71" cy="27" r="1.5"/><circle cx="77" cy="27" r="1.5"/><circle cx="83" cy="27" r="1.5"/><circle cx="89" cy="27" r="1.5"/></g><circle cx="95" cy="27" r="2" fill="#fff"/>
         <text x="80" y="128" text-anchor="middle" fill="#ffbe3c" font-size="7.5">Déšť 14 km Z, dorazí asi za 25 min</text><text x="80" y="138" text-anchor="middle" fill="#969696" font-size="7">postup 35 km/h k východu</text></svg>
-      <h3>Meteoradar</h3><p>Animace srážek za posledních 30 min kolem domova (ČHMI). Dole je vyhodnocení, co k tobě dorazí a kdy, podle toho, jak se srážky na radaru posouvají.</p>
+      <h3>Meteoradar</h3><p>Animace srážek za posledních 30 min na obrysové mapě. Dole je vyhodnocení, co k tobě dorazí a kdy.</p>
+    </div>
+    <div class="screen">
+      <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka spotová cena elektřiny"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
+        <text x="80" y="18" text-anchor="middle" fill="#969696" font-size="7">Spotová cena</text>
+        <text x="80" y="31" text-anchor="middle" fill="#c8c8c8" font-size="9">16:00–16:15</text>
+        <text x="74" y="56" text-anchor="middle" fill="#ff503c" font-size="22" font-weight="700">3,30</text>
+        <text x="110" y="56" text-anchor="middle" fill="#aaa" font-size="7">Kč/kWh</text>
+        <text x="80" y="70" text-anchor="middle" fill="#ff503c" font-size="7">další 15 min: 3,25 ↓</text>
+        <g><rect x="16" y="94" width="34" height="14" fill="#4a3a10"/><rect x="50" y="86" width="8" height="22" fill="#5a1e18"/><rect x="58" y="80" width="2" height="28" fill="#fff"/>
+        <rect x="60" y="92" width="14" height="16" fill="#ffc800"/><rect x="74" y="104" width="14" height="4" fill="#3cdc64"/><rect x="88" y="108" width="8" height="4" fill="#50b4ff"/>
+        <rect x="96" y="94" width="12" height="14" fill="#ffc800"/><rect x="108" y="80" width="20" height="28" fill="#ff503c"/><rect x="128" y="94" width="16" height="14" fill="#ffc800"/></g>
+        <line x1="16" y1="108" x2="144" y2="108" stroke="#5a5a5a"/>
+        <text x="80" y="134" text-anchor="middle" fill="#aaa" font-size="7">↓-0,80 13:00  ↑4,10 19:00</text></svg>
+      <h3>Cena elektřiny</h3><p>Spotová cena v Kč/kWh po čtvrthodinách, graf dne, nejlevnější a nejdražší čas. Dlouhý stisk ukáže zítřek. Ve výchozím stavu je vypnutá.</p>
+    </div>
+    <div class="screen">
+      <svg viewBox="0 0 160 160" role="img" aria-label="Úvodní obrazovka"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
+        <g fill="none" stroke="#0f462a"><circle cx="80" cy="80" r="74"/><circle cx="80" cy="80" r="50"/><circle cx="80" cy="80" r="25"/></g>
+        <path d="M80 80 L80 6 A74 74 0 0 1 132 28 Z" fill="#05351a"/>
+        <g transform="translate(84 42) rotate(64)" fill="#ffbe3c"><path d="M0 -10 L-1.5 -7 L-1.5 9 L1.5 9 L1.5 -7 Z"/><path d="M-1.5 -2 L-10 3 L-10 5 L-1.5 2 Z"/><path d="M1.5 -2 L10 3 L10 5 L1.5 2 Z"/><path d="M-1.5 7 L-4 10 L4 10 L1.5 7 Z"/></g>
+        <text x="80" y="66" text-anchor="middle" fill="#969696" font-size="7">Made by</text>
+        <text x="78" y="82" text-anchor="middle" fill="#fff" font-size="13">Pablo Garage</text><text x="121" y="76" fill="#fff" font-size="6">®</text>
+        <text x="80" y="100" text-anchor="middle" fill="#5ac8ff" font-size="9">verze v0.10.1</text>
+        <text x="80" y="126" text-anchor="middle" fill="#d97757" font-size="7">powered by Claude Code</text></svg>
+      <h3>Úvodní obrazovka</h3><p>Na 3 s po zapnutí, s číslem verze. WiFi se mezitím už připojuje.</p>
     </div>
   </div>
   <div class="tbl"><table>
@@ -493,9 +551,35 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <p class="muted">Červená tečka nahoře na displeji znamená, že zařízení není připojené k WiFi.</p>
 </section>
 
+<section id="web">
+  <header><span class="eyebrow">Krok 5</span><h3>Webové nastavení</h3>
+  <p>Otevřeš ho v prohlížeči na IP adrese zařízení (je dole na obrazovce Hodiny), nebo podržením tlačítka 5 s přes hotspot. Po uložení se zařízení restartuje.</p></header>
+  <div class="tbl"><table>
+    <thead><tr><th>Sekce</th><th>Co tam nastavíš</th></tr></thead>
+    <tbody>
+      <tr><td>Jazyk</td><td>čeština, English, Deutsch, Italiano: pro displej i web. Jmeniny se ukazují jen česky, státní svátky se překládají.</td></tr>
+      <tr><td>WiFi</td><td>síť ze seznamu nalezených a heslo</td></tr>
+      <tr><td>Poloha</td><td>souřadnice, nebo kliknutí do mapy či vyhledání adresy (jen když je telefon online). Sama se vybere nejbližší stanice ČHMI.</td></tr>
+      <tr><td>Obrazovky</td><td>které se zobrazují; dosah radaru letadel 10–100 km; poloměr meteoradaru 25–200 km; <b>automatické přepínání</b> vypnuto/10–60 s (po stisku tlačítka minutu pauza); <b>podklad mapy</b> pro oba radary (žádný / hranice a města / hranice, řeky a města)</td></tr>
+      <tr><td>Detail letadla</td><td>které údaje se ukazují (logo, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
+      <tr><td>Spotová cena elektřiny</td><td>přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena.</td></tr>
+      <tr><td>Meteostanice ČHMI</td><td>stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód)</td></tr>
+      <tr><td>Jas displeje</td><td>den, večer a noc se začátkem a jasem; pin podsvícení, pokud ho modul má</td></tr>
+      <tr><td>Čas (NTP)</td><td>hlavní a záložní NTP server (výchozí pool.ntp.org a time.google.com, třeba i tik.cesnet.cz nebo router)</td></tr>
+      <tr><td>Firmware</td><td>verze, automatické aktualizace a tlačítko „Zkontrolovat a nainstalovat“</td></tr>
+    </tbody></table></div>
+  <p>Odkaz <b>Systémové informace</b> (<code>/system</code>) ukazuje živě každé 2 s:</p>
+  <ul class="plain">
+    <li>teplotu čipu, vytížení CPU, RAM a flash,</li>
+    <li>WiFi, dobu běhu a důvod posledního restartu,</li>
+    <li>stav všech zdrojů dat: letadla, předpověď, meteoradar, loga, trasy, cena elektřiny, čas a aktualizace.</li>
+  </ul>
+  <p>Když něco nefunguje, je tam vidět proč.</p>
+</section>
+
 <section id="ota">
-  <header><span class="eyebrow">Krok 5</span><h3>Aktualizace firmwaru (OTA)</h3>
-  <p>Není potřeba nic dělat. Zařízení se na GitHub podívá minutu po zapnutí a pak jednou denně. Když najde novější verzi, stáhne ji, na displeji ukáže „Aktualizace“ s procenty a restartuje se.</p></header>
+  <header><span class="eyebrow">Krok 6</span><h3>Aktualizace firmwaru (OTA)</h3>
+  <p>Není potřeba nic dělat. Zařízení se na GitHub podívá minutu po zapnutí a pak jednou denně. Když najde novější verzi, <b>nejdřív se restartuje</b> a stáhne ji hned po startu, dokud je paměť volná. Na displeji ukáže „Aktualizace“ s procenty a pak se znovu restartuje do nové verze.</p></header>
   <figure class="fig">
     <svg viewBox="0 0 900 170" role="img" aria-label="Paměť se dvěma oddíly: nová verze se zapíše do neaktivního oddílu a po ověření se z něj nastartuje">
       <g font-size="13">
@@ -503,10 +587,10 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <text x="55" y="80" text-anchor="middle" class="s-muted" font-size="11">zavaděč</text>
         <text x="55" y="96" text-anchor="middle" class="s-muted" font-size="11">nastavení</text>
         <rect x="100" y="40" width="250" height="90" rx="6" class="s-panel st-green" stroke-width="2"/>
-        <text x="225" y="76" text-anchor="middle" class="s-green" font-weight="600">oddíl A · běží v0.1.2</text>
+        <text x="225" y="76" text-anchor="middle" class="s-green" font-weight="600">oddíl A · běží v0.9.3</text>
         <text x="225" y="98" text-anchor="middle" class="s-muted" font-size="12">1,9 MB</text>
         <rect x="360" y="40" width="250" height="90" rx="6" class="s-panel st-mag" stroke-width="2" stroke-dasharray="6 4"/>
-        <text x="485" y="76" text-anchor="middle" class="s-mag" font-weight="600">oddíl B · zapisuje se v0.2.0</text>
+        <text x="485" y="76" text-anchor="middle" class="s-mag" font-weight="600">oddíl B · zapisuje se v0.10.1</text>
         <text x="485" y="98" text-anchor="middle" class="s-muted" font-size="12">1,9 MB</text>
         <text x="760" y="70" text-anchor="middle" class="s-ink" font-weight="600">kontrola v pořádku?</text>
         <text x="760" y="92" text-anchor="middle" class="s-green" font-size="12">ano → start z B</text>
@@ -521,19 +605,19 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 </section>
 
 <section id="vydani">
-  <header><span class="eyebrow">Krok 6 · pro vývoj</span><h3>Vydání nové verze</h3>
+  <header><span class="eyebrow">Krok 7 · pro vývoj</span><h3>Vydání nové verze</h3>
   <p>O sestavení a vydání se stará GitHub Actions. Stačí zvýšit číslo verze.</p></header>
   <ol class="steps">
     <li><div><p>Udělej změny ve firmwaru a pushni je do větve <code>main</code>. Každý push se automaticky zkusí přeložit, takže chyba se ukáže hned.</p></div></li>
     <li><div><p>V souboru <code>VERSION</code> zvyš číslo, např. z <code>0.1.2</code> na <code>0.2.0</code>, a pushni. Jde to i přímo v editoru na webu GitHubu (ikona tužky).</p></div></li>
-    <li><div><p>GitHub Actions přeloží firmware a vytvoří Release <code>v0.2.0</code> se soubory <code>firmware.bin</code> (pro OTA) a <code>firmware-full.bin</code> (pro USB). Trvá to asi minutu.</p></div></li>
+    <li><div><p>GitHub Actions přeloží firmware a vytvoří Release <code>v0.2.0</code> se třemi soubory: <code>firmware.bin</code> (pro OTA), <code>firmware-full.bin</code> (pro USB) a <code>esp32-stand-system-arduino-v0.2.0.zip</code> (zdrojáky pro Arduino IDE s vloženou verzí). Trvá to asi dvě minuty.</p></div></li>
     <li><div><p>Zařízení si novou verzi stáhne při nejbližší denní kontrole. Hned ji nainstaluješ restartem zařízení nebo tlačítkem ve webovém nastavení.</p></div></li>
   </ol>
   <p class="note"><b>Podmínky:</b> repozitář musí být veřejný, protože zařízení se ke GitHubu připojuje bez hesla. Číslo verze musí vždy stoupat.</p>
 </section>
 
 <section id="problemy">
-  <header><span class="eyebrow">Krok 7</span><h3>Řešení problémů</h3></header>
+  <header><span class="eyebrow">Krok 8</span><h3>Řešení problémů</h3></header>
   <div class="faq">
     <details><summary>Na displeji je QR kód, ale telefon WiFi „Letadla-XXXX“ nevidí</summary>
       <p>Známá vada ESP32-C3 Super Mini: kvůli špatné anténě hotspot s plným výkonem nevysílá. Od verze v0.1.1 je výkon snížený. Nahraj přes USB nejnovější <code>firmware-full.bin</code>. Někdy pomůže i přiblížit telefon nebo podržet prst u antény na desce.</p></details>
@@ -541,6 +625,14 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <p>Po třech neúspěšných pokusech (asi minuta) se samo přepne do hotspotu. Zkontroluj heslo a to, že síť vysílá v pásmu 2,4 GHz, protože ESP32 pásmo 5 GHz neumí.</p></details>
     <details><summary>Na radaru je „HTTP 426“ nebo jiná chyba ADS-B</summary>
       <p>Chybu 426 opravuje verze v0.1.2. U jiných kódů chybová hláška říká, které API selhalo. Zařízení automaticky zkusí to druhé. Pokud selžou obě, bývá to dočasný výpadek služby.</p></details>
+    <details><summary>Meteoradar nebo loga hlásí „málo RAM“, nebo se nezobrazují</summary>
+      <p>Každé šifrované spojení potřebuje asi 45 kB RAM a ESP32-C3 jí má málo. Od verze v0.6.5 je paměť rozvržená tak, aby to stačilo. Nainstaluj nejnovější verzi. Na stránce Systém sleduj u RAM hodnotu <b>minimum</b>: nad zhruba 15 kB je vše v pořádku.</p></details>
+    <details><summary>Aktualizace hlásí „connection refused“</summary>
+      <p>Starší verze (do v0.6.3) stahovaly aktualizaci za běhu, kdy nezbývala paměť na spojení. Jednou nahraj nejnovější <code>firmware-full.bin</code> přes USB, nebo dočasně vypni obrazovky Předpověď a Meteoradar a klikni na „Zkontrolovat a nainstalovat“. Od v0.6.4 se zařízení před stažením restartuje a problém už nenastává.</p></details>
+    <details><summary>U letadla se nezobrazuje logo nebo trasa</summary>
+      <p>Obojí funguje jen u letů leteckých společností. Volací znak musí mít tvar 3 písmena a číslo, např. CSA2LK. Soukromá letadla vysílají registraci (OKNEB) a pro ty logo ani trasa neexistují. Trasa se dohledává v komunitních databázích a u charterů a cargo letů občas chybí. Otazník před trasou znamená, že trasa nesedí k poloze letadla. Výsledek posledního pokusu je na stránce Systém.</p></details>
+    <details><summary>Cena elektřiny se nenačte nebo chybí zítřek</summary>
+      <p>Obrazovku je potřeba zapnout v sekci Obrazovky. Ceny se stahují až po synchronizaci času. Zítřek OTE zveřejňuje kolem 13:00 a do té doby dlouhý stisk ukazuje dnešek. Stav je na stránce Systém v řádku Cena elektřiny.</p></details>
     <details><summary>Na obrazovce počasí chybí některá hodnota</summary>
       <p>Ne každá stanice měří všechno: vítr, srážky nebo tlak můžou chybět. Na sériové lince (115200 baud) se po každém stažení vypíšou všechny dostupné veličiny s kódy. Podle nich jde případně upravit kódy nahoře v <code>main.cpp</code>.</p></details>
     <details><summary>Barvy na displeji jsou obrácené nebo divné</summary>
@@ -554,7 +646,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <footer>
   Zdrojový kód: <a href="https://github.com/pavel-srajer/esp32-stand-system" target="_blank" rel="noopener">github.com/pavel-srajer/esp32-stand-system</a>.
-  Data: airplanes.live, adsb.lol (komunitní ADS-B), ČHMI otevřená data. Písmo na displeji: efont.
+  Data: airplanes.live, adsb.lol, adsbdb.com (komunitní ADS-B a trasy), ČHMI otevřená data, Open-Meteo, OTE přes spotovaelektrina.cz, Natural Earth (mapa), Jxck-S/airline-logos (loga). Písmo na displeji: efont.
 </footer>
 </div>
 
