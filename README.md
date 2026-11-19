@@ -122,6 +122,7 @@ pio run -t upload && pio device monitor
 ```
 
 **C) Arduino IDE**
+Nejjednodušší je stáhnout z Release soubor **`esp32-stand-system-arduino-vX.Y.Z.zip`**. Obsahuje složku `firmware/` s číslem verze (`fw_version.h`, díky kterému fungují automatické aktualizace) a návod `ARDUINO_IDE.txt`. Rozbal ho a otevři `firmware/firmware.ino`.
 - Otevři `firmware/firmware.ino` (kód je v `.cpp` souborech ve stejné složce).
 - Deska: **ESP32C3 Dev Module**, *USB CDC On Boot: Enabled*, *Partition Scheme: Minimal SPIFFS (1.9MB APP with OTA)*, *Flash Mode: DIO*.
 - Knihovny: **LovyanGFX** (1.2.x) a **ArduinoJson** (7.x).
