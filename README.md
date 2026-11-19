@@ -25,7 +25,7 @@ Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 | **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
 | **Hodiny** | čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
 | **Spotová cena elektřiny** | aktuální čtvrthodina v Kč/kWh, další čtvrthodina, graf dne po 15 min, nejlevnější a nejdražší čas (ve výchozím stavu vypnutá) | zítřek na 30 s |
-| **Poznámka** | vlastní text ze stránky Systém. Písmo se zvolí co největší a text se zalomí do kruhu (ve výchozím stavu vypnutá) | – |
+| **Poznámka** | vlastní text ze stránky Systém s volitelnou barvou textu a pozadí, velikostí, tučným písmem, kurzívou, podtržením a blikáním. Text se zalomí do kruhu (ve výchozím stavu vypnutá) | ukončí blikání |
 
 - Po zapnutí se na 3 s ukáže **úvodní obrazovka** s verzí firmwaru. WiFi se mezitím už připojuje.
 - Barvy letadel podle výšky: zelená < 900 m, žlutá < 3 km, oranžová < 6 km, růžová < 9 km, modrá výš, šedá = na zemi.
@@ -74,6 +74,7 @@ Nahoře je sekce **Obrazovka**: ukazuje, co je právě na displeji, a tlačítky
 
 - Zařízení minutu po startu a pak jednou denně zkontroluje `releases/latest` tohoto repozitáře. Ve webovém nastavení je i tlačítko **„Zkontrolovat a nainstalovat nejnovější verzi“**.
 - Když najde novější verzi a jsou zapnuté **automatické aktualizace** (výchozí stav), **restartuje se a stáhne ji hned po startu**. V tu chvíli je RAM volná pro šifrované spojení na server GitHubu. Na displeji je „Aktualizace“ s procenty.
+- Přesměrování GitHubu na server se soubory (`release-assets.githubusercontent.com`) si zařízení zjistí samo a první spojení zavře. Je tak otevřené vždy jen jedno šifrované spojení. Stažení se při neúspěchu zkusí až třikrát a během aktualizace web odpovídá jen krátkou stránkou „Aktualizuji…“.
 - Paměť má dva oddíly pro program. Když se stahování přeruší, běží dál stará verze a další pokus přijde za den.
 - Repozitář musí být **veřejný**, protože zařízení se ke GitHub API připojuje bez tokenu.
 - Lokálně sestavený firmware (verze `dev`) se automaticky nepřepisuje, tlačítko na webu ale funguje.
@@ -173,7 +174,7 @@ ESP32-C3 nemá PSRAM a každé šifrované spojení potřebuje asi 45 kB RAM. Pr
 - dekodér PNG je **jeden a statický** a PNG se dekóduje rovnou při stahování,
 - letadla i ceny elektřiny se z JSON čtou **po jedné položce**,
 - radar má **trvalý pracovní buffer**,
-- aktualizace se stahuje **hned po restartu**.
+- aktualizace se stahuje **hned po restartu** a vždy jen **jedním** šifrovaným spojením (přesměrování GitHubu se řeší zvlášť).
 
 Na stránce Systém sleduj u RAM hodnotu **minimum**. Když zůstává nad ~15 kB, je vše v pořádku.
 

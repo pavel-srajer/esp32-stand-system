@@ -140,7 +140,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     <div class="eyebrow">ESP32-C3 · GC9A01 1,28″ · ADS-B · ČHMI · OTE</div>
     <h1>Radar letadel, počasí a cena elektřiny na stole</h1>
     <p class="lead">Malý kulatý displej ukazuje letadla, která právě letí kolem tvého domu, i s logem a trasou. Dál předpověď s upozorněním, že začne pršet, animovaný meteoradar ČHMI, spotovou cenu elektřiny a hodiny se jmeninami. Nastavuje se z telefonu, umí česky, anglicky, německy i italsky a nové verze si stahuje sám z GitHubu.</p>
-    <div class="meta"><span>repo: pavel-srajer/esp32-stand-system</span><span>firmware ≈ 1,3 MB</span><span>CZ · EN · DE · IT</span><span>displej 240 × 240 px</span></div>
+    <div class="meta"><span>repo: pavel-srajer/esp32-stand-system</span><span>firmware ≈ 1,5 MB</span><span>CZ · EN · DE · IT</span><span>displej 240 × 240 px</span></div>
   </div>
   <svg viewBox="0 0 260 260" role="img" aria-label="Náhled radaru na kulatém displeji">
     <circle cx="130" cy="130" r="126" fill="var(--screen)" stroke="var(--line)" stroke-width="4"/>
@@ -533,9 +533,15 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <g transform="translate(84 42) rotate(64)" fill="#ffbe3c"><path d="M0 -10 L-1.5 -7 L-1.5 9 L1.5 9 L1.5 -7 Z"/><path d="M-1.5 -2 L-10 3 L-10 5 L-1.5 2 Z"/><path d="M1.5 -2 L10 3 L10 5 L1.5 2 Z"/><path d="M-1.5 7 L-4 10 L4 10 L1.5 7 Z"/></g>
         <text x="80" y="66" text-anchor="middle" fill="#969696" font-size="7">Made by</text>
         <text x="78" y="82" text-anchor="middle" fill="#fff" font-size="13">Pablo Garage</text><text x="121" y="76" fill="#fff" font-size="6">®</text>
-        <text x="80" y="100" text-anchor="middle" fill="#5ac8ff" font-size="9">verze v0.10.1</text>
+        <text x="80" y="100" text-anchor="middle" fill="#5ac8ff" font-size="9">verze v0.14.3</text>
         <text x="80" y="126" text-anchor="middle" fill="#d97757" font-size="7">powered by Claude Code</text></svg>
       <h3>Úvodní obrazovka</h3><p>Na 3 s po zapnutí, s číslem verze. WiFi se mezitím už připojuje.</p>
+    </div>
+    <div class="screen">
+      <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka poznámka"><circle cx="80" cy="80" r="76" fill="#002266"/>
+        <text x="80" y="72" text-anchor="middle" fill="#ffdd00" font-size="15" font-weight="700">Večeře v 18:00</text>
+        <text x="80" y="94" text-anchor="middle" fill="#ffdd00" font-size="15" font-weight="700">Žluťoučký kůň</text></svg>
+      <h3>Poznámka</h3><p>Vlastní text ze stránky Systém: barva, velikost, tučné písmo, kurzíva, podtržení a blikání do potvrzení tlačítkem.</p>
     </div>
   </div>
   <div class="tbl"><table>
@@ -561,7 +567,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <tr><td>WiFi</td><td>síť ze seznamu nalezených a heslo</td></tr>
       <tr><td>Poloha</td><td>souřadnice, nebo kliknutí do mapy či vyhledání adresy (jen když je telefon online). Sama se vybere nejbližší stanice ČHMI.</td></tr>
       <tr><td>Obrazovky</td><td>které se zobrazují a <b>v jakém pořadí</b> (přetažením za úchyt ☰, jde i prstem na mobilu); dosah radaru letadel 10–100 km; poloměr meteoradaru 25–200 km; <b>automatické přepínání</b> vypnuto/10–60 s (po stisku tlačítka minutu pauza); <b>podklad mapy</b> pro oba radary (žádný / hranice a města / hranice, řeky a města)</td></tr>
-      <tr><td>Detail letadla</td><td>které údaje se ukazují (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
+      <tr><td>Detail letadla</td><td>řádky jsou ve stejném pořadí jako na displeji; které údaje se ukazují (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
       <tr><td>Spotová cena elektřiny</td><td>přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena.</td></tr>
       <tr><td>Meteostanice ČHMI</td><td>stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód)</td></tr>
       <tr><td>Jas displeje</td><td>den, večer a noc se začátkem a jasem; pin podsvícení, pokud ho modul má</td></tr>
@@ -579,7 +585,8 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <section id="ota">
   <header><span class="eyebrow">Krok 6</span><h3>Aktualizace firmwaru (OTA)</h3>
-  <p>Není potřeba nic dělat. Zařízení se na GitHub podívá minutu po zapnutí a pak jednou denně. Když najde novější verzi, <b>nejdřív se restartuje</b> a stáhne ji hned po startu, dokud je paměť volná. Na displeji ukáže „Aktualizace“ s procenty a pak se znovu restartuje do nové verze.</p></header>
+  <p>Není potřeba nic dělat. Zařízení se na GitHub podívá minutu po zapnutí a pak jednou denně. Když najde novější verzi, <b>nejdřív se restartuje</b> a stáhne ji hned po startu, dokud je paměť volná. Na displeji ukáže „Aktualizace“ s procenty a pak se znovu restartuje do nové verze.</p>
+  <p>GitHub stažení přesměrovává na jiný server. Zařízení si cílovou adresu zjistí samo a první spojení zavře, takže má vždy otevřené jen jedno šifrované spojení. Když stažení selže, zkusí ho až třikrát. Během aktualizace web odpovídá jen krátkou stránkou „Aktualizuji…“.</p></header>
   <figure class="fig">
     <svg viewBox="0 0 900 170" role="img" aria-label="Paměť se dvěma oddíly: nová verze se zapíše do neaktivního oddílu a po ověření se z něj nastartuje">
       <g font-size="13">
@@ -587,10 +594,10 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <text x="55" y="80" text-anchor="middle" class="s-muted" font-size="11">zavaděč</text>
         <text x="55" y="96" text-anchor="middle" class="s-muted" font-size="11">nastavení</text>
         <rect x="100" y="40" width="250" height="90" rx="6" class="s-panel st-green" stroke-width="2"/>
-        <text x="225" y="76" text-anchor="middle" class="s-green" font-weight="600">oddíl A · běží v0.9.3</text>
+        <text x="225" y="76" text-anchor="middle" class="s-green" font-weight="600">oddíl A · běží v0.14.2</text>
         <text x="225" y="98" text-anchor="middle" class="s-muted" font-size="12">1,9 MB</text>
         <rect x="360" y="40" width="250" height="90" rx="6" class="s-panel st-mag" stroke-width="2" stroke-dasharray="6 4"/>
-        <text x="485" y="76" text-anchor="middle" class="s-mag" font-weight="600">oddíl B · zapisuje se v0.10.1</text>
+        <text x="485" y="76" text-anchor="middle" class="s-mag" font-weight="600">oddíl B · zapisuje se v0.14.3</text>
         <text x="485" y="98" text-anchor="middle" class="s-muted" font-size="12">1,9 MB</text>
         <text x="760" y="70" text-anchor="middle" class="s-ink" font-weight="600">kontrola v pořádku?</text>
         <text x="760" y="92" text-anchor="middle" class="s-green" font-size="12">ano → start z B</text>
