@@ -31,7 +31,9 @@ void settingsLoad() {
   gCfg.ntp1 = prefs.getString("ntp1", d.ntp1);
   gCfg.ntp2 = prefs.getString("ntp2", d.ntp2);
   gCfg.lang = prefs.getInt("lang", d.lang);
-  gCfg.detailMask = prefs.getInt("detail", d.detailMask);
+  gCfg.detailMask = prefs.getInt("detail2", -1);
+  if (gCfg.detailMask < 0)  // starší nastavení bez řádku "letecká společnost" -> zapnout ho
+    gCfg.detailMask = prefs.isKey("detail") ? (prefs.getInt("detail", 0xFF) | DET_AIRLINE) : d.detailMask;
   gCfg.speedUnit = prefs.getInt("spdu", d.speedUnit);
   gCfg.routeFmt = prefs.getInt("rfmt", d.routeFmt);
   gCfg.priceFee = prefs.getFloat("pfee", d.priceFee);
@@ -65,7 +67,7 @@ void settingsSave() {
   prefs.putString("ntp1", gCfg.ntp1);
   prefs.putString("ntp2", gCfg.ntp2);
   prefs.putInt("lang", gCfg.lang);
-  prefs.putInt("detail", gCfg.detailMask);
+  prefs.putInt("detail2", gCfg.detailMask);
   prefs.putInt("spdu", gCfg.speedUnit);
   prefs.putInt("rfmt", gCfg.routeFmt);
   prefs.putFloat("pfee", gCfg.priceFee);

@@ -536,7 +536,8 @@ static void handleRoot() {
                         tr("Výška ve stopách a letová hladina", "Altitude in feet and flight level", "Höhe in Fuß und Flugfläche", "Quota in piedi e livello di volo"),
                         tr("Rychlost a kurz", "Speed and track", "Geschwindigkeit und Kurs", "Velocità e rotta"),
                         tr("Vzdálenost a směr", "Distance and direction", "Entfernung und Richtung", "Distanza e direzione"),
-                        tr("Pořadí letadla (3 / 17)", "Aircraft number (3 / 17)", "Flugzeugnummer (3 / 17)", "Numero aereo (3 / 17)")};
+                        tr("Pořadí letadla (3 / 17)", "Aircraft number (3 / 17)", "Flugzeugnummer (3 / 17)", "Numero aereo (3 / 17)"),
+                        tr("Letecká společnost (Czech Airlines)", "Airline name (Czech Airlines)", "Fluggesellschaft (Czech Airlines)", "Compagnia aerea (Czech Airlines)")};
     h += F("<fieldset><legend>");
     h += tr("Detail letadla", "Aircraft detail", "Flugzeugdetail", "Dettaglio aereo");
     h += F("</legend><small>");
@@ -578,7 +579,7 @@ static void handleRoot() {
       }
     }
     h += F("</select>");
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
       h += F("<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto' name='det");
       h += i;
       h += "'";
@@ -821,7 +822,7 @@ static void handleSave() {
       if (server.hasArg("scr" + String(i))) m |= 1 << i;
     gCfg.screens = m ? m : 1;
     int dm = 0;
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < 9; i++)
       if (server.hasArg("det" + String(i))) dm |= 1 << i;
     gCfg.detailMask = dm;
     if (server.hasArg("pfee")) {

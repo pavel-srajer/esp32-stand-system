@@ -12,6 +12,7 @@ enum DetailBits {
   DET_SPEED = 1 << 5,
   DET_DIST = 1 << 6,
   DET_INDEX = 1 << 7,
+  DET_AIRLINE = 1 << 8,
 };
 
 struct Settings {
@@ -39,7 +40,7 @@ struct Settings {
   String ntp1 = "pool.ntp.org";     // hlavní NTP server
   String ntp2 = "time.google.com";  // záložní NTP server
   int lang = 0;  // jazyk: 0 čeština, 1 English, 2 Deutsch, 3 Italiano
-  int detailMask = 0xFF;  // údaje na obrazovce Detail letadla (bity DET_*)
+  int detailMask = 0x1FF;  // údaje na obrazovce Detail letadla (bity DET_*)
   int speedUnit = 0;      // rychlost letadla: 0 km/h, 1 uzly (kt), 2 mph
   int routeFmt = 0;       // trasa: 0 IATA, 1 ICAO, 2 město, 3 název letiště
   float priceFee = 0;     // cena elektřiny: přirážka Kč/kWh (distribuce, poplatky)

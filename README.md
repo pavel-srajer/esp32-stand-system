@@ -19,7 +19,7 @@ Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 | Obrazovka | Co ukazuje | Dlouhý stisk |
 |---|---|---|
 | **Radar letadel** | letadla kolem domova, barva podle výšky, dole nejbližší letadlo | dosah 10 / 25 / 50 / 100 km |
-| **Detail letadla** | logo společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz, vzdálenost. Co se zobrazí, se volí na webu | další letadlo |
+| **Detail letadla** | logo a název společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz, vzdálenost. Co se zobrazí, se volí na webu | další letadlo |
 | **Předpověď** | aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko), výhled na 2–8 h | obnovit |
 | **Meteoradar ČHMI** | animace srážek za posledních 30 min na obrysové mapě. Dole je vyhodnocení, např. „Déšť 12 km Z, dorazí asi za 25 min“, a rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
@@ -51,7 +51,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 | **WiFi** | síť ze seznamu nalezených, heslo |
 | **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
 | **Obrazovky** | které obrazovky se zobrazují, dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
-| **Detail letadla** | které údaje se zobrazí (logo, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
+| **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
 | **Spotová cena elektřiny** | přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
 | **Jas displeje** | den / večer / noc se začátkem a jasem v %, pin podsvícení. V noci pod 30 % první stisk tlačítka rozsvítí displej na 30 s |
@@ -132,6 +132,7 @@ Všechny jsou zdarma a bez registrace.
 |---|---|---|
 | Letadla (ADS-B) | [airplanes.live](https://airplanes.live), záložně [adsb.lol](https://adsb.lol) | 10 s |
 | Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení, 3 v paměti |
+| Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |
 | Předpověď | [Open-Meteo](https://open-meteo.com): aktuální stav, srážky po 15 min na 2 h, hodinová a denní předpověď | 15 min |
 | Meteoradar | ČHMI, kompozit max. odrazivosti `maxz/png_masked`, posledních 6 snímků po 5 min | 5 min |
@@ -162,6 +163,7 @@ Všechny jsou zdarma a bez registrace.
 | `firmware/fonts_cz.h` | písmo s diakritikou, generuje `tools/make_fonts.py` |
 | `firmware/mapdata.h` | obrysová mapa, generuje `tools/make_map.py` |
 | `firmware/namedays.h` | česká jména v kalendáři |
+| `firmware/airlines.h` | názvy leteckých společností, generuje `tools/make_airlines.py` |
 
 ## Paměť
 

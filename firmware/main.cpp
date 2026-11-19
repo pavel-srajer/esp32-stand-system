@@ -34,6 +34,7 @@
 #include "price.h"
 #include "namedays.h"
 #include "mapdata.h"
+#include "airlines.h"
 #include "i18n.h"
 
 // ===================================================================
@@ -800,6 +801,19 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
 // ---------------- Obrazovka 2: detail letadla ----------------
 static int gDetailIdx = 0;
 
+// název letecké společnosti podle ICAO kódu (binární vyhledávání v airlines.h)
+static const char* airlineName(const char* icao) {
+  int lo = 0, hi = AIRLINE_COUNT - 1;
+  while (lo <= hi) {
+    int m = (lo + hi) / 2;
+    int r = strncmp(icao, AIRLINE_CODES + m * 3, 3);
+    if (!r) return AIRLINE_NAMES + AIRLINE_OFF[m];
+    if (r < 0) hi = m - 1;
+    else lo = m + 1;
+  }
+  return nullptr;
+}
+
 // zkrátí text (UTF-8) tak, aby se s "…" vešel do šířky maxW px aktuálním písmem
 static void fitText(char* l, size_t cap, int maxW) {
   if (spr.textWidth(l) <= maxW) return;
@@ -843,24 +857,27 @@ static void drawDetail(const PlaneData& pd) {
   bool hasRoute = (M & DET_ROUTE) && airline && routeGet(pl.flight, pl.lat, pl.lon, route);
   bool altOk = pl.alt != ALT_GROUND && pl.alt != ALT_UNKNOWN;
 
-  enum { I_LOGO, I_CALL, I_ROUTE, I_TYPE, I_ALT, I_FT, I_SPEED, I_DIST, I_INDEX };
+  const char* company = ((M & DET_AIRLINE) && airline) ? airlineName(icao) : nullptr;
+
+  enum { I_LOGO, I_CALL, I_AIRLINE, I_ROUTE, I_TYPE, I_ALT, I_FT, I_SPEED, I_DIST, I_INDEX };
   struct Item {
     int id, h;
-  } items[9];
+  } items[10];
   int ni = 0, total = 0;
   auto add = [&](int id, int h) {
     items[ni++] = {id, h};
     total += h;
   };
-  if (logo) add(I_LOGO, 60);
-  add(I_CALL, 30);
-  if (hasRoute) add(I_ROUTE, gCfg.routeFmt == 3 ? 30 : 20);
-  if ((M & DET_TYPE) && (pl.type[0] || pl.reg[0])) add(I_TYPE, 20);
-  if (M & DET_ALT) add(I_ALT, 26);
-  if ((M & DET_FT) && altOk) add(I_FT, 16);
-  if (M & DET_SPEED) add(I_SPEED, 19);
-  if (M & DET_DIST) add(I_DIST, 19);
-  if (M & DET_INDEX) add(I_INDEX, 17);
+  if (logo) add(I_LOGO, 58);
+  add(I_CALL, 28);
+  if (company) add(I_AIRLINE, 16);
+  if (hasRoute) add(I_ROUTE, gCfg.routeFmt == 3 ? 29 : 19);
+  if ((M & DET_TYPE) && (pl.type[0] || pl.reg[0])) add(I_TYPE, 19);
+  if (M & DET_ALT) add(I_ALT, 25);
+  if ((M & DET_FT) && altOk) add(I_FT, 15);
+  if (M & DET_SPEED) add(I_SPEED, 18);
+  if (M & DET_DIST) add(I_DIST, 18);
+  if (M & DET_INDEX) add(I_INDEX, 15);
 
   spr.setTextDatum(textdatum_t::middle_center);
   int y = CY - total / 2;
@@ -875,6 +892,16 @@ static void drawDetail(const PlaneData& pd) {
         spr.setTextColor(col);
         spr.drawString(pl.flight, CX, cy);
         break;
+      case I_AIRLINE: {
+        char nm[64];
+        strlcpy(nm, company, sizeof nm);
+        spr.setFont(&fontCZ_12);
+        spr.setTextColor(rgb(220, 220, 220));
+        int maxW = 2 * (int)sqrtf(max(0.0f, 116.0f * 116 - (float)(cy - CY) * (cy - CY))) - 16;
+        fitText(nm, sizeof nm, maxW);
+        spr.drawString(nm, CX, cy);
+        break;
+      }
       case I_ROUTE: {
         // formát dle nastavení; když údaj chybí, použije se jednodušší (název -> město -> IATA)
         auto pick = [](const Airport& a, int fmt) -> const char* {
