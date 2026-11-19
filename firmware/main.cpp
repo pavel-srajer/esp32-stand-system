@@ -32,6 +32,7 @@
 #include "logo.h"
 #include "route.h"
 #include "price.h"
+#include "screens.h"
 #include "namedays.h"
 #include "mapdata.h"
 #include "airlines.h"
@@ -44,6 +45,7 @@ static const int PIN_BUTTON = 9;  // tlačítko BOOT
 
 // obrazovky (pořadí = bity v gCfg.screens)
 enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_PRICE, SCR_COUNT };
+static int gScreen = SCR_RADAR;  // právě zobrazená obrazovka
 static const float RAIN_RADII[] = {25, 50, 100, 200};
 static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
 static const uint32_t RAIN_REFRESH_MS = 300000;      // ČHMI radar každých 5 min
@@ -1736,6 +1738,15 @@ void appStatusJson(JsonObject o) {
   o["rain_err"] = radarError();
   o["logo"] = logoStatus();
   o["route"] = routeStatus();
+  o["screen"] = gPortalMode ? -1 : gScreen;
+  {
+    JsonArray sc = o["screens"].to<JsonArray>();
+    for (int i = 0; i < SCR_COUNT; i++) {
+      JsonObject e = sc.add<JsonObject>();
+      e["name"] = screenName(i);
+      e["on"] = scrOn(i);
+    }
+  }
   {
     PriceData pr;
     priceGet(pr);
@@ -1756,7 +1767,6 @@ void appStatusJson(JsonObject o) {
   o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
 }
 
-static int gScreen = SCR_RADAR;
 static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
 static uint32_t gLastSwitch = 0;    // kdy se naposledy změnila obrazovka
 static uint32_t gLastPress = 0;     // kdy byl naposledy stisk (pauza automatiky)
@@ -1811,6 +1821,29 @@ static void onLongPress() {
 }
 
 // krátký stisk < 0,7 s, dlouhý 0,7–5 s (akce po puštění), držení 5 s = konfigurační hotspot
+// --- obrazovky pro webové rozhraní ---
+int screenCount() { return SCR_COUNT; }
+int screenCurrent() { return gScreen; }
+bool screenEnabled(int i) { return i >= 0 && i < SCR_COUNT && scrOn(i); }
+const char* screenName(int i) {
+  switch (i) {
+    case SCR_RADAR: return tr("Radar letadel", "Aircraft radar", "Flugzeugradar", "Radar aerei");
+    case SCR_DETAIL: return tr("Detail letadla", "Aircraft detail", "Flugzeugdetail", "Dettaglio aereo");
+    case SCR_FORECAST: return tr("Předpověď", "Forecast", "Vorhersage", "Previsioni");
+    case SCR_RAIN: return tr("Meteoradar", "Weather radar", "Wetterradar", "Radar meteo");
+    case SCR_WEATHER: return tr("Měření ČHMI", "ČHMI station", "ČHMI-Station", "Stazione ČHMI");
+    case SCR_CLOCK: return tr("Hodiny", "Clock", "Uhr", "Orologio");
+    case SCR_PRICE: return tr("Cena elektřiny", "Electricity price", "Strompreis", "Prezzo elettricità");
+    default: return "?";
+  }
+}
+void screenSet(int i) {
+  if (i < 0 || i >= SCR_COUNT || gPortalMode) return;
+  gScreen = i;
+  gDetailIdx = 0;
+  gLastSwitch = gLastPress = millis();  // automatické přepínání na minutu pauza
+}
+
 static void pollButton() {
   static bool down = false, swallow = false;
   static uint32_t downAt = 0, lastChange = 0;

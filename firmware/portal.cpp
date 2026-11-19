@@ -4,6 +4,7 @@
 #include "sysinfo.h"
 #include "brightness.h"
 #include "i18n.h"
+#include "screens.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -163,8 +164,13 @@ main{max-width:720px;margin:auto}h1{font-size:1.4em;margin:.2em 0 .3em}a{color:#
 .bar i.w{background:#d29922}.bar i.c{background:#f85149}
 table{width:100%;border-collapse:collapse;font-size:.92em}td{padding:6px 4px;border-bottom:1px solid #21262d;vertical-align:top}
 td:first-child{color:#9da7b3;width:42%}h2{font-size:1.05em;margin:18px 0 6px;color:#58a6ff}
-#st{font-size:.8em;color:#7d8590}</style></head><body><main>
+#st{font-size:.8em;color:#7d8590}
+#scr{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+#scr button{padding:9px 14px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-size:.95em;cursor:pointer}
+#scr button.cur{background:#1f6feb;border-color:#1f6feb;color:#fff}
+#scr button:disabled{opacity:.45;cursor:default}</style></head><body><main>
 <p><a href="/">← {{settings}}</a></p><h1>{{sysinfo}}</h1><div id="st">{{loading}}</div>
+<h2>{{screen}}</h2><div id="scr"></div><div class="sub" id="scrs"></div>
 <div class="grid">
 <div class="card"><div class="lbl">{{chiptemp}}</div><div class="big" id="temp">–</div><div class="bar"><i id="tempb"></i></div><div class="sub">{{sensor}}</div></div>
 <div class="card"><div class="lbl">{{cpuload}}</div><div class="big" id="cpu">–</div><div class="bar"><i id="cpub"></i></div><div class="sub" id="cpus"></div></div>
@@ -182,7 +188,12 @@ function age(s){return s<0?'{{notyet}}':s<60?'{{ago_s}}'.replace('#',s):'{{ago_m
 function rows(id,r){document.getElementById(id).innerHTML=r.map(function(x){return '<tr><td>'+x[0]+'</td><td>'+x[1]+'</td></tr>'}).join('')}
 function t(id,v){document.getElementById(id).textContent=v}
 function esc(v){return String(v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function setScr(i){fetch('/api/screen?s='+i).then(load).catch(function(){})}
+function scr(a){var e=document.getElementById('scr');if(!a||a.screen<0||!a.screens){e.innerHTML='';return}var j=a;
+ e.innerHTML=j.screens.map(function(s,i){return s.on?'<button type="button" class="'+(i==j.screen?'cur':'')+'" onclick="setScr('+i+')">'+esc(s.name)+'</button>':''}).join('');
+ var c=j.screens[j.screen];t('scrs',c?'{{onscreen}}: '+c.name:'')}
 function load(){fetch('/api/status').then(function(r){return r.json()}).then(function(j){
+ scr(j.app);
  t('temp',j.temp==null?'–':String(j.temp).replace('.',',')+' °C');bar('tempb',(j.temp||0)/90*100,60,75);
  t('cpu',j.cpu<0?'–':j.cpu+' %');bar('cpub',j.cpu,60,85);t('cpus',j.mhz+' MHz, {{core}} (RISC-V)');
  var h=j.heap,used=h.total-h.free;t('ram',Math.round(used/h.total*100)+' %');bar('ramb',used/h.total*100,75,90);
@@ -262,6 +273,8 @@ static const Tok TOKS[] = {
     {"radarhere", {"Radar u tebe", "Radar near you", "Radar bei dir", "Radar vicino a te"}},
     {"logos", {"Loga společností", "Airline logos", "Airline-Logos", "Loghi compagnie"}},
     {"route", {"Trasa letu", "Flight route", "Flugroute", "Rotta del volo"}},
+    {"screen", {"Obrazovka", "Screen", "Bildschirm", "Schermata"}},
+    {"onscreen", {"na displeji", "on display", "angezeigt", "sul display"}},
     {"price", {"Cena elektřiny", "Electricity price", "Strompreis", "Prezzo elettricità"}},
     {"tomorrow", {"zítra", "tomorrow", "morgen", "domani"}},
     {"station", {"Stanice", "Station", "Station", "Stazione"}},
@@ -316,6 +329,12 @@ static void handleStatus() {
   serializeJson(doc, out);
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", out);
+}
+
+static void handleScreen() {
+  gLastActivity = millis();
+  screenSet(server.arg("s").toInt());
+  server.send(204);
 }
 
 static void handleBright() {
@@ -919,6 +938,7 @@ void webBegin(bool apMode) {
   server.on("/system", HTTP_GET, handleSystem);
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/bright", HTTP_GET, handleBright);
+  server.on("/api/screen", HTTP_GET, handleScreen);
   server.onNotFound(handleNotFound);
   server.begin();
   gLastActivity = millis();

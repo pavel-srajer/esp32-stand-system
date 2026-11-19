@@ -67,7 +67,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 - WiFi (signál, kanál, IP), dobu běhu a důvod posledního restartu,
 - stav všech zdrojů dat (ADS-B, předpověď, meteoradar, loga, trasy, cena elektřiny), NTP a aktualizací.
 
-Totéž ve formátu JSON vrací `/api/status`.
+Nahoře je sekce **Obrazovka**: ukazuje, co je právě na displeji, a tlačítky přepneš na kteroukoli zapnutou obrazovku. Automatické přepínání se pak na minutu pozastaví. Totéž ve formátu JSON vrací `/api/status`, přepnout jde i přes `/api/screen?s=<číslo>`.
 
 ## Aktualizace firmwaru (OTA z GitHubu)
 
