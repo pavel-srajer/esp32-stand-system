@@ -1,0 +1,25 @@
+esp32-stand-system – sestavení v Arduino IDE
+=============================================
+
+1) Rozbal ZIP. Vznikne složka "firmware" se souborem firmware.ino a dalšími
+   .cpp/.h soubory. Všechny musí zůstat pohromadě v této složce.
+   V Arduino IDE otevři firmware/firmware.ino.
+
+2) Deska (Boards Manager: "esp32" od Espressif Systems, verze 2.0.17):
+     Board:            ESP32C3 Dev Module
+     USB CDC On Boot:  Enabled
+     Partition Scheme: Minimal SPIFFS (1.9MB APP with OTA)
+     Flash Mode:       DIO
+
+3) Knihovny (Library Manager, nebo ZIP z GitHubu), přesně tyto verze:
+     LovyanGFX    1.2.7   (lovyan03/LovyanGFX)
+     ArduinoJson  7.2.1   (bblanchon/ArduinoJson)
+     PNGdec       1.1.7   (bitbank2/PNGdec)
+
+4) Nahraj (Upload). Pokud se deska nepřipojí: podrž BOOT, stiskni RESET, pusť BOOT.
+
+Soubor fw_version.h obsahuje číslo verze tohoto vydání. Díky němu zařízení
+správně pozná novější verze na GitHubu a aktualizuje se samo (OTA).
+
+Nastavení (WiFi, poloha, obrazovky…) se dělá přes webové rozhraní, viz README
+na https://github.com/pavel-srajer/esp32-stand-system

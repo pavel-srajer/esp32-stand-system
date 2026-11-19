@@ -7,6 +7,11 @@
 
 #define GITHUB_REPO "pavel-srajer/esp32-stand-system"
 
+// Balíček pro Arduino IDE z GitHub Release obsahuje fw_version.h s číslem verze,
+// takže i sestavení z IDE zná svou verzi (a funguje automatická aktualizace).
+#if __has_include("fw_version.h")
+#include "fw_version.h"
+#endif
 #ifndef FW_VERSION
 #define FW_VERSION "dev"  // lokální build; v CI se nastaví podle git tagu
 #endif

@@ -59,6 +59,8 @@ jobs:
           pio run -e esp32c3
 
       - name: Sestavení výstupů
+        env:
+          VER: ${{ steps.ver.outputs.version }}
         run: |
           B=.pio/build/esp32c3
           BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)
@@ -67,6 +69,12 @@ jobs:
           python -m esptool --chip esp32c3 merge_bin -o dist/firmware-full.bin \
             --flash_mode dio --flash_size 4MB \
             0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$BOOT_APP0" 0x10000 $B/firmware.bin
+          # balíček pro Arduino IDE: složka firmware/ (firmware.ino + .cpp/.h) s vloženou verzí
+          mkdir -p pkg/firmware
+          cp firmware/*.ino firmware/*.cpp firmware/*.h pkg/firmware/
+          echo "#define FW_VERSION \"$VER\"" > pkg/firmware/fw_version.h
+          cp docs/ARDUINO_IDE.txt pkg/firmware/ARDUINO_IDE.txt
+          (cd pkg && zip -qr ../dist/esp32-stand-system-arduino-$VER.zip firmware)
           ls -la dist
 
       - uses: actions/upload-artifact@v4
