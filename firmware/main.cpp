@@ -49,7 +49,7 @@ static int gScreen = SCR_RADAR;  // právě zobrazená obrazovka
 static const float RAIN_RADII[] = {25, 50, 100, 200};
 static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
 static const uint32_t RAIN_REFRESH_MS = 300000;      // ČHMI radar každých 5 min
-static const uint32_t PLANES_REFRESH_MS = 10000;    // API povolují max ~1 dotaz/s
+static const uint32_t PLANES_REFRESH_MS = 15000;    // šetrně k veřejným API (při 429 viz sApiPause*)
 static const uint32_t WEATHER_REFRESH_MS = 600000;  // ČHMI publikuje 10min data
 static const uint32_t PORTAL_IDLE_RESTART_MS = 300000;  // portál bez aktivity -> zkus znovu WiFi
 static const char* TZ_INFO = "CET-1CEST,M3.5.0,M10.5.0/3";
@@ -206,11 +206,19 @@ static void insertPlane(PlaneData& d, const Plane& pl) {
   d.p[pos] = pl;
 }
 
+// Omezení počtu dotazů: server, který odpoví 429 (moc dotazů), se na chvíli
+// vynechá – nejdřív 1 min, při opakování až 10 min (nebo podle Retry-After).
+static uint32_t sApiPauseUntil[2] = {0, 0};
+static uint32_t sApiPauseMs[2] = {0, 0};
+static int sLastCode = 0, sRetryAfter = 0;
+
 static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   float rangeKm = RANGES_KM[gRangeIdx];
   int nm = (int)ceilf(rangeKm / 1.852f) + 1;
   char url[128];
   snprintf(url, sizeof url, tmpl, gCfg.lat, gCfg.lon, nm);
+  sLastCode = 0;
+  sRetryAfter = 0;
 
   WiFiClientSecure client;
   client.setInsecure();  // bez ověřování certifikátu (veřejná data)
@@ -223,7 +231,11 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
     strlcpy(out.err, "HTTP begin", sizeof out.err);
     return false;
   }
+  static const char* hdrs[] = {"Retry-After"};
+  http.collectHeaders(hdrs, 1);
   int code = http.GET();
+  sLastCode = code;
+  sRetryAfter = http.header("Retry-After").toInt();
   if (code != 200) {
     Serial.printf("[ADSB] %s -> HTTP %d\n", url, code);
     snprintf(out.err, sizeof out.err, "%s HTTP %d", strstr(tmpl, "adsb.lol") ? "adsb.lol" : "airplanes.live", code);
@@ -281,11 +293,27 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
 static void fetchPlanes() {
   static PlaneData tmp;
   static int apiIdx = 0;
-  bool ok = false;
+  bool ok = false, tried = false;
   for (int i = 0; i < 2 && !ok; i++) {
-    ok = fetchPlanesFrom(PLANE_APIS[apiIdx], tmp);
+    int a = apiIdx;
+    if ((int32_t)(sApiPauseUntil[a] - millis()) > 0) {  // tenhle server teď odpočívá
+      apiIdx = (apiIdx + 1) % 2;
+      continue;
+    }
+    tried = true;
+    ok = fetchPlanesFrom(PLANE_APIS[a], tmp);
+    if (sLastCode == 429) {
+      uint32_t p = sApiPauseMs[a] ? min<uint32_t>(sApiPauseMs[a] * 2, 600000) : 60000;
+      if (sRetryAfter > 0) p = max<uint32_t>(p, min(sRetryAfter, 1800) * 1000UL);
+      sApiPauseMs[a] = p;
+      sApiPauseUntil[a] = millis() + p;
+      Serial.printf("[ADSB] server %d: HTTP 429, pauza %u s\n", a, (unsigned)(p / 1000));
+    } else if (ok) {
+      sApiPauseMs[a] = 0;
+    }
     if (!ok) apiIdx = (apiIdx + 1) % 2;
   }
+  if (!tried) return;  // oba servery odpočívají – nechat poslední data i hlášku
   xSemaphoreTake(gMutex, portMAX_DELAY);
   if (ok) {
     tmp.updatedMs = millis();

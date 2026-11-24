@@ -70,7 +70,7 @@ static int fromAdsbLol(const char* cs, float lat, float lon, RouteInfo& r) {
   if (code != 200) {
     http.end();
     snprintf(sStatus, sizeof sStatus, "%s: adsb.lol HTTP %d", cs, code);
-    return code < 0 ? -1 : 0;
+    return (code < 0 || code == 429) ? -1 : 0;  // 429 = moc dotazů -> zkusit později
   }
   JsonDocument filter;
   for (const char* k : {"iata", "icao", "location", "name"}) filter[0]["_airports"][0][k] = true;

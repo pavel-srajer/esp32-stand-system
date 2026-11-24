@@ -132,7 +132,7 @@ Všechny jsou zdarma a bez registrace.
 
 | Data | Zdroj | Jak často |
 |---|---|---|
-| Letadla (ADS-B) | [airplanes.live](https://airplanes.live), záložně [adsb.lol](https://adsb.lol) | 10 s |
+| Letadla (ADS-B) | [airplanes.live](https://airplanes.live), záložně [adsb.lol](https://adsb.lol). Server, který odpoví 429 (moc dotazů), se na 1–10 min vynechá | 15 s |
 | Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení, 3 v paměti |
 | Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |

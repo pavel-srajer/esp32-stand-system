@@ -206,7 +206,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <g font-size="13">
         <rect x="640" y="8" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
         <text x="654" y="30" class="s-blue" font-weight="600">airplanes.live · adsb.lol · adsbdb</text>
-        <text x="654" y="50" class="s-muted" font-size="12">letadla 10 s · trasy a loga</text>
+        <text x="654" y="50" class="s-muted" font-size="12">letadla 15 s · trasy a loga</text>
         <rect x="640" y="72" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
         <text x="654" y="94" class="s-blue" font-weight="600">api.open-meteo.com</text>
         <text x="654" y="114" class="s-muted" font-size="12">předpověď a upozornění · 15 min</text>
@@ -638,6 +638,8 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <p>GitHub přesměrovává stažení na jiný server a starší verze přitom na chvíli potřebovaly paměť pro dvě šifrovaná spojení najednou. Od verze <b>v0.14.2</b> zařízení přesměrování vyřeší samo a vždy má otevřené jen jedno spojení. Pokud máš starší verzi a aktualizace selže, zavři v prohlížeči stránku Systém a zkus to znovu. Když to nepomůže, nahraj jednou <code>firmware-full.bin</code> přes USB. Další aktualizace už půjdou přes WiFi.</p></details>
     <details><summary>U letadla se nezobrazuje logo nebo trasa</summary>
       <p>Obojí funguje jen u letů leteckých společností. Volací znak musí mít tvar 3 písmena a číslo, např. CSA2LK. Soukromá letadla vysílají registraci (OKNEB) a pro ty logo ani trasa neexistují. Trasa se dohledává v komunitních databázích a u charterů a cargo letů občas chybí. Otazník před trasou znamená, že trasa nesedí k poloze letadla. Výsledek posledního pokusu je na stránce Systém.</p></details>
+    <details><summary>U letadel svítí „HTTP 429“</summary>
+      <p>Server s letovými daty hlásí, že od tvé IP adresy dostal moc dotazů (počítají se i jiná zařízení ve stejné síti). Zařízení ten server na 1–10 minut vynechá, zkusí ten druhý a mezitím ukazuje poslední známá letadla. Chyba zmizí sama, jakmile se data zase stáhnou.</p></details>
     <details><summary>Cena elektřiny se nenačte nebo chybí zítřek</summary>
       <p>Obrazovku je potřeba zapnout v sekci Obrazovky. Ceny se stahují až po synchronizaci času. Zítřek OTE zveřejňuje kolem 13:00 a do té doby dlouhý stisk ukazuje dnešek. Stav i to, ze kterého zdroje data právě jsou, je na stránce Systém v řádku Cena elektřiny. Když jeden zdroj nejde, zařízení samo zkusí druhý.</p></details>
     <details><summary>Na obrazovce počasí chybí některá hodnota</summary>
