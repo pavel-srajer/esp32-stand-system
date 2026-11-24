@@ -46,6 +46,8 @@ void settingsLoad() {
   gCfg.priceFee = prefs.getFloat("pfee", d.priceFee);
   gCfg.priceVat = prefs.getFloat("pvat", d.priceVat);
   gCfg.priceSrc = prefs.getInt("psrc", d.priceSrc);
+  gCfg.adsbUrl = prefs.getString("adsburl", "");
+  gCfg.planeSrc = prefs.getInt("plsrc", d.planeSrc);
   prefs.end();
 }
 
@@ -82,6 +84,8 @@ void settingsSave() {
   prefs.putFloat("pfee", gCfg.priceFee);
   prefs.putFloat("pvat", gCfg.priceVat);
   prefs.putInt("psrc", gCfg.priceSrc);
+  prefs.putString("adsburl", gCfg.adsbUrl);
+  prefs.putInt("plsrc", gCfg.planeSrc);
   prefs.end();
 }
 

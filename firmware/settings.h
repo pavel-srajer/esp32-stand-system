@@ -52,6 +52,8 @@ struct Settings {
   int routeFmt = 0;       // trasa: 0 IATA, 1 ICAO, 2 město, 3 název letiště
   float priceFee = 0;     // cena elektřiny: přirážka Kč/kWh (distribuce, poplatky)
   float priceVat = 0;     // cena elektřiny: DPH v %
+  String adsbUrl = "";    // vlastní přijímač ADS-B (IP/adresa, doplní se :8080/data/aircraft.json)
+  int planeSrc = 0;       // letadla: 0 automaticky, 1 jen vlastní přijímač, 2 jen adsb.fi, 3 jen adsb.lol
   int priceSrc = 0;       // zdroj cen: 0 spotovaelektrina.cz, 1 spotovky.cz (druhý je záloha)
 };
 

@@ -220,7 +220,7 @@ textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:
 <h2>{{device}}</h2><table id="dev"></table>
 <h2>WiFi</h2><table id="wifi"></table>
 <h2>{{app}}</h2><table id="app"></table>
-<p><small>{{datasrc}}: <a href="https://adsb.fi" target="_blank">adsb.fi</a>, <a href="https://adsb.lol" target="_blank">adsb.lol</a> (ODbL), <a href="https://www.adsbdb.com" target="_blank">adsbdb</a>, ČHMI, <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>, OTE (spotovaelektrina.cz, spotovky.cz)</small></p>
+<p><small>{{datasrc}}: {{ownrx}}, <a href="https://adsb.fi" target="_blank">adsb.fi</a>, <a href="https://adsb.lol" target="_blank">adsb.lol</a> (ODbL), <a href="https://www.adsbdb.com" target="_blank">adsbdb</a>, ČHMI, <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>, OTE (spotovaelektrina.cz, spotovky.cz)</small></p>
 </main><script>
 function kb(b){return b>=1048576?(b/1048576).toFixed(2)+' MB':(b/1024).toFixed(1)+' kB'}
 function bar(id,p,w,c){var e=document.getElementById(id);e.style.width=Math.max(0,Math.min(100,p))+'%';e.className=p>=c?'c':p>=w?'w':''}
@@ -254,7 +254,7 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
   ['{{uptime}}',up(j.uptime)],['{{lastreset}}',esc(j.reset)]]);
  var w=j.wifi;rows('wifi',[['{{mode}}',esc(w.mode)+(w.connected?', {{connected}}':'')],['{{net}}',esc(w.ssid||'–')],
   ['{{signal}}',w.connected?w.rssi+' dBm':'–'],['{{channel}}',w.ch],['{{ip}}',esc(w.ip)],['MAC',esc(w.mac)]].concat(w.mode=='hotspot'?[['{{clients}}',w.clients]]:[]));
- var a=j.app;rows('app',[['{{planes}}',a.planes+' ({{range}} '+a.range+' km)'],['ADS-B',age(a.planes_age)+(a.planes_err?' · {{error}}: '+esc(a.planes_err):'')],
+ var a=j.app;rows('app',[['{{planes}}',a.planes+' ({{range}} '+a.range+' km)'],['ADS-B',(a.planes_src?esc(a.planes_src)+' · ':'')+age(a.planes_age)+(a.planes_err?' · {{error}}: '+esc(a.planes_err):'')],
   ['{{station_w}}',age(a.weather_age)+(a.weather_err?' · {{error}}: '+esc(a.weather_err):'')],
   ['{{forecast}} Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · {{alerts}}: '+a.fc_alerts:'')+(a.fc_err?' · {{error}}: '+esc(a.fc_err):'')],
   ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{route}}',esc(a.route||'–')],['{{price}}',(a.price_src?esc(a.price_src)+' · ':'')+age(a.price_age)+(a.price_age>=0?' · {{tomorrow}}: '+(a.price_tom?'✔':'–'):'')+(a.price_err?' · '+esc(a.price_err):'')],['{{station}}',esc(a.station)],
@@ -287,6 +287,7 @@ static const Tok TOKS[] = {
     {"gpsloc", {"Poloha z telefonu", "Location from phone", "Standort vom Handy", "Posizione dal telefono"}},
     {"iploc", {"Jen přibližná poloha podle IP adresy (přesnou polohu z GPS prohlížeč stránce zařízení na http:// nedovolí) – zpřesni kliknutím do mapy nebo vyhledáním adresy", "Only approximate location from IP address (browsers don't allow GPS for the device's http:// page) – refine by clicking the map or searching an address", "Nur ungefährer Standort laut IP-Adresse (für die http://-Seite des Geräts erlaubt der Browser kein GPS) – per Klick in die Karte oder Adresssuche verfeinern", "Solo posizione approssimativa dall'indirizzo IP (il browser non consente il GPS per la pagina http:// del dispositivo) – affina cliccando sulla mappa o cercando l'indirizzo"}},
     {"datasrc", {"Zdroje dat", "Data sources", "Datenquellen", "Fonti dati"}},
+    {"ownrx", {"vlastní přijímač ADS-B", "own ADS-B receiver", "eigener ADS-B-Empfänger", "ricevitore ADS-B proprio"}},
     {"locfail", {"Polohu se nepodařilo zjistit", "Could not detect location", "Standort nicht ermittelbar", "Impossibile rilevare la posizione"}},
     {"notfound", {"Nenalezeno", "Not found", "Nicht gefunden", "Non trovato"}},
     {"loading", {"načítám…", "loading…", "lädt…", "caricamento…"}},
@@ -670,6 +671,37 @@ static void handleRoot() {
     h += F("</small></fieldset>");
   }
 
+  // --- Zdroj letadel (ADS-B) ---
+  {
+    h += F("<fieldset><legend>");
+    h += tr("Zdroj dat o letadlech", "Aircraft data source", "Flugdatenquelle", "Fonte dati aerei");
+    h += F("</legend><label>");
+    h += tr("Zdroj", "Source", "Quelle", "Fonte");
+    h += F("</label><select name='plsrc'>");
+    const char* SN[] = {tr("Automaticky (vlastní přijímač → adsb.fi → adsb.lol)", "Automatic (own receiver → adsb.fi → adsb.lol)",
+                           "Automatisch (eigener Empfänger → adsb.fi → adsb.lol)", "Automatico (ricevitore proprio → adsb.fi → adsb.lol)"),
+                        tr("Jen vlastní přijímač", "Own receiver only", "Nur eigener Empfänger", "Solo ricevitore proprio"),
+                        tr("Jen adsb.fi", "adsb.fi only", "Nur adsb.fi", "Solo adsb.fi"),
+                        tr("Jen adsb.lol (max. 500 dotazů/den)", "adsb.lol only (max. 500 requests/day)", "Nur adsb.lol (max. 500 Abfragen/Tag)", "Solo adsb.lol (max. 500 richieste/giorno)")};
+    for (int i = 0; i < 4; i++) {
+      h += F("<option value='");
+      h += i;
+      h += gCfg.planeSrc == i ? F("' selected>") : F("'>");
+      h += SN[i];
+      h += F("</option>");
+    }
+    h += F("</select><label>");
+    h += tr("Adresa vlastního přijímače", "Own receiver address", "Adresse des eigenen Empfängers", "Indirizzo ricevitore proprio");
+    h += F("</label><input name='adsburl' placeholder='192.168.1.50' value='");
+    h += esc(gCfg.adsbUrl);
+    h += F("'><small>");
+    h += tr("Např. adsb-feeder (ADSB.im), readsb, tar1090 nebo ultrafeeder v domácí síti. Stačí IP adresa – doplní se :8080/data/aircraft.json. Jiný port nebo cestu napiš celou (s http://), např. http://192.168.1.50:8087/data/aircraft.json. Jde i adsb-feeder.local, IP adresa je ale spolehlivější. Vlastní přijímač se čte každých 5 s, internet každých 15 s. Prázdné = jen internet.",
+            "E.g. adsb-feeder (ADSB.im), readsb, tar1090 or ultrafeeder on your home network. An IP address is enough – :8080/data/aircraft.json is added. For another port or path write the full URL (with http://), e.g. http://192.168.1.50:8087/data/aircraft.json. adsb-feeder.local works too, but an IP address is more reliable. Own receiver is read every 5 s, internet every 15 s. Empty = internet only.",
+            "Z. B. adsb-feeder (ADSB.im), readsb, tar1090 oder ultrafeeder im Heimnetz. Eine IP-Adresse genügt – :8080/data/aircraft.json wird ergänzt. Anderen Port oder Pfad vollständig angeben, z. B. http://192.168.1.50:8087/data/aircraft.json. adsb-feeder.local geht auch, eine IP-Adresse ist aber zuverlässiger. Eigener Empfänger alle 5 s, Internet alle 15 s. Leer = nur Internet.",
+            "Ad es. adsb-feeder (ADSB.im), readsb, tar1090 o ultrafeeder nella rete di casa. Basta l'indirizzo IP – si aggiunge :8080/data/aircraft.json. Per altra porta o percorso scrivilo per intero, es. http://192.168.1.50:8087/data/aircraft.json. Funziona anche adsb-feeder.local, ma l'IP è più affidabile. Ricevitore proprio ogni 5 s, internet ogni 15 s. Vuoto = solo internet.");
+    h += F("</small></fieldset>");
+  }
+
   // --- Detail letadla ---
   {
     const char* DN[] = {tr("Logo společnosti", "Airline logo", "Airline-Logo", "Logo compagnia"),
@@ -1002,6 +1034,12 @@ static void handleSave() {
       gCfg.priceVat = constrain(v.toFloat(), 0.0f, 50.0f);
     }
     if (server.hasArg("psrc")) gCfg.priceSrc = constrain(server.arg("psrc").toInt(), 0, 1);
+    if (server.hasArg("plsrc")) gCfg.planeSrc = constrain(server.arg("plsrc").toInt(), 0, 3);
+    if (server.hasArg("adsburl")) {
+      gCfg.adsbUrl = server.arg("adsburl");
+      gCfg.adsbUrl.trim();
+      if (gCfg.adsbUrl.length() > 120) gCfg.adsbUrl = gCfg.adsbUrl.substring(0, 120);
+    }
     if (server.hasArg("rfmt")) gCfg.routeFmt = constrain(server.arg("rfmt").toInt(), 0, 3);
     if (server.hasArg("spdu")) gCfg.speedUnit = constrain(server.arg("spdu").toInt(), 0, 2);
     if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);

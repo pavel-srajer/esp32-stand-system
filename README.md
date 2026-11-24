@@ -53,6 +53,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 | **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
 | **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
 | **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
+| **Zdroj dat o letadlech** | Automaticky (vlastní přijímač → adsb.fi → adsb.lol), jen vlastní přijímač, jen adsb.fi nebo jen adsb.lol. Adresa vlastního přijímače (adsb-feeder/ADSB.im, readsb, tar1090, ultrafeeder): stačí IP, doplní se `:8080/data/aircraft.json`; jiný port nebo cestu zadej celou s `http://`. Vlastní přijímač se čte každých 5 s |
 | **Spotová cena elektřiny** | zdroj dat (spotovaelektrina.cz nebo spotovky.cz; když zvolený nejde, použije se automaticky druhý), přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
 | **Jas displeje** | den / večer / noc se začátkem a jasem v %, pin podsvícení. V noci pod 30 % první stisk tlačítka rozsvítí displej na 30 s |
@@ -132,7 +133,7 @@ Všechny jsou zdarma a bez registrace.
 
 | Data | Zdroj | Jak často |
 |---|---|---|
-| Letadla (ADS-B) | [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
+| Letadla (ADS-B) | vlastní přijímač v domácí síti (`aircraft.json`, 5 s), jinak [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
 | Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení, 3 v paměti |
 | Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |

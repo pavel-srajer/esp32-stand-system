@@ -49,6 +49,7 @@ static int gScreen = SCR_RADAR;  // právě zobrazená obrazovka
 static const float RAIN_RADII[] = {25, 50, 100, 200};
 static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
 static const uint32_t RAIN_REFRESH_MS = 300000;      // ČHMI radar každých 5 min
+static const uint32_t PLANES_LOCAL_MS = 5000;      // vlastní přijímač v domácí síti
 static const uint32_t PLANES_REFRESH_MS = 15000;    // šetrně k veřejným API (při 429 viz sApiPause*)
 static const uint32_t WEATHER_REFRESH_MS = 600000;  // ČHMI publikuje 10min data
 static const uint32_t PORTAL_IDLE_RESTART_MS = 300000;  // portál bez aktivity -> zkus znovu WiFi
@@ -104,6 +105,7 @@ struct PlaneData {
   bool ok = false;
   uint32_t updatedMs = 0;
   char err[32] = "";
+  char src[24] = "";  // odkud jsou data (vlastní přijímač / adsb.fi / adsb.lol)
 };
 
 struct Weather {
@@ -215,23 +217,57 @@ static uint32_t sApiPauseUntil[2] = {0, 0};
 static uint32_t sApiPauseMs[2] = {0, 0};
 static int sLastCode = 0, sRetryAfter = 0;
 
-static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
+// Pole letadel: "ac" (adsb.fi, adsb.lol) nebo "aircraft" (aircraft.json z readsb/tar1090).
+// Čte klíče, dokud nenajde jeden z nich, a nastaví stream za "[".
+static bool findPlaneArray(Stream& s) {
+  int ch;
+  while ((ch = s.read()) >= 0) {
+    if (ch != '"') continue;
+    char key[12];
+    int k = 0;
+    while ((ch = s.read()) >= 0 && ch != '"')
+      if (k < 11) key[k++] = ch;
+    key[k] = 0;
+    if (ch < 0) return false;
+    if (!strcmp(key, "ac") || !strcmp(key, "aircraft")) return s.find("[");
+  }
+  return false;
+}
+
+// Adresa vlastního přijímače z nastavení: "192.168.1.50" -> http://192.168.1.50:8080/data/aircraft.json
+static String localAdsbUrl() {
+  String u = gCfg.adsbUrl;
+  u.trim();
+  if (!u.length()) return u;
+  bool bare = !u.startsWith("http://") && !u.startsWith("https://");  // jen IP/jméno -> výchozí port 8080
+  if (bare) u = "http://" + u;
+  int hostStart = u.indexOf("//") + 2, slash = u.indexOf('/', hostStart);
+  String host = slash < 0 ? u.substring(hostStart) : u.substring(hostStart, slash);
+  String path = slash < 0 ? "" : u.substring(slash);
+  if (bare && host.indexOf(':') < 0) host += ":8080";
+  if (path == "" || path == "/") path = "/data/aircraft.json";
+  else if (path.endsWith("/")) path += "data/aircraft.json";
+  return u.substring(0, hostStart) + host + path;
+}
+
+static bool fetchPlanesFrom(const char* url, const char* name, PlaneData& out) {
   float rangeKm = RANGES_KM[gRangeIdx];
-  int nm = (int)ceilf(rangeKm / 1.852f) + 1;
-  char url[128];
-  snprintf(url, sizeof url, tmpl, gCfg.lat, gCfg.lon, nm);
   sLastCode = 0;
   sRetryAfter = 0;
 
-  WiFiClientSecure client;
-  client.setInsecure();  // bez ověřování certifikátu (veřejná data)
+  // vlastní přijímač v domácí síti jede přes obyčejné HTTP – bez TLS, šetří RAM
+  bool secure = !strncmp(url, "https://", 8);
+  WiFiClientSecure sclient;
+  WiFiClient pclient;
+  if (secure) sclient.setInsecure();  // bez ověřování certifikátu (veřejná data)
   HTTPClient http;
   BodyStream::prepare(http);  // HTTP/1.1 (HTTP/1.0 některé servery odmítají s 426)
-  http.setConnectTimeout(8000);
+  http.setConnectTimeout(secure ? 8000 : 4000);
   http.setTimeout(10000);
   http.setUserAgent("esp32-stand-system/1.0");
-  if (!http.begin(client, url)) {
-    strlcpy(out.err, "HTTP begin", sizeof out.err);
+  bool begun = secure ? http.begin(sclient, url) : http.begin(pclient, url);
+  if (!begun) {
+    snprintf(out.err, sizeof out.err, "%s: URL?", name);
     return false;
   }
   static const char* hdrs[] = {"Retry-After"};
@@ -241,7 +277,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   sRetryAfter = http.header("Retry-After").toInt();
   if (code != 200) {
     Serial.printf("[ADSB] %s -> HTTP %d\n", url, code);
-    snprintf(out.err, sizeof out.err, "%s HTTP %d", strstr(tmpl, "adsb.lol") ? "adsb.lol" : "adsb.fi", code);
+    snprintf(out.err, sizeof out.err, "%s HTTP %d", name, code);
     http.end();
     return false;
   }
@@ -253,8 +289,9 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   JsonDocument filter;
   for (const char* k : {"hex", "flight", "r", "t", "alt_baro", "gs", "track", "baro_rate", "lat", "lon"})
     filter[k] = true;
+  filter["seen_pos"] = true;
   out.count = 0;
-  if (!body.find("\"ac\"") || !body.find("[")) {
+  if (!findPlaneArray(body)) {
     http.end();
     strlcpy(out.err, tr("ADS-B: chybí seznam", "ADS-B: no list", "ADS-B: keine Liste", "ADS-B: nessun elenco"), sizeof out.err);
     return false;
@@ -265,6 +302,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
     if (err) break;  // prázdné pole nebo konec dat
     JsonObject a = doc.as<JsonObject>();
     if (!a["lat"].is<float>() || !a["lon"].is<float>()) continue;
+    if ((a["seen_pos"] | 0.0f) > 60) continue;  // poloha starší než minuta
     Plane pl{};
     pl.lat = a["lat"];
     pl.lon = a["lon"];
@@ -289,22 +327,44 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   http.end();
   out.ok = true;
   out.err[0] = 0;
+  strlcpy(out.src, name, sizeof out.src);
   Serial.printf("[ADSB] %d letadel do %.0f km (%s)\n", out.count, rangeKm, url);
   return true;
 }
+
+// Vlastní přijímač (pokud je nastavený) má přednost; když neodpoví, použijí se internetová API.
+static bool sLocalOk = false;
 
 static void fetchPlanes() {
   static PlaneData tmp;
   static int apiIdx = 0;
   bool ok = false, tried = false;
-  for (int i = 0; i < 2 && !ok; i++) {
+  int mode = gCfg.planeSrc;  // 0 auto, 1 vlastní, 2 adsb.fi, 3 adsb.lol
+  String local = mode <= 1 ? localAdsbUrl() : String();
+  if (mode == 1 && !local.length()) {
+    xSemaphoreTake(gMutex, portMAX_DELAY);
+    strlcpy(gPlanes.err, tr("chybí adresa přijímače", "receiver address missing", "Empfängeradresse fehlt", "manca indirizzo ricevitore"), sizeof gPlanes.err);
+    xSemaphoreGive(gMutex);
+    return;
+  }
+  if (local.length()) {
+    tried = true;
+    ok = fetchPlanesFrom(local.c_str(), tr("vlastní přijímač", "own receiver", "eigener Empfänger", "ricevitore proprio"), tmp);
+  }
+  sLocalOk = ok;
+  if (mode >= 2) apiIdx = mode - 2;  // pevně zvolený server
+  for (int i = 0; i < 2 && !ok && mode != 1; i++) {
     int a = apiIdx;
+    if (mode >= 2 && i > 0) break;  // bez zálohy
     if ((int32_t)(sApiPauseUntil[a] - millis()) > 0) {  // tenhle server teď odpočívá
       apiIdx = (apiIdx + 1) % 2;
       continue;
     }
     tried = true;
-    ok = fetchPlanesFrom(PLANE_APIS[a], tmp);
+    char url[128];
+    float rangeKm = RANGES_KM[gRangeIdx];
+    snprintf(url, sizeof url, PLANE_APIS[a], gCfg.lat, gCfg.lon, (int)ceilf(rangeKm / 1.852f) + 1);
+    ok = fetchPlanesFrom(url, a == 0 ? "adsb.fi" : "adsb.lol", tmp);
     if (sLastCode == 429 || sLastCode == 403) {  // moc dotazů / zablokováno
       uint32_t p = sApiPauseMs[a] ? min<uint32_t>(sApiPauseMs[a] * 2, 600000) : 60000;
       if (sRetryAfter > 0) p = max<uint32_t>(p, min(sRetryAfter, 1800) * 1000UL);
@@ -563,7 +623,7 @@ static void netTask(void*) {
     }
     if (WiFi.status() == WL_CONNECTED) {
       uint32_t now = millis();
-      if (gForcePlanes || now - lastPlanes >= PLANES_REFRESH_MS) {
+      if (gForcePlanes || now - lastPlanes >= (sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS)) {
         gForcePlanes = false;
         fetchPlanes();
         lastPlanes = millis();
@@ -1811,13 +1871,14 @@ void appStatusJson(JsonObject o) {
   while (n < gPlanes.count && gPlanes.p[n].distKm <= range) n++;
   long pAge = gPlanes.updatedMs ? (long)((millis() - gPlanes.updatedMs) / 1000) : -1;
   long wAge = gWeather.updatedMs ? (long)((millis() - gWeather.updatedMs) / 1000) : -1;
-  String pErr = gPlanes.err, wErr = gWeather.err;
+  String pErr = gPlanes.err, wErr = gWeather.err, pSrc = gPlanes.src;
   xSemaphoreGive(gMutex);
 
   o["planes"] = n;
   o["range"] = (int)range;
   o["planes_age"] = gPortalMode ? -1 : pAge;
   o["planes_err"] = pErr;
+  o["planes_src"] = pSrc;
   o["weather_age"] = gPortalMode ? -1 : wAge;
   o["weather_err"] = wErr;
   o["station"] = gCfg.name + " (" + gCfg.wsi + ")";
