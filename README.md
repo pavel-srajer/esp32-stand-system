@@ -53,7 +53,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 | **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
 | **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
 | **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
-| **Spotová cena elektřiny** | přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
+| **Spotová cena elektřiny** | zdroj dat (spotovaelektrina.cz nebo spotovky.cz; když zvolený nejde, použije se automaticky druhý), přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
 | **Jas displeje** | den / večer / noc se začátkem a jasem v %, pin podsvícení. V noci pod 30 % první stisk tlačítka rozsvítí displej na 30 s |
 | **Čas (NTP)** | hlavní a záložní NTP server (výchozí `pool.ntp.org`, `time.google.com`) |
@@ -139,7 +139,7 @@ Všechny jsou zdarma a bez registrace.
 | Předpověď | [Open-Meteo](https://open-meteo.com): aktuální stav, srážky po 15 min na 2 h, hodinová a denní předpověď | 15 min |
 | Meteoradar | ČHMI, kompozit max. odrazivosti `maxz/png_masked`, posledních 6 snímků po 5 min | 5 min |
 | Měření ze stanice | ČHMI otevřená data, 10min měření `10m-<WSI>-<YYYYMMDD>.json` | 10 min |
-| Cena elektřiny | výsledky denního trhu [OTE](https://www.ote-cr.cz) v Kč po 15 min přes [spotovaelektrina.cz](https://spotovaelektrina.cz). Zítřek je k dispozici kolem 13:00 | 30 min |
+| Cena elektřiny | výsledky denního trhu [OTE](https://www.ote-cr.cz) v Kč po 15 min přes [spotovaelektrina.cz](https://spotovaelektrina.cz) nebo [spotovky.cz](https://spotovky.cz) (volba v nastavení, druhý zdroj je záloha). Zítřek je k dispozici kolem 13:00 | 30 min |
 | Mapa | [Natural Earth](https://www.naturalearthdata.com) (hranice, řeky; volné dílo), česká města z janpipek/cli-plotting-talk. Uložená ve firmwaru | – |
 | Jmeniny | hermajan/timely, ověřeno proti xnekv03/nameday-api. Uložené ve firmwaru | – |
 

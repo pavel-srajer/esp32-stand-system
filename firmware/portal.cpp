@@ -246,7 +246,7 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
  var a=j.app;rows('app',[['{{planes}}',a.planes+' ({{range}} '+a.range+' km)'],['ADS-B',age(a.planes_age)+(a.planes_err?' · {{error}}: '+esc(a.planes_err):'')],
   ['{{station_w}}',age(a.weather_age)+(a.weather_err?' · {{error}}: '+esc(a.weather_err):'')],
   ['{{forecast}} Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · {{alerts}}: '+a.fc_alerts:'')+(a.fc_err?' · {{error}}: '+esc(a.fc_err):'')],
-  ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{route}}',esc(a.route||'–')],['{{price}}',age(a.price_age)+(a.price_age>=0?' · {{tomorrow}}: '+(a.price_tom?'✔':'–'):'')+(a.price_err?' · '+esc(a.price_err):'')],['{{station}}',esc(a.station)],
+  ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{route}}',esc(a.route||'–')],['{{price}}',(a.price_src?esc(a.price_src)+' · ':'')+age(a.price_age)+(a.price_age>=0?' · {{tomorrow}}: '+(a.price_tom?'✔':'–'):'')+(a.price_err?' · '+esc(a.price_err):'')],['{{station}}',esc(a.station)],
   ['{{bright}}',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['{{time}}',esc(a.ntp)],['{{update}}',esc(a.ota)],['{{stack}}',a.stack_net+' B (net), '+a.stack_loop+' B (UI)']]);
  t('st','{{updated}} '+new Date().toLocaleTimeString('{{locale}}'));
 }).catch(function(){t('st','{{noresp}}')})}
@@ -729,7 +729,17 @@ static void handleRoot() {
   // --- Cena elektřiny ---
   h += F("<fieldset><legend>");
   h += tr("Spotová cena elektřiny", "Spot electricity price", "Strom-Spotpreis", "Prezzo spot elettricità");
-  h += F("</legend><div class='row'><div><label>");
+  h += F("</legend><label>");
+  h += tr("Zdroj dat", "Data source", "Datenquelle", "Fonte dati");
+  h += F("</label><select name='psrc'>");
+  for (int i = 0; i < 2; i++) {
+    h += F("<option value='");
+    h += i;
+    h += gCfg.priceSrc == i ? F("' selected>") : F("'>");
+    h += i == 0 ? F("spotovaelektrina.cz") : F("spotovky.cz");
+    h += F("</option>");
+  }
+  h += F("</select><div class='row'><div><label>");
   h += tr("Přirážka [Kč/kWh]", "Surcharge [CZK/kWh]", "Aufschlag [CZK/kWh]", "Supplemento [CZK/kWh]");
   h += F("</label><input name='pfee' inputmode='decimal' value='");
   h += String(gCfg.priceFee, 3);
@@ -738,10 +748,10 @@ static void handleRoot() {
   h += F("</label><input name='pvat' inputmode='decimal' value='");
   h += String(gCfg.priceVat, 0);
   h += F("'></div></div><small>");
-  h += tr("Ceny denního trhu OTE (přes spotovaelektrina.cz). Při 0 a 0 se zobrazuje holá burzovní cena. Přirážkou můžeš přičíst distribuci, poplatky a marži dodavatele, pak se připočte DPH. Dlouhý stisk tlačítka na obrazovce ukáže zítřek (OTE ho zveřejňuje kolem 13:00).",
-          "OTE day-ahead prices (via spotovaelektrina.cz). With 0 and 0 the bare exchange price is shown. The surcharge adds distribution, fees and supplier margin, then VAT is applied. A long press on the screen shows tomorrow (published by OTE around 13:00).",
-          "OTE-Day-Ahead-Preise (über spotovaelektrina.cz). Bei 0 und 0 wird der reine Börsenpreis angezeigt. Der Aufschlag addiert Netz, Gebühren und Marge, danach wird die MwSt. angewendet. Langer Tastendruck zeigt morgen (OTE veröffentlicht gegen 13:00).",
-          "Prezzi day-ahead OTE (tramite spotovaelektrina.cz). Con 0 e 0 si vede il prezzo di borsa. Il supplemento aggiunge distribuzione, oneri e margine, poi si applica l’IVA. Pressione lunga sulla schermata: domani (pubblicato da OTE verso le 13:00).");
+  h += tr("Ceny denního trhu OTE. Když zvolený zdroj nejde, použije se automaticky druhý. Při 0 a 0 se zobrazuje holá burzovní cena. Přirážkou můžeš přičíst distribuci, poplatky a marži dodavatele, pak se připočte DPH. Dlouhý stisk tlačítka na obrazovce ukáže zítřek (OTE ho zveřejňuje kolem 13:00).",
+          "OTE day-ahead prices. If the chosen source fails, the other one is used automatically. With 0 and 0 the bare exchange price is shown. The surcharge adds distribution, fees and supplier margin, then VAT is applied. A long press on the screen shows tomorrow (published by OTE around 13:00).",
+          "OTE-Day-Ahead-Preise. Fällt die gewählte Quelle aus, wird automatisch die andere verwendet. Bei 0 und 0 wird der reine Börsenpreis angezeigt. Der Aufschlag addiert Netz, Gebühren und Marge, danach wird die MwSt. angewendet. Langer Tastendruck zeigt morgen (OTE veröffentlicht gegen 13:00).",
+          "Prezzi day-ahead OTE. Se la fonte scelta non risponde, si usa automaticamente l’altra. Con 0 e 0 si vede il prezzo di borsa. Il supplemento aggiunge distribuzione, oneri e margine, poi si applica l’IVA. Pressione lunga sulla schermata: domani (pubblicato da OTE verso le 13:00).");
   h += F("</small></fieldset>");
 
   // --- ČHMI ---
@@ -973,6 +983,7 @@ static void handleSave() {
       gCfg.priceFee = constrain(f.toFloat(), -10.0f, 20.0f);
       gCfg.priceVat = constrain(v.toFloat(), 0.0f, 50.0f);
     }
+    if (server.hasArg("psrc")) gCfg.priceSrc = constrain(server.arg("psrc").toInt(), 0, 1);
     if (server.hasArg("rfmt")) gCfg.routeFmt = constrain(server.arg("rfmt").toInt(), 0, 3);
     if (server.hasArg("spdu")) gCfg.speedUnit = constrain(server.arg("spdu").toInt(), 0, 2);
     if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);

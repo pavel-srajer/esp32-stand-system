@@ -1850,6 +1850,7 @@ void appStatusJson(JsonObject o) {
     o["price_age"] = pr.updatedMs ? (long)((millis() - pr.updatedMs) / 1000) : -1;
     o["price_tom"] = pr.tomorrowOk;
     o["price_err"] = pr.err;
+    o["price_src"] = priceSrcName(pr.src);
   }
   {
     RadarInfo ri;

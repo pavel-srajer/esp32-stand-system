@@ -183,7 +183,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <header><h3>Celkový přehled</h3>
   <p>Deska ESP32-C3 má vestavěnou WiFi. Přes internet se ptá několika bezplatných služeb a výsledek kreslí na displej. Z telefonu se na ni dostaneš přes webovou stránku, kterou sama poskytuje.</p></header>
   <figure class="fig">
-    <svg viewBox="0 0 900 400" role="img" aria-label="Schéma: ESP32 komunikuje s ADS-B API, Open-Meteo, ČHMI, spotovaelektrina.cz, GitHubem a NTP, ovládá displej a poskytuje webové nastavení telefonu">
+    <svg viewBox="0 0 900 400" role="img" aria-label="Schéma: ESP32 komunikuje s ADS-B API, Open-Meteo, ČHMI, spotovaelektrina.cz nebo spotovky.cz, GitHubem a NTP, ovládá displej a poskytuje webové nastavení telefonu">
       <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" class="s-muted"/></marker></defs>
       <!-- zařízení -->
       <rect x="300" y="130" width="230" height="140" rx="12" class="s-panel st-ink" stroke-width="2"/>
@@ -214,8 +214,8 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <text x="654" y="158" class="s-blue" font-weight="600">opendata.chmi.cz</text>
         <text x="654" y="178" class="s-muted" font-size="12">meteoradar 5 min · stanice 10 min</text>
         <rect x="640" y="200" width="250" height="54" rx="8" class="s-panel st-blue" stroke-width="1.5"/>
-        <text x="654" y="222" class="s-blue" font-weight="600">spotovaelektrina.cz (OTE)</text>
-        <text x="654" y="242" class="s-muted" font-size="12">cena elektřiny po 15 min · 30 min</text>
+        <text x="654" y="222" class="s-blue" font-weight="600">spotová cena OTE</text>
+        <text x="654" y="242" class="s-muted" font-size="12">po 15 min · 2 zdroje · 30 min</text>
         <rect x="640" y="264" width="250" height="54" rx="8" class="s-panel st-mag" stroke-width="1.5"/>
         <text x="654" y="286" class="s-mag" font-weight="600">GitHub</text>
         <text x="654" y="306" class="s-muted" font-size="12">nová verze firmwaru 1× denně · loga</text>
@@ -312,7 +312,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     </div>
     <div style="display:grid;gap:8px">
       <div class="eyebrow">Cena elektřiny · OTE</div>
-      <p>Výsledky denního trhu <a href="https://www.ote-cr.cz" target="_blank" rel="noopener">OTE</a> po 15 minutách, v korunách, přes <a href="https://spotovaelektrina.cz" target="_blank" rel="noopener">spotovaelektrina.cz</a>. Ceny na zítřek OTE zveřejňuje kolem 13:00.</p>
+      <p>Výsledky denního trhu <a href="https://www.ote-cr.cz" target="_blank" rel="noopener">OTE</a> po 15 minutách, v korunách, přes <a href="https://spotovaelektrina.cz" target="_blank" rel="noopener">spotovaelektrina.cz</a> nebo <a href="https://spotovky.cz" target="_blank" rel="noopener">spotovky.cz</a>. Zdroj si zvolíš v nastavení; když nejde, použije se automaticky druhý. Ceny na zítřek OTE zveřejňuje kolem 13:00.</p>
       <p>Bez nastavení je to holá burzovní cena. Ve webovém nastavení můžeš přičíst poplatky a DPH.</p>
     </div>
   </div>
@@ -568,7 +568,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <tr><td>Poloha</td><td>souřadnice, nebo kliknutí do mapy či vyhledání adresy (jen když je telefon online). Sama se vybere nejbližší stanice ČHMI.</td></tr>
       <tr><td>Obrazovky</td><td>které se zobrazují a <b>v jakém pořadí</b> (přetažením za úchyt ☰, jde i prstem na mobilu); dosah radaru letadel 10–100 km; poloměr meteoradaru 25–200 km; <b>automatické přepínání</b> vypnuto/10–60 s (po stisku tlačítka minutu pauza); <b>podklad mapy</b> pro oba radary (žádný / hranice a města / hranice, řeky a města)</td></tr>
       <tr><td>Detail letadla</td><td>řádky jsou ve stejném pořadí jako na displeji; které údaje se ukazují (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
-      <tr><td>Spotová cena elektřiny</td><td>přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena.</td></tr>
+      <tr><td>Spotová cena elektřiny</td><td>zdroj dat (spotovaelektrina.cz nebo spotovky.cz, druhý je záloha), přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena.</td></tr>
       <tr><td>Meteostanice ČHMI</td><td>stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód)</td></tr>
       <tr><td>Jas displeje</td><td>den, večer a noc se začátkem a jasem; pin podsvícení, pokud ho modul má</td></tr>
       <tr><td>Čas (NTP)</td><td>hlavní a záložní NTP server (výchozí pool.ntp.org a time.google.com, třeba i tik.cesnet.cz nebo router)</td></tr>
@@ -639,7 +639,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     <details><summary>U letadla se nezobrazuje logo nebo trasa</summary>
       <p>Obojí funguje jen u letů leteckých společností. Volací znak musí mít tvar 3 písmena a číslo, např. CSA2LK. Soukromá letadla vysílají registraci (OKNEB) a pro ty logo ani trasa neexistují. Trasa se dohledává v komunitních databázích a u charterů a cargo letů občas chybí. Otazník před trasou znamená, že trasa nesedí k poloze letadla. Výsledek posledního pokusu je na stránce Systém.</p></details>
     <details><summary>Cena elektřiny se nenačte nebo chybí zítřek</summary>
-      <p>Obrazovku je potřeba zapnout v sekci Obrazovky. Ceny se stahují až po synchronizaci času. Zítřek OTE zveřejňuje kolem 13:00 a do té doby dlouhý stisk ukazuje dnešek. Stav je na stránce Systém v řádku Cena elektřiny.</p></details>
+      <p>Obrazovku je potřeba zapnout v sekci Obrazovky. Ceny se stahují až po synchronizaci času. Zítřek OTE zveřejňuje kolem 13:00 a do té doby dlouhý stisk ukazuje dnešek. Stav i to, ze kterého zdroje data právě jsou, je na stránce Systém v řádku Cena elektřiny. Když jeden zdroj nejde, zařízení samo zkusí druhý.</p></details>
     <details><summary>Na obrazovce počasí chybí některá hodnota</summary>
       <p>Ne každá stanice měří všechno: vítr, srážky nebo tlak můžou chybět. Na sériové lince (115200 baud) se po každém stažení vypíšou všechny dostupné veličiny s kódy. Podle nich jde případně upravit kódy nahoře v <code>main.cpp</code>.</p></details>
     <details><summary>Barvy na displeji jsou obrácené nebo divné</summary>
@@ -653,7 +653,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <footer>
   Zdrojový kód: <a href="https://github.com/pavel-srajer/esp32-stand-system" target="_blank" rel="noopener">github.com/pavel-srajer/esp32-stand-system</a>.
-  Data: airplanes.live, adsb.lol, adsbdb.com (komunitní ADS-B a trasy), ČHMI otevřená data, Open-Meteo, OTE přes spotovaelektrina.cz, Natural Earth (mapa), Jxck-S/airline-logos (loga), Virtual Radar Server standing data (názvy společností). Písmo na displeji: efont.
+  Data: airplanes.live, adsb.lol, adsbdb.com (komunitní ADS-B a trasy), ČHMI otevřená data, Open-Meteo, OTE přes spotovaelektrina.cz a spotovky.cz, Natural Earth (mapa), Jxck-S/airline-logos (loga), Virtual Radar Server standing data (názvy společností). Písmo na displeji: efont.
 </footer>
 </div>
 

@@ -45,6 +45,7 @@ void settingsLoad() {
   gCfg.routeFmt = prefs.getInt("rfmt", d.routeFmt);
   gCfg.priceFee = prefs.getFloat("pfee", d.priceFee);
   gCfg.priceVat = prefs.getFloat("pvat", d.priceVat);
+  gCfg.priceSrc = prefs.getInt("psrc", d.priceSrc);
   prefs.end();
 }
 
@@ -80,6 +81,7 @@ void settingsSave() {
   prefs.putInt("rfmt", gCfg.routeFmt);
   prefs.putFloat("pfee", gCfg.priceFee);
   prefs.putFloat("pvat", gCfg.priceVat);
+  prefs.putInt("psrc", gCfg.priceSrc);
   prefs.end();
 }
 

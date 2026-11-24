@@ -52,6 +52,7 @@ struct Settings {
   int routeFmt = 0;       // trasa: 0 IATA, 1 ICAO, 2 město, 3 název letiště
   float priceFee = 0;     // cena elektřiny: přirážka Kč/kWh (distribuce, poplatky)
   float priceVat = 0;     // cena elektřiny: DPH v %
+  int priceSrc = 0;       // zdroj cen: 0 spotovaelektrina.cz, 1 spotovky.cz (druhý je záloha)
 };
 
 extern Settings gCfg;
