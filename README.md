@@ -24,7 +24,7 @@ Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 | **Meteoradar ČHMI** | animace srážek za posledních 30 min na obrysové mapě. Dole je vyhodnocení, např. „Déšť 12 km Z, dorazí asi za 25 min“, a rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
 | **Hodiny** | čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
-| **Spotová cena elektřiny** | aktuální čtvrthodina v Kč/kWh, další čtvrthodina, graf dne po 15 min, nejlevnější a nejdražší čas (ve výchozím stavu vypnutá) | zítřek na 30 s |
+| **Spotová cena elektřiny** | aktuální čtvrthodina v Kč/kWh (na 3 desetinná místa), další čtvrthodina, graf dne po 15 min, nejlevnější a nejdražší čas (ve výchozím stavu vypnutá) | zítřek na 30 s |
 | **Poznámka** | vlastní text ze stránky Systém s volitelnou barvou textu a pozadí, velikostí, tučným písmem, kurzívou, podtržením a blikáním. Text se zalomí do kruhu (ve výchozím stavu vypnutá) | ukončí blikání |
 
 - Po zapnutí se na 3 s ukáže **úvodní obrazovka** s verzí firmwaru. WiFi se mezitím už připojuje.

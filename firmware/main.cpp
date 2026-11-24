@@ -1535,7 +1535,7 @@ static void drawPrice(uint32_t now) {
     float r = mx > mn ? (v - mn) / (mx - mn) : 0.5f;
     return r < 0.33f ? rgb(60, 220, 100) : r < 0.66f ? rgb(255, 200, 0) : rgb(255, 80, 60);
   };
-  auto price2 = [&](char* out, size_t n, float v) { fmtDec(out, n, v, 2); };
+  auto price2 = [&](char* out, size_t n, float v) { fmtDec(out, n, v, 3); };  // Kč/kWh na 3 desetinná místa
 
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setFont(&fontCZ_12);
