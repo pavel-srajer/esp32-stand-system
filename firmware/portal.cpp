@@ -358,21 +358,62 @@ static const Tok TOKS[] = {
     {"noresp", {"zařízení neodpovídá", "device not responding", "Gerät antwortet nicht", "il dispositivo non risponde"}},
 };
 
-static String localize(const char* tpl) {
+// Stránka se posílá po kouscích (chunked). Celá by měla přes 30 kB a do rozdrobené
+// RAM (největší volný blok bývá jen ~10 kB) by se najednou nevešla.
+class PageOut {
+ public:
+  explicit PageOut(const char* type) {
+    buf.reserve(CHUNK + 256);
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, type, "");
+  }
+  ~PageOut() { end(); }
+  template <typename T>
+  PageOut& operator+=(const T& v) {
+    buf += v;
+    if (buf.length() >= CHUNK) flush();
+    return *this;
+  }
+  void write(const char* p, size_t n) {
+    while (n) {
+      size_t k = min(n, (size_t)CHUNK);
+      buf.concat(p, k);
+      p += k;
+      n -= k;
+      if (buf.length() >= CHUNK) flush();
+    }
+  }
+  void flush() {
+    if (buf.length()) server.sendContent(buf);
+    buf = "";
+  }
+  void end() {
+    if (done) return;
+    flush();
+    server.sendContent("");  // konec chunked odpovědi
+    done = true;
+  }
+
+ private:
+  static const size_t CHUNK = 1400;
+  String buf;
+  bool done = false;
+};
+
+// Doplní překlady {{klíč}} a rovnou posílá.
+static void localize(PageOut& out, const char* tpl) {
   int L = constrain(gCfg.lang, 0, LANG_COUNT - 1);
-  String out;
-  out.reserve(strlen(tpl) + 512);
   const char* p = tpl;
   for (;;) {
     const char* a = strstr(p, "{{");
     if (!a) {
-      out += p;
+      out.write(p, strlen(p));
       break;
     }
-    out.concat(p, a - p);
+    out.write(p, a - p);
     const char* b = strstr(a + 2, "}}");
     if (!b) {
-      out += a;
+      out.write(a, strlen(a));
       break;
     }
     bool found = false;
@@ -382,15 +423,15 @@ static String localize(const char* tpl) {
         found = true;
         break;
       }
-    if (!found) out.concat(a, b + 2 - a);
+    if (!found) out.write(a, b + 2 - a);
     p = b + 2;
   }
-  return out;
 }
 
 static void handleSystem() {
   gLastActivity = millis();
-  server.send(200, "text/html; charset=utf-8", localize(PAGE_SYS));
+  PageOut out("text/html; charset=utf-8");
+  localize(out, PAGE_SYS);
 }
 
 static void handleStatus() {
@@ -449,9 +490,8 @@ static void handleRoot() {
   }
   if (server.hasArg("rescan")) scan();
 
-  String h;
-  h.reserve(6000);
-  h += localize(PAGE_HEAD);
+  PageOut h("text/html; charset=utf-8");
+  localize(h, PAGE_HEAD);
 
   // --- Jazyk ---
   {
@@ -965,8 +1005,7 @@ static void handleRoot() {
   h += RANGES[constrain(gCfg.rangeIdx, 0, 3)];
   h += F(";</script>");
 
-  h += localize(PAGE_TAIL);
-  server.send(200, "text/html; charset=utf-8", h);
+  localize(h, PAGE_TAIL);
 }
 
 static void handleSave() {
