@@ -1,5 +1,5 @@
 // ESP32-C3 Super Mini + GC9A01 (1.28" kulatý displej)
-// Letadla v okolí (ADS-B: airplanes.live / adsb.lol) + aktuální meteodata ČHMI.
+// Letadla v okolí (ADS-B: adsb.fi / adsb.lol) + aktuální meteodata ČHMI.
 //
 // Tlačítko BOOT (GPIO 9):
 //   krátký stisk  -> další obrazovka (radar -> detail letadla -> počasí -> hodiny)
@@ -59,10 +59,13 @@ static const bool WIFI_LOW_TX_POWER = true;
 static const float RANGES_KM[] = {10, 25, 50, 100};
 static const int NUM_RANGES = sizeof(RANGES_KM) / sizeof(RANGES_KM[0]);
 
-// API vracejí stejný formát (readsb "v2"), při výpadku se zkusí druhé.
+// API vracejí stejný formát (readsb, pole "ac"), při výpadku se zkusí druhé.
 // Parametry: lat, lon, poloměr v NM.
+// adsb.fi: 1 dotaz/s, jen osobní nekomerční použití (uvést adsb.fi s odkazem).
+// adsb.lol: bez klíče jen 500 dotazů/den z jedné IP – proto jen záloha.
+// (airplanes.live od 11/2026 bez registrace odpovídá 403.)
 static const char* PLANE_APIS[] = {
-    "https://api.airplanes.live/v2/point/%.4f/%.4f/%d",
+    "https://opendata.adsb.fi/api/v3/lat/%.4f/lon/%.4f/dist/%d",
     "https://api.adsb.lol/v2/point/%.4f/%.4f/%d",
 };
 
@@ -206,7 +209,7 @@ static void insertPlane(PlaneData& d, const Plane& pl) {
   d.p[pos] = pl;
 }
 
-// Omezení počtu dotazů: server, který odpoví 429 (moc dotazů), se na chvíli
+// Omezení počtu dotazů: server, který odpoví 429 (moc dotazů) nebo 403, se na chvíli
 // vynechá – nejdřív 1 min, při opakování až 10 min (nebo podle Retry-After).
 static uint32_t sApiPauseUntil[2] = {0, 0};
 static uint32_t sApiPauseMs[2] = {0, 0};
@@ -238,7 +241,7 @@ static bool fetchPlanesFrom(const char* tmpl, PlaneData& out) {
   sRetryAfter = http.header("Retry-After").toInt();
   if (code != 200) {
     Serial.printf("[ADSB] %s -> HTTP %d\n", url, code);
-    snprintf(out.err, sizeof out.err, "%s HTTP %d", strstr(tmpl, "adsb.lol") ? "adsb.lol" : "airplanes.live", code);
+    snprintf(out.err, sizeof out.err, "%s HTTP %d", strstr(tmpl, "adsb.lol") ? "adsb.lol" : "adsb.fi", code);
     http.end();
     return false;
   }
@@ -302,12 +305,12 @@ static void fetchPlanes() {
     }
     tried = true;
     ok = fetchPlanesFrom(PLANE_APIS[a], tmp);
-    if (sLastCode == 429) {
+    if (sLastCode == 429 || sLastCode == 403) {  // moc dotazů / zablokováno
       uint32_t p = sApiPauseMs[a] ? min<uint32_t>(sApiPauseMs[a] * 2, 600000) : 60000;
       if (sRetryAfter > 0) p = max<uint32_t>(p, min(sRetryAfter, 1800) * 1000UL);
       sApiPauseMs[a] = p;
       sApiPauseUntil[a] = millis() + p;
-      Serial.printf("[ADSB] server %d: HTTP 429, pauza %u s\n", a, (unsigned)(p / 1000));
+      Serial.printf("[ADSB] server %d: HTTP %d, pauza %u s\n", a, sLastCode, (unsigned)(p / 1000));
     } else if (ok) {
       sApiPauseMs[a] = 0;
     }

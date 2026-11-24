@@ -160,6 +160,16 @@ js.onload=function(){if(!window.L)return;
   .then(function(r){return r.json()}).then(function(j){qb.textContent='{{search}}';if(j[0])set(L.latLng(+j[0].lat,+j[0].lon),true);else near.textContent='{{notfound}}: '+q.value})
   .catch(function(){qb.textContent='{{search}}'})};
  q.onkeydown=function(e){if(e.key=='Enter'){e.preventDefault();qb.onclick()}};
+ var gb=document.getElementById('gb');
+ function ipLoc(){fetch('https://get.geojs.io/v1/ip/geo.json').then(function(r){return r.json()}).then(function(j){
+   var a=num(j.latitude),b=num(j.longitude);if(isNaN(a)||isNaN(b))throw 0;set(L.latLng(a,b),true);
+   near.textContent='{{iploc}}'+(j.city?' ('+j.city+')':'')+'. '+near.textContent;gb.textContent='📍 {{myloc}}'})
+  .catch(function(){gb.textContent='📍 {{myloc}}';near.textContent='{{locfail}}'})}
+ gb.onclick=function(){gb.textContent='…';
+  if(window.isSecureContext&&navigator.geolocation)navigator.geolocation.getCurrentPosition(function(p){
+    set(L.latLng(p.coords.latitude,p.coords.longitude),true);gb.textContent='📍 {{myloc}}';
+    near.textContent='{{gpsloc}} (±'+Math.round(p.coords.accuracy)+' m). '+near.textContent},ipLoc,{enableHighAccuracy:true,timeout:15000});
+  else ipLoc()};
  setTimeout(function(){map.invalidateSize()},200);
 };
 document.head.appendChild(js);
@@ -210,6 +220,7 @@ textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:
 <h2>{{device}}</h2><table id="dev"></table>
 <h2>WiFi</h2><table id="wifi"></table>
 <h2>{{app}}</h2><table id="app"></table>
+<p><small>{{datasrc}}: <a href="https://adsb.fi" target="_blank">adsb.fi</a>, <a href="https://adsb.lol" target="_blank">adsb.lol</a> (ODbL), <a href="https://www.adsbdb.com" target="_blank">adsbdb</a>, ČHMI, <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>, OTE (spotovaelektrina.cz, spotovky.cz)</small></p>
 </main><script>
 function kb(b){return b>=1048576?(b/1048576).toFixed(2)+' MB':(b/1024).toFixed(1)+' kB'}
 function bar(id,p,w,c){var e=document.getElementById(id);e.style.width=Math.max(0,Math.min(100,p))+'%';e.className=p>=c?'c':p>=w?'w':''}
@@ -272,6 +283,11 @@ static const Tok TOKS[] = {
                 "Le impostazioni si aprono poi all’indirizzo IP del dispositivo nella rete di casa, oppure tieni premuto BOOT per 5 s per riavviare questo hotspot."}},
     {"nearest", {"Nejbližší stanice ČHMI", "Nearest ČHMI station", "Nächste ČHMI-Station", "Stazione ČHMI più vicina"}},
     {"search", {"Hledat", "Search", "Suchen", "Cerca"}},
+    {"myloc", {"Moje poloha", "My location", "Mein Standort", "La mia posizione"}},
+    {"gpsloc", {"Poloha z telefonu", "Location from phone", "Standort vom Handy", "Posizione dal telefono"}},
+    {"iploc", {"Jen přibližná poloha podle IP adresy (přesnou polohu z GPS prohlížeč stránce zařízení na http:// nedovolí) – zpřesni kliknutím do mapy nebo vyhledáním adresy", "Only approximate location from IP address (browsers don't allow GPS for the device's http:// page) – refine by clicking the map or searching an address", "Nur ungefährer Standort laut IP-Adresse (für die http://-Seite des Geräts erlaubt der Browser kein GPS) – per Klick in die Karte oder Adresssuche verfeinern", "Solo posizione approssimativa dall'indirizzo IP (il browser non consente il GPS per la pagina http:// del dispositivo) – affina cliccando sulla mappa o cercando l'indirizzo"}},
+    {"datasrc", {"Zdroje dat", "Data sources", "Datenquellen", "Fonti dati"}},
+    {"locfail", {"Polohu se nepodařilo zjistit", "Could not detect location", "Standort nicht ermittelbar", "Impossibile rilevare la posizione"}},
     {"notfound", {"Nenalezeno", "Not found", "Nicht gefunden", "Non trovato"}},
     {"loading", {"načítám…", "loading…", "lädt…", "caricamento…"}},
     {"chiptemp", {"Teplota čipu", "Chip temperature", "Chiptemperatur", "Temperatura chip"}},
@@ -515,6 +531,8 @@ static void handleRoot() {
   h += tr("Vyhledat obec nebo adresu", "Search town or address", "Ort oder Adresse suchen", "Cerca città o indirizzo");
   h += F("'><button type='button' id='qb' class='sbtn'>");
   h += tr("Hledat", "Search", "Suchen", "Cerca");
+  h += F("</button><button type='button' id='gb' class='sbtn'>📍 ");
+  h += tr("Moje poloha", "My location", "Mein Standort", "La mia posizione");
   h += F("</button></div><div id='map'></div></div><small id='nomap'>");
   h += tr("Mapa se zobrazí, když je telefon připojený k internetu (v domácí síti). Jinak: na mapy.cz pravé tlačítko na místo → souřadnice.",
           "The map appears when your phone is online (in your home network). Otherwise copy coordinates e.g. from Google Maps (right click).",

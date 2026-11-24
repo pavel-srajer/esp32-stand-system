@@ -146,11 +146,12 @@ void routeService() {
   unlock();
   if (!cs[0]) return;
 
+  // adsbdb první: adsb.lol má bez klíče jen 500 dotazů/den z IP (sdílené s polohami letadel)
   RouteInfo r;
-  int res = fromAdsbLol(cs, lat, lon, r);
+  int res = fromAdsbdb(cs, r);
   if (res <= 0) {
     RouteInfo r2;
-    int res2 = fromAdsbdb(cs, r2);
+    int res2 = fromAdsbLol(cs, lat, lon, r2);
     if (res2 > 0) {
       r = r2;
       res = 1;
