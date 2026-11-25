@@ -48,6 +48,7 @@ struct Settings {
   String ntp2 = "time.google.com";  // záložní NTP server
   int lang = 0;  // jazyk: 0 čeština, 1 English, 2 Deutsch, 3 Italiano
   int detailMask = 0x1FF;  // údaje na obrazovce Detail letadla (bity DET_*)
+  int detailCycle = 0;    // Detail letadla: automaticky další letadlo každých N s (0 = vypnuto)
   int speedUnit = 0;      // rychlost letadla: 0 km/h, 1 uzly (kt), 2 mph
   int routeFmt = 0;       // trasa: 0 IATA, 1 ICAO, 2 město, 3 název letiště
   float priceFee = 0;     // cena elektřiny: přirážka Kč/kWh (distribuce, poplatky)

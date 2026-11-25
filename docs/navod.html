@@ -455,7 +455,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <text x="80" y="114" text-anchor="middle" fill="#ffe678" font-size="9">520 km/h · 64°</text>
         <text x="80" y="127" text-anchor="middle" fill="#78c8ff" font-size="9">6,4 km SV</text>
         <text x="80" y="140" text-anchor="middle" fill="#969696" font-size="8">3 / 17</text></svg>
-      <h3>Detail letadla</h3><p>Logo a název společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz a vzdálenost. Co se zobrazí, si vybereš na webu.</p>
+      <h3>Detail letadla</h3><p>Logo a název společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz a vzdálenost. Co se zobrazí, si vybereš na webu. Letadla v dosahu se mohou samy střídat v nastaveném intervalu; dlouhý stisk přepne na další hned.</p>
     </div>
     <div class="screen">
       <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka počasí"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
@@ -567,7 +567,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <tr><td>WiFi</td><td>síť ze seznamu nalezených a heslo</td></tr>
       <tr><td>Poloha</td><td>souřadnice, nebo kliknutí do mapy či vyhledání adresy (jen když je telefon online). Sama se vybere nejbližší stanice ČHMI.</td></tr>
       <tr><td>Obrazovky</td><td>které se zobrazují a <b>v jakém pořadí</b> (přetažením za úchyt ☰, jde i prstem na mobilu); dosah radaru letadel 10–100 km; poloměr meteoradaru 25–200 km; <b>automatické přepínání</b> vypnuto/10–60 s (po stisku tlačítka minutu pauza); <b>podklad mapy</b> pro oba radary (žádný / hranice a města / hranice, řeky a města)</td></tr>
-      <tr><td>Detail letadla</td><td>řádky jsou ve stejném pořadí jako na displeji; které údaje se ukazují (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
+      <tr><td>Detail letadla</td><td>řádky jsou ve stejném pořadí jako na displeji; které údaje se ukazují (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>automatické přepínání letadel</b> v dosahu (vypnuto nebo každých 3–30 s); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
       <tr><td>Zdroj dat o letadlech</td><td>Automaticky (vlastní přijímač → adsb.fi → adsb.lol), jen vlastní přijímač, jen adsb.fi nebo jen adsb.lol. Máš-li doma přijímač ADS-B (adsb-feeder/ADSB.im, readsb, tar1090, ultrafeeder), napiš jeho IP adresu – zařízení si doplní <code>:8080/data/aircraft.json</code>. Jiný port nebo cestu zadej celou, např. <code>http://192.168.1.50:8087/data/aircraft.json</code>. Vlastní přijímač se čte každých 5 s, bez limitů a bez šifrování (šetří RAM).</td></tr>
       <tr><td>Spotová cena elektřiny</td><td>zdroj dat (spotovaelektrina.cz nebo spotovky.cz, druhý je záloha), přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena.</td></tr>
       <tr><td>Meteostanice ČHMI</td><td>stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód)</td></tr>

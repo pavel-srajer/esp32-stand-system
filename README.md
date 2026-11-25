@@ -19,7 +19,7 @@ Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 | Obrazovka | Co ukazuje | Dlouhý stisk |
 |---|---|---|
 | **Radar letadel** | letadla kolem domova, barva podle výšky, dole nejbližší letadlo | dosah 10 / 25 / 50 / 100 km |
-| **Detail letadla** | logo a název společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz, vzdálenost. Co se zobrazí, se volí na webu | další letadlo |
+| **Detail letadla** | logo a název společnosti, volací znak, trasa (PRG → LHR), typ, registrace, výška, rychlost, kurz, vzdálenost. Co se zobrazí, se volí na webu. Letadla v dosahu se mohou automaticky střídat (interval na webu) | další letadlo |
 | **Předpověď** | aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko), výhled na 2–8 h | obnovit |
 | **Meteoradar ČHMI** | animace srážek za posledních 30 min na obrysové mapě. Dole je vyhodnocení, např. „Déšť 12 km Z, dorazí asi za 25 min“, a rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
@@ -52,7 +52,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 | **WiFi** | síť ze seznamu nalezených, heslo |
 | **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
 | **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
-| **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
+| **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), automatické přepínání letadel v dosahu (vypnuto / každých 3–30 s), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
 | **Zdroj dat o letadlech** | Automaticky (vlastní přijímač → adsb.fi → adsb.lol), jen vlastní přijímač, jen adsb.fi nebo jen adsb.lol. Adresa vlastního přijímače (adsb-feeder/ADSB.im, readsb, tar1090, ultrafeeder): stačí IP, doplní se `:8080/data/aircraft.json`; jiný port nebo cestu zadej celou s `http://`. Vlastní přijímač se čte každých 5 s |
 | **Spotová cena elektřiny** | zdroj dat (spotovaelektrina.cz nebo spotovky.cz; když zvolený nejde, použije se automaticky druhý), přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |

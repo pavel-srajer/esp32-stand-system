@@ -42,6 +42,7 @@ void settingsLoad() {
   if (gCfg.detailMask < 0)  // starší nastavení bez řádku "letecká společnost" -> zapnout ho
     gCfg.detailMask = prefs.isKey("detail") ? (prefs.getInt("detail", 0xFF) | DET_AIRLINE) : d.detailMask;
   gCfg.speedUnit = prefs.getInt("spdu", d.speedUnit);
+  gCfg.detailCycle = prefs.getInt("dcycle", d.detailCycle);
   gCfg.routeFmt = prefs.getInt("rfmt", d.routeFmt);
   gCfg.priceFee = prefs.getFloat("pfee", d.priceFee);
   gCfg.priceVat = prefs.getFloat("pvat", d.priceVat);
@@ -80,6 +81,7 @@ void settingsSave() {
   prefs.putInt("lang", gCfg.lang);
   prefs.putInt("detail2", gCfg.detailMask);
   prefs.putInt("spdu", gCfg.speedUnit);
+  prefs.putInt("dcycle", gCfg.detailCycle);
   prefs.putInt("rfmt", gCfg.routeFmt);
   prefs.putFloat("pfee", gCfg.priceFee);
   prefs.putFloat("pvat", gCfg.priceVat);

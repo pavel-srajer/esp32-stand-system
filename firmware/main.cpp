@@ -895,6 +895,16 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
 
 // ---------------- Obrazovka 2: detail letadla ----------------
 static int gDetailIdx = 0;
+// Volací znak zobrazeného letadla: seznam se řadí podle vzdálenosti a každých pár
+// sekund mění pořadí – detail proto drží stejné letadlo, dokud se nepřepne dál.
+static char gDetailCs[10] = "";
+static uint32_t gDetailStepAt = 0;  // kdy se naposledy přepnulo letadlo
+
+static void detailNext() {
+  gDetailIdx++;
+  gDetailCs[0] = 0;
+  gDetailStepAt = millis();
+}
 
 // název letecké společnosti podle ICAO kódu (binární vyhledávání v airlines.h)
 static const char* airlineName(const char* icao) {
@@ -931,8 +941,15 @@ static void drawDetail(const PlaneData& pd) {
     drawCenteredMsg(pd.ok ? tr("žádné letadlo", "no aircraft", "kein Flugzeug", "nessun aereo") : tr("načítám…", "loading…", "lädt…", "caricamento…"), pd.ok ? tr("v dosahu radaru", "in radar range", "im Radarbereich", "nel raggio radar") : pd.err);
     return;
   }
+  if (gDetailCs[0])
+    for (int j = 0; j < n; j++)
+      if (!strcmp(pd.p[j].flight, gDetailCs)) {
+        gDetailIdx = j;
+        break;
+      }
   if (gDetailIdx >= n) gDetailIdx = 0;
   const Plane& pl = pd.p[gDetailIdx];
+  strlcpy(gDetailCs, pl.flight, sizeof gDetailCs);
   uint16_t col = altColor(pl.alt);
   char b[48], t[24];
 
@@ -2000,6 +2017,8 @@ static void onShortPress() {
     }
   }
   gDetailIdx = 0;
+  gDetailCs[0] = 0;
+  gDetailStepAt = millis();
   gLastSwitch = millis();
 }
 
@@ -2013,7 +2032,7 @@ static void onLongPress() {
       gForcePlanes = true;
       break;
     case SCR_DETAIL:
-      gDetailIdx++;
+      detailNext();
       break;
     case SCR_RAIN:
       gCfg.rainRadiusIdx = (gCfg.rainRadiusIdx + 1) % 4;
@@ -2090,6 +2109,8 @@ void screenSet(int i) {
   if (i < 0 || i >= SCR_COUNT || gPortalMode) return;
   gScreen = i;
   gDetailIdx = 0;
+  gDetailCs[0] = 0;
+  gDetailStepAt = millis();
   gLastSwitch = gLastPress = millis();  // automatické přepínání na minutu pauza
 }
 
@@ -2318,6 +2339,11 @@ void loop() {
       WiFi.softAPgetStationNum() == 0) {
     ESP.restart();  // nikdo nic nenastavuje -> zkus znovu uloženou WiFi
   }
+
+  // Detail letadla: automaticky další letadlo v dosahu
+  if (!gPortalMode && gScreen == SCR_DETAIL && gCfg.detailCycle > 0 && !gBtnHeldMs &&
+      now - gDetailStepAt >= (uint32_t)gCfg.detailCycle * 1000)
+    detailNext();
 
   // automatické přepínání obrazovek (po stisku tlačítka minutu pauza)
   if (!gPortalMode && gCfg.cycleSec > 0 && !gBtnHeldMs && now - gLastSwitch >= (uint32_t)gCfg.cycleSec * 1000 &&

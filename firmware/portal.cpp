@@ -778,6 +778,26 @@ static void handleRoot() {
       }
     }
     h += F("</select><label>");
+    h += tr("Automaticky přepínat letadla v dosahu", "Automatically cycle aircraft in range", "Flugzeuge in Reichweite automatisch wechseln", "Alterna automaticamente gli aerei in zona");
+    h += F("</label><select name='dcycle'>");
+    {
+      static const int DC[] = {0, 3, 5, 8, 10, 15, 20, 30};
+      for (int v : DC) {
+        h += F("<option value='");
+        h += v;
+        h += "'";
+        if (v == gCfg.detailCycle) h += F(" selected");
+        h += ">";
+        if (v) {
+          h += tr("každých", "every", "alle", "ogni");
+          h += String(" ") + v + " s";
+        } else {
+          h += tr("vypnuto (jen dlouhým stiskem)", "off (long press only)", "aus (nur langer Druck)", "spento (solo pressione lunga)");
+        }
+        h += F("</option>");
+      }
+    }
+    h += F("</select><label>");
     h += tr("Zobrazení trasy", "Route format", "Routenanzeige", "Formato rotta");
     h += F("</label><select name='rfmt'>");
     {
@@ -1080,6 +1100,7 @@ static void handleSave() {
       if (gCfg.adsbUrl.length() > 120) gCfg.adsbUrl = gCfg.adsbUrl.substring(0, 120);
     }
     if (server.hasArg("rfmt")) gCfg.routeFmt = constrain(server.arg("rfmt").toInt(), 0, 3);
+    if (server.hasArg("dcycle")) gCfg.detailCycle = constrain(server.arg("dcycle").toInt(), 0, 120);
     if (server.hasArg("spdu")) gCfg.speedUnit = constrain(server.arg("spdu").toInt(), 0, 2);
     if (server.hasArg("cycle")) gCfg.cycleSec = constrain(server.arg("cycle").toInt(), 0, 600);
     if (server.hasArg("rmap")) gCfg.rainMap = constrain(server.arg("rmap").toInt(), 0, 2);
