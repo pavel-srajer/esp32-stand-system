@@ -1131,12 +1131,30 @@ static void handleSave() {
   String pg = F("<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width'>"
                 "<body style='font-family:sans-serif;background:#0d1117;color:#e6edf3;padding:24px'><h2>");
   pg += tr("Uloženo ✔", "Saved ✔", "Gespeichert ✔", "Salvato ✔");
-  pg += "</h2><p>";
-  pg += tr("Zařízení se restartuje a připojí k zadané WiFi. Tuto stránku můžeš zavřít.",
-           "The device restarts and connects to the selected WiFi. You can close this page.",
-           "Das Gerät startet neu und verbindet sich mit dem gewählten WLAN. Du kannst diese Seite schließen.",
-           "Il dispositivo si riavvia e si connette al WiFi scelto. Puoi chiudere questa pagina.");
-  pg += "</p></body>";
+  pg += "</h2><p id='m'>";
+  if (gAp) {  // první nastavení přes hotspot: zařízení přejde do domácí sítě a dostane jinou adresu
+    pg += tr("Zařízení se restartuje a připojí k zadané WiFi. Tuto stránku můžeš zavřít.",
+             "The device restarts and connects to the selected WiFi. You can close this page.",
+             "Das Gerät startet neu und verbindet sich mit dem gewählten WLAN. Du kannst diese Seite schließen.",
+             "Il dispositivo si riavvia e si connette al WiFi scelto. Puoi chiudere questa pagina.");
+    pg += "</p></body>";
+  } else {  // domácí síť: počkat, až zařízení znovu naběhne, a vrátit se do nastavení
+    pg += tr("Zařízení se restartuje, za chvíli se vrátíš do nastavení…", "The device is restarting, you will be back in the settings shortly…",
+             "Das Gerät startet neu, gleich geht es zurück zu den Einstellungen…", "Il dispositivo si riavvia, a breve tornerai alle impostazioni…");
+    pg += F("</p><p id='t' style='color:#8b949e'></p><script>var t0=Date.now(),"
+            "back=function(){location.replace('/')};"
+            "function poll(){var s=Math.round((Date.now()-t0)/1000);document.getElementById('t').textContent=s+' s';"
+            "if(s>90){document.getElementById('m').innerHTML=\"");
+    pg += tr("Zařízení zatím neodpovídá (možná změnilo adresu).", "The device is not responding yet (its address may have changed).",
+             "Das Gerät antwortet noch nicht (evtl. neue Adresse).", "Il dispositivo non risponde ancora (forse ha cambiato indirizzo).");
+    pg += F(" <a href='/' style='color:#58a6ff'>");
+    pg += tr("Zkusit znovu", "Try again", "Erneut versuchen", "Riprova");
+    pg += F("</a>\";return}"
+            "var c=new AbortController();setTimeout(function(){c.abort()},2500);"
+            "fetch('/api/status',{cache:'no-store',signal:c.signal}).then(function(r){if(r.ok)back();else setTimeout(poll,1500)})"
+            ".catch(function(){setTimeout(poll,1500)})}"
+            "setTimeout(poll,5000)</script></body>");
+  }
   server.send(200, "text/html; charset=utf-8", pg);
   delay(1500);
   ESP.restart();
