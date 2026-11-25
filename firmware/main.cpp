@@ -160,6 +160,9 @@ static const char* planesWord(int n) {
     case LANG_EN: return "aircraft";
     case LANG_DE: return n == 1 ? "Flugzeug" : "Flugzeuge";
     case LANG_IT: return n == 1 ? "aereo" : "aerei";
+    case LANG_PT: return n == 1 ? "avião" : "aviões";
+    case LANG_ES: return n == 1 ? "avión" : "aviones";
+    case LANG_VI: return "máy bay";
     default: return n == 1 ? "letadlo" : (n >= 2 && n <= 4) ? "letadla" : "letadel";
   }
 }
@@ -1248,7 +1251,10 @@ static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc)
       {"neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"},
       {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
       {"Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"},
-      {"domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"}};
+      {"domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"},
+      {"domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"},
+      {"domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"},
+      {"Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"}};
   static const char* const MON_EN[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   int L = constrain(gCfg.lang, 0, LANG_COUNT - 1);
   time_t now = time(nullptr);
@@ -1269,7 +1275,8 @@ static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc)
   spr.setFont(&fontCZ_16);
   spr.setTextColor(rgb(180, 180, 180));
   if (L == LANG_EN) snprintf(b, sizeof b, "%s %d %s", DNY[L][lt.tm_wday], lt.tm_mday, MON_EN[lt.tm_mon]);
-  else if (L == LANG_IT) snprintf(b, sizeof b, "%s %d/%d", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
+  else if (L == LANG_IT || L == LANG_PT || L == LANG_ES || L == LANG_VI)
+    snprintf(b, sizeof b, "%s %d/%d", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
   else if (L == LANG_DE) snprintf(b, sizeof b, "%s %d.%d.", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
   else snprintf(b, sizeof b, "%s %d. %d.", DNY[L][lt.tm_wday], lt.tm_mday, lt.tm_mon + 1);
   spr.drawString(b, CX, CY + 18);
@@ -1903,7 +1910,10 @@ void appStatusJson(JsonObject o) {
       {"nekontrolováno", "kontroluji…", "aktuální verze", "je dostupná nová verze", "stahuji…", "chyba"},
       {"not checked", "checking…", "up to date", "new version available", "downloading…", "error"},
       {"nicht geprüft", "prüfe…", "aktuell", "neue Version verfügbar", "lade herunter…", "Fehler"},
-      {"non verificato", "verifica…", "aggiornato", "nuova versione disponibile", "download…", "errore"}};
+      {"non verificato", "verifica…", "aggiornato", "nuova versione disponibile", "download…", "errore"},
+      {"não verificado", "a verificar…", "atualizado", "nova versão disponível", "a transferir…", "erro"},
+      {"no comprobado", "comprobando…", "actualizado", "nueva versión disponible", "descargando…", "error"},
+      {"chưa kiểm tra", "đang kiểm tra…", "đã mới nhất", "có phiên bản mới", "đang tải xuống…", "lỗi"}};
   String ota = OTA_TXT[constrain(gCfg.lang, 0, LANG_COUNT - 1)][gOta.state];
   if (gOta.latest[0]) ota += String(" (GitHub: ") + gOta.latest + ")";
   if (gOta.state == OTA_FAILED && gOta.msg[0]) ota += String(": ") + gOta.msg;
@@ -2088,6 +2098,7 @@ static String displayableText(const String& in) {
       continue;
     }
     bool ok = (cp >= 0x20 && cp < 0x7F) || cp == '\n' || (cp >= 0xA0 && cp < 0x180) || cp == 0x2013 || cp == 0x2014 ||
+              cp == 0x1A0 || cp == 0x1A1 || cp == 0x1AF || cp == 0x1B0 || (cp >= 0x1EA0 && cp <= 0x1EF9) ||  // vietnamština
               cp == 0x2022 || cp == 0x2026 || (cp >= 0x2190 && cp <= 0x2193);
     if (ok) out.concat((const char*)p, n);
     p += n;

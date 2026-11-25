@@ -232,7 +232,7 @@ function esc(v){return String(v).replace(/[&<>"]/g,function(c){return {'&':'&amp
 function setScr(i){fetch('/api/screen?s='+i).then(load).catch(function(){})}
 var noteInit=false;
 function g(id){return document.getElementById(id)}
-function saveNote(){var v=g('note').value,st=(g('nb1').checked?1:0)|(g('nb2').checked?2:0)|(g('nb4').checked?4:0);
+function saveNote(){var v=g('note').value;if(v.normalize)v=v.normalize('NFC');var st=(g('nb1').checked?1:0)|(g('nb2').checked?2:0)|(g('nb4').checked?4:0);
  var body='note='+encodeURIComponent(v)+'&fg='+encodeURIComponent(g('nfg').value)+'&bg='+encodeURIComponent(g('nbg').value)+'&size='+g('nsize').value+'&style='+st+'&blink='+g('nblink').value;
  fetch('/api/note',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
  .then(function(){t('nst','{{note_ok}}');load()}).catch(function(){t('nst','{{noresp}}')})}
@@ -267,10 +267,10 @@ load();setInterval(load,2000);
 // Překlady pro {{klíče}} v šablonách stránek (cs, en, de, it). V JS řetězcích bez apostrofů.
 struct Tok {
   const char* k;
-  const char* t[LANG_COUNT];
+  const char* t[4];  // cs, en, de, it; pt/es/vi podle angličtiny přes trExtra()
 };
 static const Tok TOKS[] = {
-    {"lang", {"cs", "en", "de", "it"}},
+    {"lang", {"cs", "en", "de", "it"}},  // pt/es/vi viz tokText()
     {"locale", {"cs-CZ", "en-GB", "de-DE", "it-IT"}},
     {"t_set", {"Nastavení – Letadla", "Settings – Planes", "Einstellungen – Flugzeuge", "Impostazioni – Aerei"}},
     {"h1", {"✈ Letadla &amp; počasí – nastavení", "✈ Planes &amp; weather – settings", "✈ Flugzeuge &amp; Wetter – Einstellungen", "✈ Aerei &amp; meteo – impostazioni"}},
@@ -400,6 +400,14 @@ class PageOut {
   bool done = false;
 };
 
+static const char* tokText(const Tok& t, int L) {
+  if (L < LANG_PT) return t.t[L];
+  static const char* const CODE[] = {"pt", "es", "vi"}, *const LOC[] = {"pt-PT", "es-ES", "vi-VN"};
+  if (!strcmp(t.k, "lang")) return CODE[L - LANG_PT];
+  if (!strcmp(t.k, "locale")) return LOC[L - LANG_PT];
+  return trExtra(t.t[1], L);
+}
+
 // Doplní překlady {{klíč}} a rovnou posílá.
 static void localize(PageOut& out, const char* tpl) {
   int L = constrain(gCfg.lang, 0, LANG_COUNT - 1);
@@ -421,7 +429,7 @@ static void localize(PageOut& out, const char* tpl) {
       if (strlen(t.k) == (size_t)(b - a - 2) && !strncmp(t.k, a + 2, b - a - 2)) {
         // Překlady se vkládají i do JavaScriptu mezi '…' – rovný apostrof (don't,
         // dall'indirizzo) by skript rozbil, proto se nahradí typografickým ’.
-        for (const char* c = t.t[L]; *c; c++)
+        for (const char* c = tokText(t, L); *c; c++)
           if (*c == '\'') out += "\xE2\x80\x99";
           else out += *c;
         found = true;
@@ -499,8 +507,8 @@ static void handleRoot() {
 
   // --- Jazyk ---
   {
-    static const char* const LN[] = {"Čeština", "English", "Deutsch", "Italiano"};
-    h += F("<fieldset><legend>Jazyk · Language · Sprache · Lingua</legend><select name='lang'>");
+    static const char* const LN[] = {"Čeština", "English", "Deutsch", "Italiano", "Português", "Español", "Tiếng Việt"};
+    h += F("<fieldset><legend>Jazyk · Language · Sprache · Lingua · Idioma · Ngôn ngữ</legend><select name='lang'>");
     for (int i = 0; i < LANG_COUNT; i++) {
       h += F("<option value='");
       h += i;

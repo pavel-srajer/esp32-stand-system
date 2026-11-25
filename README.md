@@ -4,7 +4,7 @@ Stolní displej na **ESP32-C3 Super Mini** s kulatým displejem **GC9A01 1,28"**
 letadla v okolí (ADS-B) s logem a trasou, předpověď a upozornění na počasí, animovaný meteoradar ČHMI
 s vyhodnocením „kdy u tebe začne pršet“, spotová cena elektřiny a hodiny se jmeninami.
 Nastavuje se z telefonu přes WiFi hotspot a sám se aktualizuje z GitHub Releases (OTA).
-Rozhraní je **česky, anglicky, německy a italsky**.
+Rozhraní je **česky, anglicky, německy, italsky, portugalsky, španělsky a vietnamsky**.
 
 Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
 
@@ -48,7 +48,7 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 
 | Sekce | Co se tam nastavuje |
 |---|---|
-| **Jazyk** | čeština / English / Deutsch / Italiano (displej i web). Jmeniny jsou jen česky, státní svátky se překládají |
+| **Jazyk** | čeština / English / Deutsch / Italiano / Português / Español / Tiếng Việt (displej i web). Jmeniny jsou jen česky, státní svátky se překládají |
 | **WiFi** | síť ze seznamu nalezených, heslo |
 | **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
 | **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
@@ -161,7 +161,9 @@ Všechny jsou zdarma a bez registrace.
 | `firmware/ota.cpp` | kontrola GitHub Releases a OTA |
 | `firmware/sysinfo.cpp` | data pro stránku Systém |
 | `firmware/settings.cpp` | nastavení v NVS |
-| `firmware/i18n.h` | jazyky: `tr("česky", "English", "Deutsch", "Italiano")` |
+| `firmware/i18n.h` | jazyky: `tr("česky", "English", "Deutsch", "Italiano")`; portugalština, španělština a vietnamština se hledají podle anglického textu v `i18n_extra.h` |
+| `tools/i18n_extra.json` | překlady pt / es / vi podle anglického textu; `python3 tools/make_i18n.py` z nich vygeneruje `firmware/i18n_extra.h` a vypíše, co chybí (kontroluje i `%s`/`%d`) |
+| `tools/make_fonts.py` | písmo pro displej z efontJA (LovyanGFX) + složená vietnamská písmena (`tools/viet_glyphs.py`), výstup `firmware/fonts_cz.h` |
 | `firmware/display.h` | piny a konfigurace displeje |
 | `firmware/fonts_cz.h` | písmo s diakritikou, generuje `tools/make_fonts.py` |
 | `firmware/mapdata.h` | obrysová mapa, generuje `tools/make_map.py` |

@@ -54,6 +54,11 @@ jobs:
       - name: Kontrola JavaScriptu webu (všechny jazyky)
         run: python3 tools/check_web_js.py
 
+      - name: Kontrola překladů (pt, es, vi)
+        run: |
+          python3 tools/make_i18n.py --strict
+          git diff --exit-code firmware/i18n_extra.h || { echo "i18n_extra.h není aktuální – spusť tools/make_i18n.py"; exit 1; }
+
       - name: Build
         env:
           VER: ${{ steps.ver.outputs.version }}

@@ -91,6 +91,12 @@ static void computeAlerts(Forecast& f) {
             snprintf(f.nowcast, sizeof f.nowcast, "In ca. %d min beginnt es zu %s", i * 15, what);
           else if (gCfg.lang == LANG_IT)
             snprintf(f.nowcast, sizeof f.nowcast, "Tra ~%d min inizia a %s", i * 15, what);
+          else if (gCfg.lang == LANG_PT)
+            snprintf(f.nowcast, sizeof f.nowcast, "Começa a %s em ~%d min", cold ? "nevar" : "chover", i * 15);
+          else if (gCfg.lang == LANG_ES)
+            snprintf(f.nowcast, sizeof f.nowcast, "Empieza a %s en ~%d min", cold ? "nevar" : "llover", i * 15);
+          else if (gCfg.lang == LANG_VI)
+            snprintf(f.nowcast, sizeof f.nowcast, "Khoảng %d phút nữa bắt đầu %s", i * 15, cold ? "có tuyết" : "mưa");
           else
             snprintf(f.nowcast, sizeof f.nowcast, "%s starts in ~%d min", cold ? "Snow" : "Rain", i * 15);
           break;

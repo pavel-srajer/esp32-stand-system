@@ -346,7 +346,10 @@ static const char* dir8to(float deg) {  // "k východu"
       {"k severu", "k SV", "k východu", "k JV", "k jihu", "k JZ", "k západu", "k SZ"},
       {"to N", "to NE", "to E", "to SE", "to S", "to SW", "to W", "to NW"},
       {"nach N", "nach NO", "nach O", "nach SO", "nach S", "nach SW", "nach W", "nach NW"},
-      {"verso N", "verso NE", "verso E", "verso SE", "verso S", "verso SO", "verso O", "verso NO"}};
+      {"verso N", "verso NE", "verso E", "verso SE", "verso S", "verso SO", "verso O", "verso NO"},
+      {"para N", "para NE", "para E", "para SE", "para S", "para SO", "para O", "para NO"},
+      {"hacia el N", "hacia el NE", "hacia el E", "hacia el SE", "hacia el S", "hacia el SO", "hacia el O", "hacia el NO"},
+      {"về hướng B", "về hướng ĐB", "về hướng Đ", "về hướng ĐN", "về hướng N", "về hướng TN", "về hướng T", "về hướng TB"}};
   return D[constrain(gCfg.lang, 0, LANG_COUNT - 1)][dirIdx(deg)];
 }
 

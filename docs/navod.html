@@ -139,7 +139,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <div>
     <div class="eyebrow">ESP32-C3 · GC9A01 1,28″ · ADS-B · ČHMI · OTE</div>
     <h1>Radar letadel, počasí a cena elektřiny na stole</h1>
-    <p class="lead">Malý kulatý displej ukazuje letadla, která právě letí kolem tvého domu, i s logem a trasou. Dál předpověď s upozorněním, že začne pršet, animovaný meteoradar ČHMI, spotovou cenu elektřiny a hodiny se jmeninami. Nastavuje se z telefonu, umí česky, anglicky, německy i italsky a nové verze si stahuje sám z GitHubu.</p>
+    <p class="lead">Malý kulatý displej ukazuje letadla, která právě letí kolem tvého domu, i s logem a trasou. Dál předpověď s upozorněním, že začne pršet, animovaný meteoradar ČHMI, spotovou cenu elektřiny a hodiny se jmeninami. Nastavuje se z telefonu, umí česky, anglicky, německy, italsky, portugalsky, španělsky i vietnamsky a nové verze si stahuje sám z GitHubu.</p>
     <div class="meta"><span>repo: pavel-srajer/esp32-stand-system</span><span>firmware ≈ 1,5 MB</span><span>CZ · EN · DE · IT</span><span>displej 240 × 240 px</span></div>
   </div>
   <svg viewBox="0 0 260 260" role="img" aria-label="Náhled radaru na kulatém displeji">
@@ -397,7 +397,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     <ol class="steps">
       <li><div><p>Naskenuj telefonem <b>QR kód</b> na displeji, nebo se ručně připoj k otevřené WiFi <code>Letadla-XXXX</code> (přesný název je pod QR kódem).</p></div></li>
       <li><div><p>Telefon by měl sám otevřít stránku s nastavením. Když ne, otevři v prohlížeči <code>http://192.168.4.1</code>. Displej mezitím ukáže druhý QR kód s touto adresou.</p></div></li>
-      <li><div><p>Nahoře vyber <b>jazyk</b> (čeština, English, Deutsch, Italiano). Pak vyber svou domácí <b>WiFi</b> a zadej heslo.</p></div></li>
+      <li><div><p>Nahoře vyber <b>jazyk</b> (čeština, English, Deutsch, Italiano, Português, Español, Tiếng Việt). Pak vyber svou domácí <b>WiFi</b> a zadej heslo.</p></div></li>
       <li><div><p>Nastav <b>polohu</b>, tedy střed radaru. Když má telefon internet, klikni v mapě na svůj dům, nebo ho najdi přes vyhledávání adresy. Nejbližší stanice ČHMI se vybere sama. Bez internetu (v hotspotu) zadej souřadnice ručně: na mapy.cz klikni pravým tlačítkem na dům a zkopíruj je.</p></div></li>
       <li><div><p>Vyber nejbližší <b>stanici ČHMI</b>, nebo zadej kód jiné. Pak dej <b>Uložit a restartovat</b>.</p></div></li>
     </ol>
@@ -563,7 +563,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <div class="tbl"><table>
     <thead><tr><th>Sekce</th><th>Co tam nastavíš</th></tr></thead>
     <tbody>
-      <tr><td>Jazyk</td><td>čeština, English, Deutsch, Italiano: pro displej i web. Jmeniny se ukazují jen česky, státní svátky se překládají.</td></tr>
+      <tr><td>Jazyk</td><td>čeština, English, Deutsch, Italiano, Português, Español, Tiếng Việt: pro displej i web. Jmeniny se ukazují jen česky, státní svátky se překládají.</td></tr>
       <tr><td>WiFi</td><td>síť ze seznamu nalezených a heslo</td></tr>
       <tr><td>Poloha</td><td>souřadnice, nebo kliknutí do mapy či vyhledání adresy (jen když je telefon online). Sama se vybere nejbližší stanice ČHMI.</td></tr>
       <tr><td>Obrazovky</td><td>které se zobrazují a <b>v jakém pořadí</b> (přetažením za úchyt ☰, jde i prstem na mobilu); dosah radaru letadel 10–100 km; poloměr meteoradaru 25–200 km; <b>automatické přepínání</b> vypnuto/10–60 s (po stisku tlačítka minutu pauza); <b>podklad mapy</b> pro oba radary (žádný / hranice a města / hranice, řeky a města)</td></tr>
