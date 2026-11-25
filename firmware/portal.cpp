@@ -419,7 +419,11 @@ static void localize(PageOut& out, const char* tpl) {
     bool found = false;
     for (const Tok& t : TOKS)
       if (strlen(t.k) == (size_t)(b - a - 2) && !strncmp(t.k, a + 2, b - a - 2)) {
-        out += t.t[L];
+        // Překlady se vkládají i do JavaScriptu mezi '…' – rovný apostrof (don't,
+        // dall'indirizzo) by skript rozbil, proto se nahradí typografickým ’.
+        for (const char* c = t.t[L]; *c; c++)
+          if (*c == '\'') out += "\xE2\x80\x99";
+          else out += *c;
         found = true;
         break;
       }

@@ -51,6 +51,9 @@ jobs:
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "release=$REL" >> "$GITHUB_OUTPUT"
 
+      - name: Kontrola JavaScriptu webu (všechny jazyky)
+        run: python3 tools/check_web_js.py
+
       - name: Build
         env:
           VER: ${{ steps.ver.outputs.version }}
