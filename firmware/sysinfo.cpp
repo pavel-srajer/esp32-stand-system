@@ -1,6 +1,8 @@
 #include "sysinfo.h"
 #include "ota.h"
 #include "i18n.h"
+#include "settings.h"
+#include <time.h>
 #include <WiFi.h>
 #include <esp_freertos_hooks.h>
 #include <esp_ota_ops.h>
@@ -25,7 +27,32 @@ static void IRAM_ATTR tickHook() {  // běží v přerušení (i během zápisu 
   }
 }
 
+// --- plánovaný noční restart ---
+// Důvod se uloží do RAM, která restart přežije (RTC_NOINIT), a po startu se ukáže
+// na stránce Systém místo obecného "softwarový restart".
+#define RB_MAGIC 0x5EB0A700u
+static RTC_NOINIT_ATTR uint32_t sRbTag;
+static int sRbWhy = 0;  // po startu: 1 = málo paměti, 2 = každou noc
+
+void sysinfoNightlyRestart() {
+  if (!gCfg.rbMode || gOta.state == OTA_DOWNLOADING) return;
+  time_t now = time(nullptr);
+  if (now < 1700000000 || millis() < 3600000UL) return;  // bez času nebo hned po startu ne
+  struct tm lt;
+  localtime_r(&now, &lt);
+  if (lt.tm_hour != gCfg.rbHour || lt.tm_min > 5) return;  // jen v prvních minutách zvolené hodiny
+  uint32_t block = ESP.getMaxAllocHeap() / 1024;
+  int why = gCfg.rbMode == 2 ? 2 : (block < (uint32_t)gCfg.rbMinKB ? 1 : 0);
+  if (!why) return;
+  Serial.printf("[Systém] plánovaný restart (%s, největší blok %u kB)\n", why == 1 ? "málo paměti" : "každou noc", (unsigned)block);
+  sRbTag = RB_MAGIC | why;
+  delay(100);
+  ESP.restart();
+}
+
 void sysinfoBegin() {
+  if ((sRbTag & 0xFFFFFF00u) == RB_MAGIC && esp_reset_reason() == ESP_RST_SW) sRbWhy = sRbTag & 0xFF;
+  sRbTag = 0;
   sIdle = xTaskGetIdleTaskHandleForCPU(0);
   esp_register_freertos_tick_hook_for_cpu(tickHook, 0);
 }
@@ -35,7 +62,10 @@ int sysinfoCpuLoad() { return sLoad; }
 static const char* resetReason() {
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON: return tr("zapnutí napájení", "power on", "Einschalten", "accensione");
-    case ESP_RST_SW: return tr("softwarový restart", "software restart", "Software-Neustart", "riavvio software");
+    case ESP_RST_SW:
+      if (sRbWhy == 1) return tr("plánovaný noční restart (málo paměti)", "scheduled night restart (low memory)", "geplanter Nachtneustart (wenig Speicher)", "riavvio notturno programmato (poca memoria)");
+      if (sRbWhy == 2) return tr("plánovaný noční restart", "scheduled night restart", "geplanter Nachtneustart", "riavvio notturno programmato");
+      return tr("softwarový restart", "software restart", "Software-Neustart", "riavvio software");
     case ESP_RST_PANIC: return tr("pád (panic)", "crash (panic)", "Absturz (Panic)", "crash (panic)");
     case ESP_RST_INT_WDT:
     case ESP_RST_TASK_WDT:

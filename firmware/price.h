@@ -25,3 +25,12 @@ void priceGet(PriceData& out); // kopie pod zámkem
 
 // konečná cena v Kč/kWh podle nastavení (přirážka a DPH; výchozí 0 = holá cena)
 float priceFinal(float czkMwh);
+
+// Nejlevnější souvislé okno pro každé zapnuté gCfg.priceWin (délka, povolený čas od–do).
+// Hledá se od aktuální čtvrthodiny do konce známých cen (dnes + zítra, je-li zveřejněn).
+struct PriceWinResult {
+  bool ok = false;
+  int start = 0;      // čtvrthodina od dnešní půlnoci (96+ = zítra)
+  float avg = NAN;    // průměrná konečná cena Kč/kWh
+};
+void priceWindows(const PriceData& p, int curSlot, PriceWinResult* out);  // out[PRICE_WINS]

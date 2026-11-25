@@ -44,7 +44,7 @@
 static const int PIN_BUTTON = 9;  // tlačítko BOOT
 
 // obrazovky (pořadí = bity v gCfg.screens)
-enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_PRICE, SCR_NOTE, SCR_COUNT };
+enum Screen { SCR_RADAR, SCR_DETAIL, SCR_FORECAST, SCR_RAIN, SCR_WEATHER, SCR_CLOCK, SCR_PRICE, SCR_NOTE, SCR_PRICEWIN, SCR_COUNT };
 static int gScreen = SCR_RADAR;  // právě zobrazená obrazovka
 static const float RAIN_RADII[] = {25, 50, 100, 200};
 static const uint32_t FORECAST_REFRESH_MS = 900000;  // 15 min
@@ -86,6 +86,9 @@ static const int32_t ALT_GROUND = INT32_MIN + 1;
 //  Sdílená data (síťový task -> vykreslování)
 // ===================================================================
 struct Plane {
+  char hex[7];       // ICAO adresa (pro upozornění: stejné letadlo se neohlásí znovu)
+  uint16_t squawk;   // 7700 apod. (0 = neznámý)
+  uint8_t alert;     // důvody upozornění (bity ALERT_*)
   char flight[10];
   char type[6];
   char reg[10];
@@ -221,8 +224,9 @@ static uint32_t sApiPauseMs[2] = {0, 0};
 static int sLastCode = 0, sRetryAfter = 0;
 
 // Pole letadel: "ac" (adsb.fi, adsb.lol) nebo "aircraft" (aircraft.json z readsb/tar1090).
-// Čte klíče, dokud nenajde jeden z nich, a nastaví stream za "[".
-static bool findPlaneArray(Stream& s) {
+// Čte klíče, dokud nenajde jeden z nich, a nastaví stream za "[". Po cestě si vezme
+// celkový počet zpráv přijímače ("messages") pro statistiku.
+static bool findPlaneArray(Stream& s, double* messages) {
   int ch;
   while ((ch = s.read()) >= 0) {
     if (ch != '"') continue;
@@ -233,6 +237,73 @@ static bool findPlaneArray(Stream& s) {
     key[k] = 0;
     if (ch < 0) return false;
     if (!strcmp(key, "ac") || !strcmp(key, "aircraft")) return s.find("[");
+    if (messages && !strcmp(key, "messages") && s.find(":")) {
+      double v = 0;
+      while ((ch = s.peek()) == ' ') s.read();
+      while ((ch = s.peek()) >= '0' && ch <= '9') v = v * 10 + (s.read() - '0');
+      *messages = v;
+    }
+  }
+  return false;
+}
+
+// Statistika vlastního přijímače (počítá se ze všech letadel v aircraft.json, i mimo dosah radaru)
+struct RxStats {
+  bool ok = false;
+  int total = 0, withPos = 0;   // letadel celkem / s polohou
+  float maxKm = 0;              // nejvzdálenější teď
+  char maxCs[10] = "";
+  float maxToday = 0;           // rekord dne (od půlnoci)
+  char maxTodayCs[10] = "";
+  int day = -1;
+  float rssi = NAN;             // průměrná síla signálu [dBFS]
+  float msgRate = NAN;          // zpráv za sekundu
+  double lastMsgs = -1;
+  uint32_t lastMsgsMs = 0;
+  uint32_t updatedMs = 0;
+};
+static RxStats gRx;
+
+// Vlastní seznam sledovaných: registrace, typy, hex nebo začátky volacích znaků
+#define MAX_WATCH 24
+static char sWatch[MAX_WATCH][10];
+static int sNumWatch = 0;
+static String sWatchSrc = "-";
+
+static void normWatch(char* out, size_t n, const char* in) {  // velká písmena bez pomlček a mezer
+  size_t k = 0;
+  for (; *in && k + 1 < n; in++)
+    if (*in != '-' && *in != ' ') out[k++] = toupper((unsigned char)*in);
+  out[k] = 0;
+}
+
+static void parseWatchList() {
+  if (sWatchSrc == gCfg.watchList) return;
+  sWatchSrc = gCfg.watchList;
+  sNumWatch = 0;
+  const char* p = sWatchSrc.c_str();
+  while (*p && sNumWatch < MAX_WATCH) {
+    while (*p == ',' || *p == ';' || *p == ' ' || *p == '\n' || *p == '\r') p++;
+    const char* e = p;
+    while (*e && *e != ',' && *e != ';' && *e != '\n' && *e != '\r') e++;
+    char tok[16];
+    size_t l = min((size_t)(e - p), sizeof tok - 1);
+    memcpy(tok, p, l);
+    tok[l] = 0;
+    normWatch(sWatch[sNumWatch], sizeof sWatch[0], tok);
+    if (sWatch[sNumWatch][0]) sNumWatch++;
+    p = e;
+  }
+}
+
+static bool watchMatch(const Plane& pl) {
+  char reg[12], cs[12];
+  normWatch(reg, sizeof reg, pl.reg);
+  normWatch(cs, sizeof cs, pl.flight);
+  for (int i = 0; i < sNumWatch; i++) {
+    const char* w = sWatch[i];
+    if (!strcmp(w, reg) || !strcasecmp(w, pl.type) || !strcasecmp(w, pl.hex)) return true;
+    if (strlen(w) >= 3 && !strncmp(cs, w, strlen(w))) return true;  // začátek volacího znaku (např. CSA)
   }
   return false;
 }
@@ -253,7 +324,61 @@ static String localAdsbUrl() {
   return u.substring(0, hostStart) + host + path;
 }
 
-static bool fetchPlanesFrom(const char* url, const char* name, PlaneData& out) {
+// Vojenská letadla v okolí z adsb.fi /v2/mil (dotaz na okolí neposílá dbFlags).
+#define MAX_MIL 16
+static char sMilHex[MAX_MIL][7];
+static int sNumMil = 0;
+static uint32_t sMilAt = 0;  // kdy se seznam naposledy povedlo stáhnout
+
+static bool milListed(const char* hex) {
+  if (!sNumMil || !hex[0] || millis() - sMilAt > 10 * 60000UL) return false;  // starý seznam neplatí
+  for (int i = 0; i < sNumMil; i++)
+    if (!strcasecmp(sMilHex[i], hex)) return true;
+  return false;
+}
+
+static void fetchMilList() {
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  BodyStream::prepare(http);
+  http.setConnectTimeout(8000);
+  http.setTimeout(10000);
+  http.setUserAgent("esp32-stand-system/1.0");
+  if (!http.begin(client, "https://opendata.adsb.fi/api/v2/mil")) return;
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[ADSB] mil HTTP %d\n", code);
+    http.end();
+    return;
+  }
+  BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http));
+  body.setTimeout(10000);
+  JsonDocument filter;
+  for (const char* k : {"hex", "lat", "lon"}) filter[k] = true;
+  char found[MAX_MIL][7];
+  int n = 0;
+  float rangeKm = RANGES_KM[NUM_RANGES - 1];  // největší dosah, ať se nemusí stahovat znovu při změně
+  if (findPlaneArray(body, nullptr)) {
+    JsonDocument doc;
+    do {
+      if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) break;
+      if (!doc["lat"].is<float>() || n >= MAX_MIL) continue;
+      float d, b;
+      distBearing(doc["lat"], doc["lon"], d, b);
+      if (d <= rangeKm) strlcpy(found[n++], doc["hex"] | "", sizeof found[0]);
+    } while (body.findUntil(",", "]"));
+  }
+  http.end();
+  xSemaphoreTake(gMutex, portMAX_DELAY);
+  memcpy(sMilHex, found, sizeof found);
+  sNumMil = n;
+  sMilAt = millis();
+  xSemaphoreGive(gMutex);
+  Serial.printf("[ADSB] vojenských letadel do %.0f km: %d\n", rangeKm, n);
+}
+
+static bool fetchPlanesFrom(const char* url, const char* name, PlaneData& out, bool local = false) {
   float rangeKm = RANGES_KM[gRangeIdx];
   sLastCode = 0;
   sRetryAfter = 0;
@@ -293,24 +418,42 @@ static bool fetchPlanesFrom(const char* url, const char* name, PlaneData& out) {
   for (const char* k : {"hex", "flight", "r", "t", "alt_baro", "gs", "track", "baro_rate", "lat", "lon"})
     filter[k] = true;
   filter["seen_pos"] = true;
+  for (const char* k : {"squawk", "emergency", "dbFlags", "rssi"}) filter[k] = true;
   out.count = 0;
-  if (!findPlaneArray(body)) {
+  double msgs = -1;
+  if (!findPlaneArray(body, local ? &msgs : nullptr)) {
     http.end();
     strlcpy(out.err, tr("ADS-B: chybí seznam", "ADS-B: no list", "ADS-B: keine Liste", "ADS-B: nessun elenco"), sizeof out.err);
     return false;
   }
   JsonDocument doc;
+  parseWatchList();
+  RxStats st;  // jen pro vlastní přijímač
+  float rssiSum = 0;
+  int rssiN = 0;
   do {
     DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
     if (err) break;  // prázdné pole nebo konec dat
     JsonObject a = doc.as<JsonObject>();
+    st.total++;
+    if (a["rssi"].is<float>() && a["rssi"].as<float>() > -49.0f) {  // -49.5 = žádný signál
+      rssiSum += a["rssi"].as<float>();
+      rssiN++;
+    }
     if (!a["lat"].is<float>() || !a["lon"].is<float>()) continue;
     if ((a["seen_pos"] | 0.0f) > 60) continue;  // poloha starší než minuta
     Plane pl{};
     pl.lat = a["lat"];
     pl.lon = a["lon"];
     distBearing(pl.lat, pl.lon, pl.distKm, pl.brg);
+    st.withPos++;
+    if (pl.distKm > st.maxKm) {
+      st.maxKm = pl.distKm;
+      copyTrim(st.maxCs, sizeof st.maxCs, a["flight"] | (a["r"] | (a["hex"] | "")));
+    }
     if (pl.distKm > rangeKm) continue;
+    strlcpy(pl.hex, a["hex"] | "", sizeof pl.hex);
+    pl.squawk = (uint16_t)atoi(a["squawk"] | "0");
 
     copyTrim(pl.flight, sizeof pl.flight, a["flight"] | "");
     copyTrim(pl.reg, sizeof pl.reg, a["r"] | "");
@@ -325,12 +468,50 @@ static bool fetchPlanesFrom(const char* url, const char* name, PlaneData& out) {
     pl.gs = a["gs"] | NAN;
     pl.track = a["track"] | NAN;
     pl.vrate = a["baro_rate"] | 0;
+    // upozornění (vypnutá kategorie se nepočítá)
+    const int M = gCfg.alertMask;
+    const char* em = a["emergency"] | "";
+    if ((M & ALERT_EMERG) && (pl.squawk == 7500 || pl.squawk == 7600 || pl.squawk == 7700 ||
+                              (em[0] && strcmp(em, "none") != 0)))
+      pl.alert |= ALERT_EMERG;
+    if ((M & ALERT_MIL) && (((a["dbFlags"] | 0) & 1) || milListed(pl.hex))) pl.alert |= ALERT_MIL;
+    if ((M & ALERT_WATCH) && watchMatch(pl)) pl.alert |= ALERT_WATCH;
     insertPlane(out, pl);
   } while (body.findUntil(",", "]"));
   http.end();
   out.ok = true;
   out.err[0] = 0;
   strlcpy(out.src, name, sizeof out.src);
+  if (local) {  // statistika přijímače
+    xSemaphoreTake(gMutex, portMAX_DELAY);
+    uint32_t nowMs = millis();
+    if (msgs >= 0 && gRx.lastMsgs >= 0 && msgs >= gRx.lastMsgs && nowMs > gRx.lastMsgsMs)
+      gRx.msgRate = (float)((msgs - gRx.lastMsgs) * 1000.0 / (nowMs - gRx.lastMsgsMs));
+    if (msgs >= 0) {
+      gRx.lastMsgs = msgs;
+      gRx.lastMsgsMs = nowMs;
+    }
+    gRx.total = st.total;
+    gRx.withPos = st.withPos;
+    gRx.maxKm = st.maxKm;
+    strlcpy(gRx.maxCs, st.maxCs, sizeof gRx.maxCs);
+    gRx.rssi = rssiN ? rssiSum / rssiN : NAN;
+    time_t t = time(nullptr);
+    struct tm lt;
+    localtime_r(&t, &lt);
+    if (lt.tm_yday != gRx.day) {  // nový den -> nový rekord
+      gRx.day = lt.tm_yday;
+      gRx.maxToday = 0;
+      gRx.maxTodayCs[0] = 0;
+    }
+    if (st.maxKm > gRx.maxToday) {
+      gRx.maxToday = st.maxKm;
+      strlcpy(gRx.maxTodayCs, st.maxCs, sizeof gRx.maxTodayCs);
+    }
+    gRx.ok = true;
+    gRx.updatedMs = nowMs;
+    xSemaphoreGive(gMutex);
+  }
   Serial.printf("[ADSB] %d letadel do %.0f km (%s)\n", out.count, rangeKm, url);
   return true;
 }
@@ -352,7 +533,7 @@ static void fetchPlanes() {
   }
   if (local.length()) {
     tried = true;
-    ok = fetchPlanesFrom(local.c_str(), tr("vlastní přijímač", "own receiver", "eigener Empfänger", "ricevitore proprio"), tmp);
+    ok = fetchPlanesFrom(local.c_str(), tr("vlastní přijímač", "own receiver", "eigener Empfänger", "ricevitore proprio"), tmp, true);
   }
   sLocalOk = ok;
   if (mode >= 2) apiIdx = mode - 2;  // pevně zvolený server
@@ -631,6 +812,12 @@ static void netTask(void*) {
         fetchPlanes();
         lastPlanes = millis();
       }
+      // vojenská letadla pro internetové zdroje (vlastní přijímač posílá dbFlags sám)
+      static uint32_t lastMil = 0;
+      if ((gCfg.alertMask & ALERT_MIL) && !sLocalOk && (!lastMil || millis() - lastMil >= 120000)) {
+        lastMil = millis();
+        fetchMilList();
+      }
       if (scrOn(SCR_WEATHER) && timeValid() && (gForceWeather || millis() - lastWeather >= weatherInterval)) {
         gForceWeather = false;
         bool ok = fetchWeather();
@@ -861,6 +1048,10 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
     float rr = pl.distKm / range * R, a = pl.brg * DEG_TO_RAD;
     int x = CX + (int)(rr * sinf(a)), y = CY - (int)(rr * cosf(a));
     uint16_t col = altColor(pl.alt);
+    if (pl.alert) {  // zajímavé letadlo: červený blikající kroužek
+      col = rgb(255, 60, 60);
+      if ((now / 400) % 2) spr.drawCircle(x, y, 12, col);
+    }
     if (i == 0) spr.drawCircle(x, y, 10, rgb(255, 255, 255));
     drawPlaneIcon(x, y, pl.track, col);
     spr.setFont(&fonts::Font0);
@@ -898,6 +1089,27 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
 
 // ---------------- Obrazovka 2: detail letadla ----------------
 static int gDetailIdx = 0;
+
+// Aktivní upozornění na letadlo: displej přepne na detail a bliká, dokud nevyprší
+// (gCfg.alertSec) nebo ho nepotvrdíš tlačítkem. Stejné letadlo se 30 min neohlásí znovu.
+static char gAlertHex[7] = "";
+static uint8_t gAlertBits = 0;
+static uint32_t gAlertUntil = 0;
+static bool alertActive() { return gAlertHex[0] && (int32_t)(gAlertUntil - millis()) > 0; }
+
+static const char* alertText(uint8_t bits, uint16_t squawk) {
+  static char b[40];
+  if (bits & ALERT_EMERG) {
+    const char* w = squawk == 7500 ? tr("ÚNOS", "HIJACK", "ENTFÜHRUNG", "DIROTTAMENTO")
+                    : squawk == 7600 ? tr("ZTRÁTA SPOJENÍ", "RADIO FAILURE", "FUNKAUSFALL", "AVARIA RADIO")
+                                     : tr("NOUZE", "EMERGENCY", "NOTFALL", "EMERGENZA");
+    if (squawk) snprintf(b, sizeof b, "%04u %s", squawk, w);
+    else strlcpy(b, w, sizeof b);
+    return b;
+  }
+  if (bits & ALERT_MIL) return tr("VOJENSKÉ", "MILITARY", "MILITÄR", "MILITARE");
+  return tr("SLEDOVANÉ", "WATCHED", "BEOBACHTET", "SEGUITO");
+}
 // Volací znak zobrazeného letadla: seznam se řadí podle vzdálenosti a každých pár
 // sekund mění pořadí – detail proto drží stejné letadlo, dokud se nepřepne dál.
 static char gDetailCs[10] = "";
@@ -956,8 +1168,12 @@ static void drawDetail(const PlaneData& pd) {
   uint16_t col = altColor(pl.alt);
   char b[48], t[24];
 
-  // obvod: směr k letadlu
-  spr.drawCircle(CX, CY, 117, rgb(60, 60, 60));
+  // obvod: směr k letadlu (při aktivním upozornění bliká červeně)
+  if (alertActive() && !strcmp(pl.hex, gAlertHex) && (millis() / 400) % 2) {
+    for (int r = 115; r <= 119; r++) spr.drawCircle(CX, CY, r, rgb(255, 0, 0));
+  } else {
+    spr.drawCircle(CX, CY, 117, rgb(60, 60, 60));
+  }
   float a = pl.brg * DEG_TO_RAD;
   drawPlaneIcon(CX + (int)(108 * sinf(a)), CY - (int)(108 * cosf(a)), pl.track, col, 8);
 
@@ -974,15 +1190,16 @@ static void drawDetail(const PlaneData& pd) {
 
   const char* company = ((M & DET_AIRLINE) && airline) ? airlineName(icao) : nullptr;
 
-  enum { I_LOGO, I_CALL, I_AIRLINE, I_ROUTE, I_TYPE, I_ALT, I_FT, I_SPEED, I_DIST, I_INDEX };
+  enum { I_ALERT, I_LOGO, I_CALL, I_AIRLINE, I_ROUTE, I_TYPE, I_ALT, I_FT, I_SPEED, I_DIST, I_INDEX };
   struct Item {
     int id, h;
-  } items[10];
+  } items[11];
   int ni = 0, total = 0;
   auto add = [&](int id, int h) {
     items[ni++] = {id, h};
     total += h;
   };
+  if (pl.alert) add(I_ALERT, 18);
   if (logo) add(I_LOGO, 58);
   add(I_CALL, 28);
   if (company) add(I_AIRLINE, 16);
@@ -999,6 +1216,16 @@ static void drawDetail(const PlaneData& pd) {
   for (int k = 0; k < ni; k++) {
     int cy = y + items[k].h / 2;
     switch (items[k].id) {
+      case I_ALERT: {
+        bool on = (millis() / 400) % 2 || !alertActive();
+        spr.setFont(&fontCZ_16);
+        int tw = spr.textWidth(alertText(pl.alert, pl.squawk)) + 12;
+        uint16_t bg = (pl.alert & ALERT_EMERG) ? rgb(200, 0, 0) : (pl.alert & ALERT_MIL) ? rgb(120, 120, 0) : rgb(0, 90, 160);
+        if (on) spr.fillRoundRect(CX - tw / 2, cy - 9, tw, 18, 5, bg);
+        spr.setTextColor(rgb(255, 255, 255));
+        spr.drawString(alertText(pl.alert, pl.squawk), CX, cy);
+        break;
+      }
       case I_LOGO:
         spr.pushImage(CX - LOGO_SIZE / 2, y + 2, LOGO_SIZE, LOGO_SIZE, (const lgfx::rgb332_t*)logoPx);
         break;
@@ -1618,6 +1845,80 @@ static void drawNote() {
 // ---------------- Obrazovka: spotová cena elektřiny ----------------
 static uint32_t gPriceTomorrowUntil = 0;  // dlouhý stisk: na chvíli graf zítřka
 
+// "13:00–15:00" (+ den, pokud není dnes)
+static void winTimeText(char* out, size_t n, int start, int dur) {
+  int a = start * 15, e = (start + dur) * 15;
+  snprintf(out, n, "%02d:%02d–%02d:%02d", (a / 60) % 24, a % 60, (e / 60) % 24, e % 60);
+}
+
+// Obrazovka Levná elektřina: nejlevnější okna podle nastavení (až 3)
+static void drawPriceWin() {
+  static PriceData p;
+  priceGet(p);
+  const char* title = tr("Levná elektřina", "Cheap electricity", "Günstiger Strom", "Elettricità economica");
+  int nOn = 0;
+  for (const PriceWin& w : gCfg.priceWin) nOn += w.on;
+  if (!nOn) {
+    drawCenteredMsg(title, tr("nastav okna na webu", "set up windows on the web", "Zeitfenster im Web einrichten", "imposta le finestre sul web"));
+    return;
+  }
+  if (!p.todayOk || !timeValid()) {
+    drawCenteredMsg(title, p.err[0] ? p.err : tr("načítám…", "loading…", "lädt…", "caricamento…"));
+    return;
+  }
+  time_t tt = time(nullptr);
+  struct tm lt;
+  localtime_r(&tt, &lt);
+  int slot = lt.tm_hour * 4 + lt.tm_min / 15;
+  PriceWinResult r[PRICE_WINS];
+  priceWindows(p, slot, r);
+
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setFont(&fontCZ_12);
+  spr.setTextColor(rgb(150, 150, 150));
+  spr.drawString(title, CX, 26);
+  int blockH = nOn == 1 ? 80 : nOn == 2 ? 70 : 58;
+  int y = CY + 6 - nOn * blockH / 2;
+  char b[64], t[24], pr[16];
+  for (int i = 0; i < PRICE_WINS; i++) {
+    const PriceWin& w = gCfg.priceWin[i];
+    if (!w.on) continue;
+    // název (nebo "Okno 1") a délka
+    int h = w.dur / 4, m = (w.dur % 4) * 15;
+    char len[12];
+    if (m) snprintf(len, sizeof len, "%d:%02d h", h, m);
+    else snprintf(len, sizeof len, "%d h", h);
+    if (w.name.length()) snprintf(b, sizeof b, "%s · %s", w.name.c_str(), len);
+    else snprintf(b, sizeof b, "%s %d · %s", tr("Okno", "Window", "Fenster", "Finestra"), i + 1, len);
+    spr.setFont(&fontCZ_12);
+    spr.setTextColor(rgb(200, 200, 200));
+    fitText(b, sizeof b, 190);
+    spr.drawString(b, CX, y + 8);
+    if (!r[i].ok) {
+      spr.setFont(&fontCZ_16);
+      spr.setTextColor(rgb(150, 150, 150));
+      spr.drawString(p.tomorrowOk ? tr("nenalezeno", "not found", "nicht gefunden", "non trovata")
+                                  : tr("čeká na zítřejší ceny", "waiting for tomorrow's prices", "wartet auf Preise für morgen", "in attesa dei prezzi di domani"),
+                     CX, y + 32);
+    } else {
+      bool now = r[i].start <= slot && slot < r[i].start + w.dur;
+      winTimeText(t, sizeof t, r[i].start, w.dur);
+      spr.setFont(nOn == 3 ? &fontCZ_16 : &fontCZ_24);
+      spr.setTextColor(now ? rgb(60, 220, 100) : rgb(255, 255, 255));
+      spr.drawString(t, CX, y + (nOn == 3 ? 28 : 32));
+      fmtDec(pr, sizeof pr, r[i].avg, 3);
+      const char* when = now ? tr("právě teď", "right now", "jetzt", "adesso")
+                             : r[i].start >= PRICE_SLOTS ? tr("zítra", "tomorrow", "morgen", "domani")
+                                                         : tr("dnes", "today", "heute", "oggi");
+      snprintf(b, sizeof b, "%s · Ø %s %s", when, pr, tr("Kč/kWh", "CZK/kWh", "CZK/kWh", "CZK/kWh"));
+      spr.setFont(&fontCZ_12);
+      spr.setTextColor(rgb(255, 205, 90));
+      spr.drawString(b, CX, y + (nOn == 3 ? 46 : 56));
+    }
+    y += blockH;
+  }
+}
+
 static void drawPrice(uint32_t now) {
   static PriceData p;
   priceGet(p);
@@ -1903,6 +2204,33 @@ void appStatusJson(JsonObject o) {
   o["planes_age"] = gPortalMode ? -1 : pAge;
   o["planes_err"] = pErr;
   o["planes_src"] = pSrc;
+  {
+    xSemaphoreTake(gMutex, portMAX_DELAY);
+    RxStats r = gRx;
+    int nAlert = 0;
+    String alertList;
+    for (int i = 0; i < gPlanes.count; i++)
+      if (gPlanes.p[i].alert && gPlanes.p[i].distKm <= range) {
+        if (nAlert++ < 4) {
+          if (alertList.length()) alertList += ", ";
+          alertList += String(gPlanes.p[i].flight) + " (" + alertText(gPlanes.p[i].alert, gPlanes.p[i].squawk) + ")";
+        }
+      }
+    xSemaphoreGive(gMutex);
+    o["alerts_now"] = alertList;
+    if (r.ok) {
+      JsonObject x = o["rx"].to<JsonObject>();
+      x["age"] = (long)((millis() - r.updatedMs) / 1000);
+      x["total"] = r.total;
+      x["pos"] = r.withPos;
+      x["max"] = roundf(r.maxKm * 10) / 10;
+      x["max_cs"] = r.maxCs;
+      x["max_today"] = roundf(r.maxToday * 10) / 10;
+      x["max_today_cs"] = r.maxTodayCs;
+      if (!isnan(r.rssi)) x["rssi"] = roundf(r.rssi * 10) / 10;
+      if (!isnan(r.msgRate)) x["rate"] = (int)lroundf(r.msgRate);
+    }
+  }
   o["weather_age"] = gPortalMode ? -1 : wAge;
   o["weather_err"] = wErr;
   o["station"] = gCfg.name + " (" + gCfg.wsi + ")";
@@ -1970,6 +2298,28 @@ void appStatusJson(JsonObject o) {
     o["price_tom"] = pr.tomorrowOk;
     o["price_err"] = pr.err;
     o["price_src"] = priceSrcName(pr.src);
+    if (pr.todayOk && timeValid()) {
+      time_t tt = time(nullptr);
+      struct tm lt;
+      localtime_r(&tt, &lt);
+      PriceWinResult r[PRICE_WINS];
+      priceWindows(pr, lt.tm_hour * 4 + lt.tm_min / 15, r);
+      JsonArray wa = o["price_win"].to<JsonArray>();
+      for (int i = 0; i < PRICE_WINS; i++) {
+        const PriceWin& w = gCfg.priceWin[i];
+        if (!w.on) continue;
+        char t[24], pv[16], line[96];
+        if (r[i].ok) {
+          winTimeText(t, sizeof t, r[i].start, w.dur);
+          fmtDec(pv, sizeof pv, r[i].avg, 3);
+          snprintf(line, sizeof line, "%s: %s%s · Ø %s", w.name.length() ? w.name.c_str() : String(i + 1).c_str(), t,
+                   r[i].start >= PRICE_SLOTS ? tr(" (zítra)", " (tomorrow)", " (morgen)", " (domani)") : "", pv);
+        } else {
+          snprintf(line, sizeof line, "%s: –", w.name.length() ? w.name.c_str() : String(i + 1).c_str());
+        }
+        wa.add(line);
+      }
+    }
   }
   {
     RadarInfo ri;
@@ -2009,6 +2359,11 @@ static int screenOrderList(int* out) {
 static void onShortPress() {
   if (gPortalMode) {  // v portálu: krátký stisk = zpět do normálního režimu
     if (settingsHasWifi()) ESP.restart();
+    return;
+  }
+  if (alertActive()) {  // první stisk potvrdí upozornění na letadlo (detail zůstane)
+    gAlertUntil = millis();
+    gLastPress = millis();
     return;
   }
   if (gScreen == SCR_NOTE && noteBlinking()) {  // první stisk jen potvrdí (ukončí blikání)
@@ -2078,6 +2433,7 @@ const char* screenName(int i) {
     case SCR_CLOCK: return tr("Hodiny", "Clock", "Uhr", "Orologio");
     case SCR_PRICE: return tr("Cena elektřiny", "Electricity price", "Strompreis", "Prezzo elettricità");
     case SCR_NOTE: return tr("Poznámka", "Note", "Notiz", "Nota");
+    case SCR_PRICEWIN: return tr("Levná elektřina", "Cheap electricity", "Günstiger Strom", "Elettricità economica");
     default: return "?";
   }
 }
@@ -2336,6 +2692,38 @@ void setup() {
   if (!gOtaBootMode) showSplash(3000);  // WiFi se mezitím už připojuje
 }
 
+// Nové zajímavé letadlo v dosahu -> přepnout na jeho detail a blikat.
+static void checkAlerts(const PlaneData& pd) {
+  static struct {
+    char hex[7];
+    uint32_t at;
+  } seen[16] = {};
+  if (!gCfg.alertMask || gCfg.alertSec <= 0 || gPortalMode || alertActive()) return;
+  float range = RANGES_KM[gRangeIdx];
+  uint32_t now = millis();
+  for (int i = 0; i < pd.count; i++) {
+    const Plane& pl = pd.p[i];
+    if (pl.distKm > range || !pl.alert || !pl.hex[0]) continue;
+    int slot = 0;
+    bool recent = false;
+    for (int k = 0; k < 16; k++) {
+      if (!strcmp(seen[k].hex, pl.hex) && now - seen[k].at < 30 * 60000UL) recent = true;
+      if (seen[k].at < seen[slot].at) slot = k;
+    }
+    if (recent) continue;
+    strlcpy(seen[slot].hex, pl.hex, sizeof seen[slot].hex);
+    seen[slot].at = now ? now : 1;
+    strlcpy(gAlertHex, pl.hex, sizeof gAlertHex);
+    gAlertBits = pl.alert;
+    gAlertUntil = now + (uint32_t)gCfg.alertSec * 1000;
+    gScreen = SCR_DETAIL;
+    strlcpy(gDetailCs, pl.flight, sizeof gDetailCs);
+    gDetailStepAt = gLastSwitch = gLastPress = now;
+    Serial.printf("[Upozornění] %s %s (%s)\n", pl.flight, pl.hex, alertText(pl.alert, pl.squawk));
+    return;
+  }
+}
+
 void loop() {
   static PlaneData pd;
   static Weather w;
@@ -2351,18 +2739,25 @@ void loop() {
     ESP.restart();  // nikdo nic nenastavuje -> zkus znovu uloženou WiFi
   }
 
+  static uint32_t lastRbCheck = 0;  // plánovaný noční restart (kontrola jednou za minutu)
+  if (!gPortalMode && now - lastRbCheck >= 60000) {
+    lastRbCheck = now;
+    sysinfoNightlyRestart();
+  }
+
   // Detail letadla: automaticky další letadlo v dosahu
-  if (!gPortalMode && gScreen == SCR_DETAIL && gCfg.detailCycle > 0 && !gBtnHeldMs &&
+  if (!gPortalMode && gScreen == SCR_DETAIL && gCfg.detailCycle > 0 && !gBtnHeldMs && !alertActive() &&
       now - gDetailStepAt >= (uint32_t)gCfg.detailCycle * 1000)
     detailNext();
 
   // automatické přepínání obrazovek (po stisku tlačítka minutu pauza)
   if (!gPortalMode && gCfg.cycleSec > 0 && !gBtnHeldMs && now - gLastSwitch >= (uint32_t)gCfg.cycleSec * 1000 &&
       !(gScreen == SCR_NOTE && noteBlinking()) &&  // blikající poznámka zůstává do potvrzení
+      !alertActive() &&                             // upozornění na letadlo také
       (gLastPress == 0 || now - gLastPress >= CYCLE_PAUSE_MS))
     onShortPress();
 
-  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs || (gScreen == SCR_NOTE && noteBlinking())) ? 100 : 250;
+  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs || alertActive() || (gScreen == SCR_NOTE && noteBlinking())) ? 100 : 250;
   if (now - lastDraw < frame) {
     delay(5);
     return;
@@ -2375,6 +2770,7 @@ void loop() {
     pd = gPlanes;
     w = gWeather;
     xSemaphoreGive(gMutex);
+    checkAlerts(pd);
     forecastGet(fc);
   }
   renderFrame([&] {
@@ -2391,6 +2787,7 @@ void loop() {
         case SCR_FORECAST: drawForecast(fc); break;
         case SCR_PRICE: drawPrice(now); break;
         case SCR_NOTE: drawNote(); break;
+        case SCR_PRICEWIN: drawPriceWin(); break;
         case SCR_RAIN: drawRain(fc, now); break;
       }
       drawWifiDot();

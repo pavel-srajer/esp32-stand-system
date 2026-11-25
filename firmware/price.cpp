@@ -217,3 +217,39 @@ void priceTick() {
   }
   unlock();
 }
+
+void priceWindows(const PriceData& p, int curSlot, PriceWinResult* out) {
+  int end = p.tomorrowOk ? 2 * PRICE_SLOTS : PRICE_SLOTS;  // za poslední známou čtvrthodinou
+  auto at = [&](int t) -> float {
+    if (t < PRICE_SLOTS) return p.todayOk ? priceFinal(p.today[t]) : NAN;
+    return priceFinal(p.tomorrow[t - PRICE_SLOTS]);
+  };
+  for (int i = 0; i < PRICE_WINS; i++) {
+    const PriceWin& w = gCfg.priceWin[i];
+    out[i] = PriceWinResult();
+    if (!w.on || w.dur < 1) continue;
+    int span = ((w.to - w.from) % 1440 + 1440) % 1440;
+    if (span == 0) span = 1440;  // od == do -> celý den
+    float best = 1e9;
+    for (int t = max(curSlot, 0); t + w.dur <= end; t++) {
+      int sm = (t % PRICE_SLOTS) * 15;
+      int rel = ((sm - w.from) % 1440 + 1440) % 1440;
+      if (rel + w.dur * 15 > span) continue;  // okno se nevejde do povoleného času
+      float sum = 0;
+      bool okAll = true;
+      for (int k = 0; k < w.dur && okAll; k++) {
+        float v = at(t + k);
+        if (isnan(v)) okAll = false;
+        else sum += v;
+      }
+      if (!okAll) continue;
+      float avg = sum / w.dur;
+      if (avg < best - 1e-6f) {
+        best = avg;
+        out[i].ok = true;
+        out[i].start = t;
+        out[i].avg = avg;
+      }
+    }
+  }
+}

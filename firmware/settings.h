@@ -15,6 +15,21 @@ enum DetailBits {
   DET_AIRLINE = 1 << 8,
 };
 
+enum AlertBits {
+  ALERT_EMERG = 1 << 0,  // nouzový squawk 7500 / 7600 / 7700
+  ALERT_MIL = 1 << 1,    // vojenská letadla (databáze readsb / adsb.fi)
+  ALERT_WATCH = 1 << 2,  // vlastní seznam
+};
+
+#define PRICE_WINS 3
+struct PriceWin {
+  bool on = false;
+  String name;
+  int dur = 8;      // délka ve čtvrthodinách (8 = 2 h)
+  int from = 0;     // povolený začátek (minuty od půlnoci)
+  int to = 24 * 60; // povolený konec; menší než from = přes půlnoc
+};
+
 struct Settings {
   String ssid;
   String pass;
@@ -32,7 +47,7 @@ struct Settings {
   int bDay = 100, bEve = 60, bNight = 15;
   // zapnuté obrazovky (bit = pořadí: radar letadel, detail, předpověď, meteoradar, stanice ČHMI, hodiny)
   int screens = 0x2F;   // vše kromě měření ze stanice ČHMI
-  String screenOrder = "01234567";  // pořadí obrazovek (číslice = index obrazovky)
+  String screenOrder = "012345678";  // pořadí obrazovek (číslice = index obrazovky)
   String note;                       // text pro obrazovku Poznámka
   uint32_t noteFg = 0xFFFFFF;        // barva textu poznámky (RGB)
   uint32_t noteBg = 0x000000;        // barva pozadí poznámky
@@ -56,6 +71,19 @@ struct Settings {
   String adsbUrl = "";    // vlastní přijímač ADS-B (IP/adresa, doplní se :8080/data/aircraft.json)
   int planeSrc = 0;       // letadla: 0 automaticky, 1 jen vlastní přijímač, 2 jen adsb.fi, 3 jen adsb.lol
   int priceSrc = 0;       // zdroj cen: 0 spotovaelektrina.cz, 1 spotovky.cz (druhý je záloha)
+  // nejlevnější okna elektřiny (pračka, auto…): délka a povolený čas od–do
+  PriceWin priceWin[PRICE_WINS];
+  // noční restart: 0 vypnuto, 1 jen když dochází paměť, 2 každou noc
+  int rbMode = 0;
+  int rbHour = 4;     // v kolik hodin (místní čas)
+  int rbMinKB = 16;   // "dochází paměť" = největší volný blok RAM pod touto hodnotou (kB)
+  // přihlášení do webu (prázdné heslo = bez přihlášení)
+  String webUser = "admin";
+  String webPass = "";
+  // upozornění na zajímavá letadla (bity ALERT_*) a vlastní seznam
+  int alertMask = 0;
+  String watchList = "";  // registrace, typy, hex nebo začátky volacích znaků oddělené čárkou
+  int alertSec = 60;      // jak dlouho upozornění bliká (pokud ho nepotvrdíš tlačítkem)
 };
 
 extern Settings gCfg;
@@ -65,6 +93,11 @@ void settingsSave();
 void settingsSaveRange();
 void settingsSaveNote();  // uloží jen poznámku (bez restartu)
 bool settingsHasWifi();
+
+// záloha / obnova: všechna nastavení jako JSON (hesla jen se secrets=true)
+#include <ArduinoJson.h>
+void settingsToJson(JsonObject o, bool secrets);
+void settingsFromJson(JsonObjectConst o);  // jen klíče, které v JSON jsou
 
 // Příznak "po restartu spustit konfigurační portál"
 void settingsSetPortalFlag(bool on);

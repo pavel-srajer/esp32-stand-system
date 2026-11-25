@@ -111,6 +111,10 @@ fieldset{border:1px solid #30363d;border-radius:10px;margin:0 0 16px;padding:12p
 legend{color:#58a6ff;padding:0 6px}label{display:block;margin:10px 0 4px;font-size:.9em;color:#9da7b3}
 input,select{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-size:1em}
 .row{display:flex;gap:10px}.row>div{flex:1}small{color:#7d8590}
+.chk{display:flex;gap:8px;align-items:center;margin:8px 0;color:#e6edf3}.chk input{width:auto}
+.pwr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}.pwr input,.pwr select{width:auto;padding:8px}
+.pwr input[type=checkbox]{width:18px;height:18px}.pwr input[name$=nm]{flex:1;min-width:120px}.pwr span{color:#7d8590}
+textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font:inherit}
 button{width:100%;padding:14px;border:0;border-radius:10px;background:#238636;color:#fff;font-size:1.1em;margin-top:6px}
 a{color:#58a6ff}.hide{display:none}</style></head><body><main>
 <h1>{{h1}}</h1>
@@ -201,7 +205,8 @@ textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:
 .nrow label{display:flex;gap:6px;align-items:center}.nrow input[type=color]{width:38px;height:28px;border:0;background:none;padding:0}
 .nrow select{padding:5px;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#e6edf3}
 .nst{display:flex;gap:10px}.nst label{gap:3px;color:#e6edf3;font-size:1.05em}
-.nb{margin-top:6px;padding:9px 14px;border-radius:8px;border:0;background:#238636;color:#fff;font-size:.95em;cursor:pointer}</style></head><body><main>
+.nb{margin-top:6px;padding:9px 14px;border-radius:8px;border:0;background:#238636;color:#fff;font-size:.95em;cursor:pointer}
+.hide{display:none}input[type=file]{color:#9da7b3;max-width:100%}</style></head><body><main>
 <p><a href="/">← {{settings}}</a></p><h1>{{sysinfo}}</h1><div id="st">{{loading}}</div>
 <h2>{{screen}}</h2><div id="scr"></div><div class="sub" id="scrs"></div>
 <h2>{{note}}</h2><textarea id="note" rows="3" maxlength="300" placeholder="{{note_ph}}"></textarea>
@@ -220,6 +225,12 @@ textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:
 <h2>{{device}}</h2><table id="dev"></table>
 <h2>WiFi</h2><table id="wifi"></table>
 <h2>{{app}}</h2><table id="app"></table>
+<div id="rxs" class="hide"><h2>{{rxstats}}</h2><table id="rx"></table></div>
+<h2>{{backup}}</h2>
+<p class="sub">{{backup_txt}}</p>
+<div class="nrow"><a class="nb" id="bdl" href="/api/config" download style="text-decoration:none">⬇ {{backup_dl}}</a>
+<label><input type="checkbox" id="bsec" onchange="g('bdl').href='/api/config'+(this.checked?'?secrets=1':'')"> {{backup_sec}}</label></div>
+<div class="nrow"><input type="file" id="bfile" accept=".json,application/json"><button type="button" class="nb" onclick="restore()">⬆ {{restore}}</button> <span class="sub" id="bst"></span></div>
 <p><small>{{datasrc}}: {{ownrx}}, <a href="https://adsb.fi" target="_blank">adsb.fi</a>, <a href="https://adsb.lol" target="_blank">adsb.lol</a> (ODbL), <a href="https://www.adsbdb.com" target="_blank">adsbdb</a>, ČHMI, <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>, OTE (spotovaelektrina.cz, spotovky.cz)</small></p>
 </main><script>
 function kb(b){return b>=1048576?(b/1048576).toFixed(2)+' MB':(b/1024).toFixed(1)+' kB'}
@@ -230,6 +241,10 @@ function rows(id,r){document.getElementById(id).innerHTML=r.map(function(x){retu
 function t(id,v){document.getElementById(id).textContent=v}
 function esc(v){return String(v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function setScr(i){fetch('/api/screen?s='+i).then(load).catch(function(){})}
+function restore(){var f=g('bfile').files[0];if(!f)return;var r=new FileReader();
+ r.onload=function(){fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:r.result})
+  .then(function(x){if(!x.ok)throw 0;t('bst','{{restore_ok}}');setTimeout(function(){location.reload()},15000)})
+  .catch(function(){t('bst','{{restore_bad}}')})};r.readAsText(f)}
 var noteInit=false;
 function g(id){return document.getElementById(id)}
 function saveNote(){var v=g('note').value;if(v.normalize)v=v.normalize('NFC');var st=(g('nb1').checked?1:0)|(g('nb2').checked?2:0)|(g('nb4').checked?4:0);
@@ -258,7 +273,12 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
   ['{{station_w}}',age(a.weather_age)+(a.weather_err?' · {{error}}: '+esc(a.weather_err):'')],
   ['{{forecast}} Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · {{alerts}}: '+a.fc_alerts:'')+(a.fc_err?' · {{error}}: '+esc(a.fc_err):'')],
   ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{route}}',esc(a.route||'–')],['{{price}}',(a.price_src?esc(a.price_src)+' · ':'')+age(a.price_age)+(a.price_age>=0?' · {{tomorrow}}: '+(a.price_tom?'✔':'–'):'')+(a.price_err?' · '+esc(a.price_err):'')],['{{station}}',esc(a.station)],
+  ['{{pwin}}',a.price_win&&a.price_win.length?a.price_win.map(esc).join('<br>'):'–'],['{{alerts_now}}',a.alerts_now?esc(a.alerts_now):'–'],
   ['{{bright}}',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['{{time}}',esc(a.ntp)],['{{update}}',esc(a.ota)],['{{stack}}',a.stack_net+' B (net), '+a.stack_loop+' B (UI)']]);
+ var x=a.rx;g('rxs').className=x?'':'hide';
+ if(x)rows('rx',[['{{rx_planes}}',x.pos+' / '+x.total],['{{rx_max}}',x.max+' km'+(x.max_cs?' ('+esc(x.max_cs)+')':'')],
+  ['{{rx_today}}',x.max_today+' km'+(x.max_today_cs?' ('+esc(x.max_today_cs)+')':'')],['{{rx_rate}}',x.rate!=null?x.rate+' /s':'–'],
+  ['{{rx_rssi}}',x.rssi!=null?x.rssi+' dBFS':'–'],['{{updated}}',age(x.age)]]);
  t('st','{{updated}} '+new Date().toLocaleTimeString('{{locale}}'));
 }).catch(function(){t('st','{{noresp}}')})}
 load();setInterval(load,2000);
@@ -287,6 +307,21 @@ static const Tok TOKS[] = {
     {"gpsloc", {"Poloha z telefonu", "Location from phone", "Standort vom Handy", "Posizione dal telefono"}},
     {"iploc", {"Jen přibližná poloha podle IP adresy (přesnou polohu z GPS prohlížeč stránce zařízení na http:// nedovolí) – zpřesni kliknutím do mapy nebo vyhledáním adresy", "Only approximate location from IP address (browsers don't allow GPS for the device's http:// page) – refine by clicking the map or searching an address", "Nur ungefährer Standort laut IP-Adresse (für die http://-Seite des Geräts erlaubt der Browser kein GPS) – per Klick in die Karte oder Adresssuche verfeinern", "Solo posizione approssimativa dall'indirizzo IP (il browser non consente il GPS per la pagina http:// del dispositivo) – affina cliccando sulla mappa o cercando l'indirizzo"}},
     {"datasrc", {"Zdroje dat", "Data sources", "Datenquellen", "Fonti dati"}},
+    {"rxstats", {"Vlastní přijímač ADS-B", "Own ADS-B receiver", "Eigener ADS-B-Empfänger", "Ricevitore ADS-B proprio"}},
+    {"rx_planes", {"Letadla s polohou / celkem", "Aircraft with position / total", "Flugzeuge mit Position / gesamt", "Aerei con posizione / totale"}},
+    {"rx_max", {"Nejvzdálenější teď", "Farthest now", "Am weitesten jetzt", "Il più lontano ora"}},
+    {"rx_today", {"Rekord dosahu dnes", "Range record today", "Reichweitenrekord heute", "Record di portata oggi"}},
+    {"rx_rate", {"Zprávy", "Messages", "Nachrichten", "Messaggi"}},
+    {"rx_rssi", {"Průměrný signál", "Average signal", "Durchschnittliches Signal", "Segnale medio"}},
+    {"pwin", {"Nejlevnější okna", "Cheapest windows", "Günstigste Zeitfenster", "Finestre più convenienti"}},
+    {"alerts_now", {"Zajímavá letadla v dosahu", "Interesting aircraft in range", "Interessante Flugzeuge in Reichweite", "Aerei interessanti in zona"}},
+    {"backup", {"Záloha nastavení", "Settings backup", "Sicherung der Einstellungen", "Backup delle impostazioni"}},
+    {"backup_txt", {"Stáhne všechna nastavení do souboru. Nahráním souboru je obnovíš (i na jiném zařízení), zařízení se pak restartuje.", "Downloads all settings to a file. Uploading the file restores them (also on another device), then the device restarts.", "Lädt alle Einstellungen als Datei herunter. Durch Hochladen werden sie wiederhergestellt (auch auf einem anderen Gerät), danach startet das Gerät neu.", "Scarica tutte le impostazioni in un file. Caricando il file vengono ripristinate (anche su un altro dispositivo), poi il dispositivo si riavvia."}},
+    {"backup_dl", {"Stáhnout zálohu", "Download backup", "Sicherung herunterladen", "Scarica backup"}},
+    {"backup_sec", {"včetně hesel (WiFi, web)", "including passwords (WiFi, web)", "inkl. Passwörter (WLAN, Web)", "incluse le password (WiFi, web)"}},
+    {"restore", {"Obnovit ze souboru", "Restore from file", "Aus Datei wiederherstellen", "Ripristina da file"}},
+    {"restore_ok", {"Obnoveno, zařízení se restartuje…", "Restored, the device is restarting…", "Wiederhergestellt, das Gerät startet neu…", "Ripristinato, il dispositivo si riavvia…"}},
+    {"restore_bad", {"Soubor není záloha tohoto zařízení", "The file is not a backup of this device", "Die Datei ist keine Sicherung dieses Geräts", "Il file non è un backup di questo dispositivo"}},
     {"ownrx", {"vlastní přijímač ADS-B", "own ADS-B receiver", "eigener ADS-B-Empfänger", "ricevitore ADS-B proprio"}},
     {"locfail", {"Polohu se nepodařilo zjistit", "Could not detect location", "Standort nicht ermittelbar", "Impossibile rilevare la posizione"}},
     {"notfound", {"Nenalezeno", "Not found", "Nicht gefunden", "Non trovato"}},
@@ -438,6 +473,41 @@ static void localize(PageOut& out, const char* tpl) {
     if (!found) out.write(a, b + 2 - a);
     p = b + 2;
   }
+}
+
+// Volitelné přihlášení (HTTP Basic). V hotspotu (BOOT 5 s) se nevyžaduje, aby šlo
+// zapomenuté heslo obnovit – k tomu je potřeba fyzický přístup k zařízení.
+static bool authOk() {
+  if (gAp || !gCfg.webPass.length()) return true;
+  if (server.authenticate(gCfg.webUser.c_str(), gCfg.webPass.c_str())) return true;
+  server.requestAuthentication(BASIC_AUTH, "esp32-stand-system");
+  return false;
+}
+#define GUARD(fn) [] { if (authOk()) fn(); }
+
+// ---------- záloha a obnova ----------
+static void handleConfigGet() {
+  gLastActivity = millis();
+  JsonDocument doc;
+  settingsToJson(doc.to<JsonObject>(), server.arg("secrets") == "1");
+  String out;
+  serializeJsonPretty(doc, out);
+  server.sendHeader("Content-Disposition", "attachment; filename=\"esp32-stand-backup.json\"");
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", out);
+}
+
+static void handleConfigPost() {
+  gLastActivity = millis();
+  JsonDocument doc;
+  if (deserializeJson(doc, server.arg("plain")) || strcmp(doc["app"] | "", "esp32-stand-system")) {
+    server.send(400, "text/plain", "bad backup");
+    return;
+  }
+  settingsFromJson(doc.as<JsonObjectConst>());
+  server.send(200, "text/plain", "ok");
+  delay(1000);
+  ESP.restart();
 }
 
 static void handleSystem() {
@@ -602,7 +672,9 @@ static void handleRoot() {
                            tr("Měření ze stanice ČHMI", "ČHMI station measurements", "ČHMI-Stationsmessung", "Misure stazione ČHMI"),
                            tr("Hodiny", "Clock", "Uhr", "Orologio"),
                            tr("Spotová cena elektřiny", "Spot electricity price", "Strom-Spotpreis", "Prezzo spot elettricità"),
-                           tr("Poznámka (text ze stránky Systém)", "Note (text from the System page)", "Notiz (Text von der Seite System)", "Nota (testo dalla pagina Sistema)")};
+                           tr("Poznámka (text ze stránky Systém)", "Note (text from the System page)", "Notiz (Text von der Seite System)", "Nota (testo dalla pagina Sistema)"),
+                           tr("Levná elektřina (nejlevnější okna)", "Cheap electricity (cheapest windows)", "Günstiger Strom (günstigste Zeitfenster)", "Elettricità economica (finestre più convenienti)")};
+    const int NS = screenCount();
     h += F("<fieldset><legend>");
     h += tr("Obrazovky", "Screens", "Bildschirme", "Schermate");
     h += F("</legend><small>");
@@ -613,16 +685,16 @@ static void handleRoot() {
     h += F("</small>");
     // seznam v uloženém pořadí; šipky mění pořadí, skryté pole 'order' ho odešle
     {
-      int ord[8], n = 0;
-      bool seen[8] = {};
+      int ord[16], n = 0;
+      bool seen[16] = {};
       for (char c : gCfg.screenOrder) {
         int i = c - '0';
-        if (i >= 0 && i < 8 && !seen[i]) {
+        if (i >= 0 && i < NS && !seen[i]) {
           ord[n++] = i;
           seen[i] = true;
         }
       }
-      for (int i = 0; i < 8; i++)
+      for (int i = 0; i < NS; i++)
         if (!seen[i]) ord[n++] = i;
       h += F("<div id='sord'>");
       for (int k = 0; k < n; k++) {
@@ -874,6 +946,56 @@ static void handleRoot() {
           "OTE day-ahead prices. If the chosen source fails, the other one is used automatically. With 0 and 0 the bare exchange price is shown. The surcharge adds distribution, fees and supplier margin, then VAT is applied. A long press on the screen shows tomorrow (published by OTE around 13:00).",
           "OTE-Day-Ahead-Preise. Fällt die gewählte Quelle aus, wird automatisch die andere verwendet. Bei 0 und 0 wird der reine Börsenpreis angezeigt. Der Aufschlag addiert Netz, Gebühren und Marge, danach wird die MwSt. angewendet. Langer Tastendruck zeigt morgen (OTE veröffentlicht gegen 13:00).",
           "Prezzi day-ahead OTE. Se la fonte scelta non risponde, si usa automaticamente l’altra. Con 0 e 0 si vede il prezzo di borsa. Il supplemento aggiunge distribuzione, oneri e margine, poi si applica l’IVA. Pressione lunga sulla schermata: domani (pubblicato da OTE verso le 13:00).");
+  h += F("</small>");
+  // nejlevnější okna (obrazovka Levná elektřina)
+  h += F("<label>");
+  h += tr("Nejlevnější okna (obrazovka Levná elektřina)", "Cheapest windows (Cheap electricity screen)", "Günstigste Zeitfenster (Bildschirm Günstiger Strom)", "Finestre più convenienti (schermata Elettricità economica)");
+  h += F("</label>");
+  for (int i = 0; i < PRICE_WINS; i++) {
+    const PriceWin& w = gCfg.priceWin[i];
+    char b[8];
+    h += F("<div class='pwr'><input type='checkbox' name='pw");
+    h += i;
+    h += F("on'");
+    if (w.on) h += F(" checked");
+    h += F("><input name='pw");
+    h += i;
+    h += F("nm' maxlength='16' placeholder='");
+    h += tr("název, např. pračka", "name, e.g. washer", "Name, z. B. Waschmaschine", "nome, es. lavatrice");
+    h += F("' value='");
+    h += esc(w.name);
+    h += F("'><select name='pw");
+    h += i;
+    h += F("du' title='");
+    h += tr("délka", "length", "Dauer", "durata");
+    h += F("'>");
+    for (int q = 1; q <= 32; q++) {
+      snprintf(b, sizeof b, "%d:%02d", q / 4, (q % 4) * 15);
+      h += F("<option value='");
+      h += q;
+      h += q == w.dur ? F("' selected>") : F("'>");
+      h += b;
+      h += F(" h</option>");
+    }
+    h += F("</select><span>");
+    h += tr("mezi", "between", "zwischen", "tra");
+    h += F("</span><input type='time' step='900' name='pw");
+    h += i;
+    h += F("fr' value='");
+    snprintf(b, sizeof b, "%02d:%02d", w.from / 60 % 24, w.from % 60);
+    h += b;
+    h += F("'><span>–</span><input type='time' step='900' name='pw");
+    h += i;
+    h += F("to' value='");
+    snprintf(b, sizeof b, "%02d:%02d", w.to / 60 % 24, w.to % 60);
+    h += b;
+    h += F("'></div>");
+  }
+  h += F("<small>");
+  h += tr("Najde nejlevnější souvislý úsek dané délky v povoleném čase (např. pračka 2 h mezi 8:00 a 22:00, auto 4 h mezi 22:00 a 6:00 – přes půlnoc). Počítá s cenou včetně přirážky a DPH, z dnešních a (po 13:00) i zítřejších cen. 00:00–00:00 = kdykoli.",
+          "Finds the cheapest continuous block of the given length within the allowed time (e.g. washer 2 h between 8:00 and 22:00, car 4 h between 22:00 and 6:00 – over midnight). Uses the price incl. surcharge and VAT, from today’s and (after 13:00) tomorrow’s prices. 00:00–00:00 = any time.",
+          "Findet den günstigsten zusammenhängenden Block der gewählten Dauer in der erlaubten Zeit (z. B. Waschmaschine 2 h zwischen 8:00 und 22:00, Auto 4 h zwischen 22:00 und 6:00 – über Mitternacht). Rechnet mit dem Preis inkl. Aufschlag und MwSt., aus heutigen und (ab 13:00) morgigen Preisen. 00:00–00:00 = jederzeit.",
+          "Trova il blocco continuo più economico della durata scelta nell’orario consentito (es. lavatrice 2 h tra 8:00 e 22:00, auto 4 h tra 22:00 e 6:00 – oltre la mezzanotte). Usa il prezzo con supplemento e IVA, dai prezzi di oggi e (dopo le 13:00) di domani. 00:00–00:00 = sempre.");
   h += F("</small></fieldset>");
 
   // --- ČHMI ---
@@ -993,6 +1115,121 @@ static void handleRoot() {
           "Es. pool.ntp.org, tik.cesnet.cz, ntp.nic.cz, time.google.com o l’IP del router. Fuso orario CET (ora legale automatica).");
   h += F("</small></fieldset>");
 
+  // --- Upozornění na letadla ---
+  {
+    h += F("<fieldset><legend>");
+    h += tr("Upozornění na zajímavá letadla", "Alerts for interesting aircraft", "Hinweise auf interessante Flugzeuge", "Avvisi per aerei interessanti");
+    h += F("</legend>");
+    const char* AN[] = {tr("Nouzový squawk 7500 / 7600 / 7700", "Emergency squawk 7500 / 7600 / 7700", "Notfall-Squawk 7500 / 7600 / 7700", "Squawk di emergenza 7500 / 7600 / 7700"),
+                        tr("Vojenská letadla", "Military aircraft", "Militärflugzeuge", "Aerei militari"),
+                        tr("Můj seznam (níže)", "My list (below)", "Meine Liste (unten)", "La mia lista (sotto)")};
+    for (int i = 0; i < 3; i++) {
+      h += F("<label class='chk'><input type='checkbox' name='al");
+      h += i;
+      h += "'";
+      if (gCfg.alertMask & (1 << i)) h += F(" checked");
+      h += "> ";
+      h += AN[i];
+      h += F("</label>");
+    }
+    h += F("<label>");
+    h += tr("Můj seznam", "My list", "Meine Liste", "La mia lista");
+    h += F("</label><textarea name='watch' rows='2' maxlength='240' placeholder='OK-NEP, A388, A124, 49d3c1, CSA'>");
+    h += esc(gCfg.watchList);
+    h += F("</textarea><label>");
+    h += tr("Při novém letadle", "On a new aircraft", "Bei neuem Flugzeug", "Con un nuovo aereo");
+    h += F("</label><select name='alsec'>");
+    static const int AS[] = {0, 15, 30, 60, 120, 300};
+    for (int v : AS) {
+      h += F("<option value='");
+      h += v;
+      h += v == gCfg.alertSec ? F("' selected>") : F("'>");
+      if (v) {
+        h += tr("přepnout na detail a blikat", "switch to detail and blink", "zum Detail wechseln und blinken", "passa al dettaglio e lampeggia");
+        h += String(" ") + v + " s";
+      } else {
+        h += tr("jen označit (bez přepnutí)", "only mark (no switching)", "nur markieren (ohne Wechsel)", "solo segnalare (senza cambio)");
+      }
+      h += F("</option>");
+    }
+    h += F("</select><small>");
+    h += tr("Funguje s vlastním přijímačem i s internetovými zdroji. Seznam: registrace (OK-NEP), typ (A388, B748, A124), hex adresa (49d3c1) nebo začátek volacího znaku (CSA, RCH), oddělené čárkou. Označená letadla blikají na radaru červeně. Stejné letadlo se ohlásí znovu nejdřív za 30 min, stisk tlačítka upozornění potvrdí. Vojenská letadla poznají jen zdroje s databází (readsb, adsb.fi).",
+            "Works with your own receiver and with internet sources. List: registration (OK-NEP), type (A388, B748, A124), hex address (49d3c1) or callsign prefix (CSA, RCH), separated by commas. Marked aircraft blink red on the radar. The same aircraft is announced again after 30 min at the earliest, a button press acknowledges the alert. Military aircraft are only recognised by sources with a database (readsb, adsb.fi).",
+            "Funktioniert mit eigenem Empfänger und mit Internetquellen. Liste: Kennzeichen (OK-NEP), Typ (A388, B748, A124), Hex-Adresse (49d3c1) oder Rufzeichen-Anfang (CSA, RCH), durch Kommas getrennt. Markierte Flugzeuge blinken rot auf dem Radar. Dasselbe Flugzeug wird frühestens nach 30 min erneut gemeldet, ein Tastendruck bestätigt den Hinweis. Militärflugzeuge erkennen nur Quellen mit Datenbank (readsb, adsb.fi).",
+            "Funziona con il ricevitore proprio e con le fonti internet. Lista: immatricolazione (OK-NEP), tipo (A388, B748, A124), indirizzo hex (49d3c1) o inizio del nominativo (CSA, RCH), separati da virgole. Gli aerei segnalati lampeggiano in rosso sul radar. Lo stesso aereo viene segnalato di nuovo non prima di 30 min, una pressione del tasto conferma l’avviso. Gli aerei militari sono riconosciuti solo da fonti con database (readsb, adsb.fi).");
+    h += F("</small></fieldset>");
+  }
+
+  // --- Systém: noční restart ---
+  {
+    h += F("<fieldset><legend>");
+    h += tr("Noční restart", "Night restart", "Nachtneustart", "Riavvio notturno");
+    h += F("</legend><select name='rbmode'>");
+    const char* RM[] = {tr("vypnuto", "off", "aus", "spento"),
+                        tr("jen když dochází paměť", "only when memory runs low", "nur bei wenig Speicher", "solo con poca memoria"),
+                        tr("každou noc", "every night", "jede Nacht", "ogni notte")};
+    for (int i = 0; i < 3; i++) {
+      h += F("<option value='");
+      h += i;
+      h += i == gCfg.rbMode ? F("' selected>") : F("'>");
+      h += RM[i];
+      h += F("</option>");
+    }
+    h += F("</select><div class='row'><div><label>");
+    h += tr("V kolik hodin", "At what time", "Um wie viel Uhr", "A che ora");
+    h += F("</label><select name='rbhour'>");
+    for (int i = 0; i < 24; i++) {
+      h += F("<option value='");
+      h += i;
+      h += i == gCfg.rbHour ? F("' selected>") : F("'>");
+      h += String(i) + ":00";
+      h += F("</option>");
+    }
+    h += F("</select></div><div><label>");
+    h += tr("Málo paměti = největší blok pod", "Low memory = largest block below", "Wenig Speicher = größter Block unter", "Poca memoria = blocco più grande sotto");
+    h += F("</label><select name='rbmin'>");
+    static const int RB[] = {8, 12, 16, 20, 24, 32};
+    for (int v : RB) {
+      h += F("<option value='");
+      h += v;
+      h += v == gCfg.rbMinKB ? F("' selected>") : F("'>");
+      h += String(v) + " kB";
+      h += F("</option>");
+    }
+    h += F("</select></div></div><small>");
+    h += tr("Paměť ESP32-C3 se časem rozdrobí a pak může selhávat stahování (radar, loga, HTTPS). Restart trvá pár sekund a provede se jen v prvních minutách zvolené hodiny, nejdřív hodinu po zapnutí. Důvod uvidíš na stránce Systém v řádku Poslední restart.",
+            "ESP32-C3 memory fragments over time and downloads (radar, logos, HTTPS) may then fail. The restart takes a few seconds and only happens in the first minutes of the chosen hour, at the earliest one hour after power-on. The reason is shown on the System page under Last reset.",
+            "Der Speicher des ESP32-C3 zerfällt mit der Zeit, dann können Downloads (Radar, Logos, HTTPS) scheitern. Der Neustart dauert ein paar Sekunden und erfolgt nur in den ersten Minuten der gewählten Stunde, frühestens eine Stunde nach dem Einschalten. Den Grund zeigt die Seite System unter Letzter Neustart.",
+            "La memoria dell’ESP32-C3 si frammenta col tempo e i download (radar, loghi, HTTPS) possono fallire. Il riavvio dura pochi secondi e avviene solo nei primi minuti dell’ora scelta, non prima di un’ora dall’accensione. Il motivo è nella pagina Sistema alla voce Ultimo riavvio.");
+    h += F("</small></fieldset>");
+  }
+
+  // --- Přihlášení do webu ---
+  {
+    h += F("<fieldset><legend>");
+    h += tr("Přihlášení do webového rozhraní", "Web interface login", "Anmeldung an der Weboberfläche", "Accesso all’interfaccia web");
+    h += F("</legend><div class='row'><div><label>");
+    h += tr("Uživatel", "User", "Benutzer", "Utente");
+    h += F("</label><input name='wuser' maxlength='32' autocomplete='off' value='");
+    h += esc(gCfg.webUser);
+    h += F("'></div><div><label>");
+    h += tr("Heslo", "Password", "Passwort", "Password");
+    h += F("</label><input name='wpass' type='password' maxlength='64' autocomplete='new-password' placeholder='");
+    h += gCfg.webPass.length() ? tr("beze změny", "unchanged", "unverändert", "invariata") : tr("vypnuto", "off", "aus", "spento");
+    h += F("'></div></div>");
+    if (gCfg.webPass.length()) {
+      h += F("<label class='chk'><input type='checkbox' name='wpoff'> ");
+      h += tr("Zrušit heslo (web bez přihlášení)", "Remove password (no login)", "Passwort entfernen (ohne Anmeldung)", "Rimuovi password (senza accesso)");
+      h += F("</label>");
+    }
+    h += F("<small>");
+    h += tr("Když vyplníš heslo, prohlížeč se bude ptát na jméno a heslo. Zapomenuté heslo: podrž tlačítko BOOT 5 s, v hotspotu se přihlášení nevyžaduje a heslo tam zrušíš.",
+            "If you set a password, the browser asks for user and password. Forgot it? Hold the BOOT button for 5 s – the hotspot needs no login and you can remove the password there.",
+            "Mit Passwort fragt der Browser nach Benutzer und Passwort. Vergessen? BOOT-Taste 5 s halten – im Hotspot ist keine Anmeldung nötig, dort lässt es sich entfernen.",
+            "Con una password il browser chiede utente e password. Dimenticata? Tieni premuto BOOT per 5 s – nell’hotspot non serve l’accesso e puoi rimuoverla.");
+    h += F("</small></fieldset>");
+  }
+
   // --- Firmware ---
   h += F("<fieldset><legend>Firmware</legend><p><small>");
   h += tr("Verze", "Version", "Version", "Versione");
@@ -1084,13 +1321,13 @@ static void handleSave() {
   }
   {
     int m = 0;
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < screenCount(); i++)
       if (server.hasArg("scr" + String(i))) m |= 1 << i;
     gCfg.screens = m ? m : 1;
-    {  // pořadí: platná permutace číslic 0–6
+    {  // pořadí: platná permutace číslic 0 … počet obrazovek - 1
       String o = server.arg("order");
-      bool ok = o.length() == 8;
-      for (int i = 0; ok && i < 8; i++) ok = o.indexOf(char('0' + i)) >= 0;
+      bool ok = (int)o.length() == screenCount();
+      for (int i = 0; ok && i < screenCount(); i++) ok = o.indexOf(char('0' + i)) >= 0;
       if (ok) gCfg.screenOrder = o;
     }
     int dm = 0;
@@ -1106,6 +1343,41 @@ static void handleSave() {
     }
     if (server.hasArg("psrc")) gCfg.priceSrc = constrain(server.arg("psrc").toInt(), 0, 1);
     if (server.hasArg("plsrc")) gCfg.planeSrc = constrain(server.arg("plsrc").toInt(), 0, 3);
+    auto hhmm = [](const String& v, int def) {
+      int hh, mm;
+      return sscanf(v.c_str(), "%d:%d", &hh, &mm) == 2 && hh >= 0 && hh < 24 && mm >= 0 && mm < 60 ? hh * 60 + mm : def;
+    };
+    for (int i = 0; i < PRICE_WINS; i++) {
+      String k = "pw" + String(i);
+      if (!server.hasArg(k + "du")) continue;
+      PriceWin& w = gCfg.priceWin[i];
+      w.on = server.hasArg(k + "on");
+      w.name = server.arg(k + "nm").substring(0, 16);
+      w.name.trim();
+      w.dur = constrain(server.arg(k + "du").toInt(), 1, 32);
+      w.from = hhmm(server.arg(k + "fr"), w.from);
+      w.to = hhmm(server.arg(k + "to"), w.to);
+    }
+    if (server.hasArg("alsec")) {
+      int m = 0;
+      for (int i = 0; i < 3; i++)
+        if (server.hasArg("al" + String(i))) m |= 1 << i;
+      gCfg.alertMask = m;
+      gCfg.watchList = server.arg("watch").substring(0, 240);
+      gCfg.alertSec = constrain(server.arg("alsec").toInt(), 0, 600);
+    }
+    if (server.hasArg("rbmode")) {
+      gCfg.rbMode = constrain(server.arg("rbmode").toInt(), 0, 2);
+      gCfg.rbHour = constrain(server.arg("rbhour").toInt(), 0, 23);
+      gCfg.rbMinKB = constrain(server.arg("rbmin").toInt(), 4, 64);
+    }
+    if (server.hasArg("wuser")) {
+      String u = server.arg("wuser");
+      u.trim();
+      gCfg.webUser = u.length() ? u.substring(0, 32) : String("admin");
+      if (server.hasArg("wpoff")) gCfg.webPass = "";
+      else if (server.arg("wpass").length()) gCfg.webPass = server.arg("wpass").substring(0, 64);
+    }
     if (server.hasArg("adsburl")) {
       gCfg.adsbUrl = server.arg("adsburl");
       gCfg.adsbUrl.trim();
@@ -1159,7 +1431,7 @@ static void handleSave() {
     pg += tr("Zkusit znovu", "Try again", "Erneut versuchen", "Riprova");
     pg += F("</a>\";return}"
             "var c=new AbortController();setTimeout(function(){c.abort()},2500);"
-            "fetch('/api/status',{cache:'no-store',signal:c.signal}).then(function(r){if(r.ok)back();else setTimeout(poll,1500)})"
+            "fetch('/api/status',{cache:'no-store',signal:c.signal}).then(function(r){if(r.ok||r.status==401)back();else setTimeout(poll,1500)})"
             ".catch(function(){setTimeout(poll,1500)})}"
             "setTimeout(poll,5000)</script></body>");
   }
@@ -1211,14 +1483,16 @@ void webBegin(bool apMode) {
     Serial.printf("[Portal] hotspot %s %s, IP %s, TX power %d\n", apName().c_str(), ok ? "OK" : "SELHAL",
                   WiFi.softAPIP().toString().c_str(), (int)WiFi.getTxPower());
   }
-  server.on("/", HTTP_GET, handleRoot);
-  server.on("/save", HTTP_POST, handleSave);
-  server.on("/update", HTTP_POST, handleUpdate);
-  server.on("/system", HTTP_GET, handleSystem);
-  server.on("/api/status", HTTP_GET, handleStatus);
-  server.on("/api/bright", HTTP_GET, handleBright);
-  server.on("/api/screen", HTTP_GET, handleScreen);
-  server.on("/api/note", HTTP_POST, handleNote);
+  server.on("/", HTTP_GET, GUARD(handleRoot));
+  server.on("/save", HTTP_POST, GUARD(handleSave));
+  server.on("/update", HTTP_POST, GUARD(handleUpdate));
+  server.on("/system", HTTP_GET, GUARD(handleSystem));
+  server.on("/api/status", HTTP_GET, GUARD(handleStatus));
+  server.on("/api/bright", HTTP_GET, GUARD(handleBright));
+  server.on("/api/screen", HTTP_GET, GUARD(handleScreen));
+  server.on("/api/note", HTTP_POST, GUARD(handleNote));
+  server.on("/api/config", HTTP_GET, GUARD(handleConfigGet));
+  server.on("/api/config", HTTP_POST, GUARD(handleConfigPost));
   server.onNotFound(handleNotFound);
   server.begin();
   gLastActivity = millis();

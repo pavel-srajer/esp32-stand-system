@@ -25,11 +25,13 @@ Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 | **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
 | **Hodiny** | čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
 | **Spotová cena elektřiny** | aktuální čtvrthodina v Kč/kWh (na 3 desetinná místa), další čtvrthodina, graf dne po 15 min, nejlevnější a nejdražší čas (ve výchozím stavu vypnutá) | zítřek na 30 s |
+| **Levná elektřina** | až 3 nejlevnější okna podle nastavení (např. pračka 2 h mezi 8–22 h, auto 4 h přes noc): čas od–do, dnes/zítra, průměrná cena. Okno, které právě běží, svítí zeleně (ve výchozím stavu vypnutá) | – |
 | **Poznámka** | vlastní text ze stránky Systém s volitelnou barvou textu a pozadí, velikostí, tučným písmem, kurzívou, podtržením a blikáním. Text se zalomí do kruhu (ve výchozím stavu vypnutá) | ukončí blikání |
 
 - Po zapnutí se na 3 s ukáže **úvodní obrazovka** s verzí firmwaru. WiFi se mezitím už připojuje.
 - Barvy letadel podle výšky: zelená < 900 m, žlutá < 3 km, oranžová < 6 km, růžová < 9 km, modrá výš, šedá = na zemi.
 - **Červená tečka** nahoře znamená, že není připojená WiFi.
+- **Upozornění na zajímavá letadla** (zapíná se na webu): nouzový squawk 7500/7600/7700, vojenská letadla nebo letadla z tvého seznamu. Na radaru blikají červeně, displej se přepne na jejich detail s červeným štítkem (např. „7700 NOUZE“) a blikajícím okrajem. Krátký stisk upozornění potvrdí.
 
 ## První nastavení (hotspot)
 
@@ -54,7 +56,10 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 | **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
 | **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), automatické přepínání letadel v dosahu (vypnuto / každých 3–30 s), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
 | **Zdroj dat o letadlech** | Automaticky (vlastní přijímač → adsb.fi → adsb.lol), jen vlastní přijímač, jen adsb.fi nebo jen adsb.lol. Adresa vlastního přijímače (adsb-feeder/ADSB.im, readsb, tar1090, ultrafeeder): stačí IP, doplní se `:8080/data/aircraft.json`; jiný port nebo cestu zadej celou s `http://`. Vlastní přijímač se čte každých 5 s |
-| **Spotová cena elektřiny** | zdroj dat (spotovaelektrina.cz nebo spotovky.cz; když zvolený nejde, použije se automaticky druhý), přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena |
+| **Spotová cena elektřiny** | zdroj dat (spotovaelektrina.cz nebo spotovky.cz; když zvolený nejde, použije se automaticky druhý), přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena. **Nejlevnější okna** (až 3): název, délka 15 min – 8 h a povolený čas od–do (i přes půlnoc; 00:00–00:00 = kdykoli). Hledá se v dnešních a po 13:00 i zítřejších cenách, s přirážkou a DPH |
+| **Upozornění na zajímavá letadla** | nouzový squawk, vojenská letadla, vlastní seznam (registrace `OK-NEP`, typ `A388`, hex `49d3c1` nebo začátek volacího znaku `CSA`, oddělené čárkou) a co se stane u nového letadla (přepnout na detail a blikat 15–300 s, nebo jen označit). Funguje s vlastním přijímačem i s internetem; vojenská letadla z internetu se berou ze seznamu adsb.fi `/v2/mil` (každé 2 min). Stejné letadlo se ohlásí znovu nejdřív za 30 min |
+| **Noční restart** | vypnuto / jen když dochází paměť (největší volný blok RAM pod 8–32 kB) / každou noc, v kolik hodin. Proběhne v prvních minutách zvolené hodiny, nejdřív hodinu po zapnutí; na stránce Systém je pak v řádku Poslední restart „plánovaný noční restart“ |
+| **Přihlášení do webového rozhraní** | uživatel a heslo (HTTP Basic). Prázdné heslo = bez přihlášení. V hotspotu (BOOT 5 s) se přihlášení nevyžaduje, takže zapomenuté heslo jde zrušit |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
 | **Jas displeje** | den / večer / noc se začátkem a jasem v %, pin podsvícení. V noci pod 30 % první stisk tlačítka rozsvítí displej na 30 s |
 | **Čas (NTP)** | hlavní a záložní NTP server (výchozí `pool.ntp.org`, `time.google.com`) |
@@ -67,7 +72,9 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 **Systémové informace** (`http://<IP zařízení>/system`) se obnovují každé 2 s. Ukazují:
 - teplotu čipu, vytížení CPU, RAM (volno, minimum, největší blok) a flash,
 - WiFi (signál, kanál, IP), dobu běhu a důvod posledního restartu,
-- stav všech zdrojů dat (ADS-B, předpověď, meteoradar, loga, trasy, cena elektřiny), NTP a aktualizací.
+- stav všech zdrojů dat (ADS-B, předpověď, meteoradar, loga, trasy, cena elektřiny), nejlevnější okna, zajímavá letadla v dosahu, NTP a aktualizací,
+- **vlastní přijímač ADS-B** (když se čte): letadla s polohou / celkem, nejvzdálenější letadlo teď, rekord dosahu dnes, zprávy za sekundu a průměrný signál (dBFS),
+- **zálohu nastavení**: „Stáhnout zálohu“ uloží vše do souboru JSON (volitelně i s hesly WiFi a webu), „Obnovit ze souboru“ ho nahraje zpět (i do jiného zařízení) a zařízení se restartuje. API: `GET /api/config[?secrets=1]`, `POST /api/config`.
 
 Nahoře je sekce **Obrazovka**: ukazuje, co je právě na displeji, a tlačítky přepneš na kteroukoli zapnutou obrazovku. Pod ní je pole **Poznámka**: tlačítkem „Uložit a zobrazit“ se text uloží (bez restartu) a hned se ukáže na displeji. Nastavit jde barva textu a pozadí, maximální velikost (velká / střední / malá; když se text nevejde, zmenší se), **tučné**, *kurzíva*, podtržení a **blikání** (pomalé nebo rychlé, střídají se barvy). Blikající poznámka zůstane na displeji, dokud ji nepotvrdíš stiskem tlačítka. Barvy se zaokrouhlí na 256barevnou paletu displeje. Znaky, které písmo neumí (emoji), se vynechají. Automatické přepínání se pak na minutu pozastaví. Totéž ve formátu JSON vrací `/api/status`, přepnout jde i přes `/api/screen?s=<číslo>`.
 

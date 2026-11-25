@@ -543,6 +543,17 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
         <text x="80" y="94" text-anchor="middle" fill="#ffdd00" font-size="15" font-weight="700">Žluťoučký kůň</text></svg>
       <h3>Poznámka</h3><p>Vlastní text ze stránky Systém: barva, velikost, tučné písmo, kurzíva, podtržení a blikání do potvrzení tlačítkem.</p>
     </div>
+    <div class="screen">
+      <svg viewBox="0 0 160 160" role="img" aria-label="Obrazovka levná elektřina"><circle cx="80" cy="80" r="76" fill="var(--screen)"/>
+        <text x="80" y="22" text-anchor="middle" fill="#969696" font-size="7">Levná elektřina</text>
+        <text x="80" y="42" text-anchor="middle" fill="#c8c8c8" font-size="7">Pračka · 2 h</text>
+        <text x="80" y="58" text-anchor="middle" fill="#3cdc64" font-size="13">13:00–15:00</text>
+        <text x="80" y="69" text-anchor="middle" fill="#ffcd5a" font-size="7">právě teď · Ø 1,842 Kč/kWh</text>
+        <text x="80" y="90" text-anchor="middle" fill="#c8c8c8" font-size="7">Auto · 4 h</text>
+        <text x="80" y="106" text-anchor="middle" fill="#fff" font-size="13">23:00–03:00</text>
+        <text x="80" y="117" text-anchor="middle" fill="#ffcd5a" font-size="7">dnes · Ø 2,088 Kč/kWh</text></svg>
+      <h3>Levná elektřina</h3><p>Až 3 nejlevnější okna podle nastavení (třeba pračka 2 h přes den, auto 4 h přes noc): kdy, dnes nebo zítra a průměrná cena. Právě běžící okno svítí zeleně.</p>
+    </div>
   </div>
   <div class="tbl"><table>
     <thead><tr><th>Barva letadla</th><th>Výška</th></tr></thead>
@@ -568,8 +579,11 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
       <tr><td>Poloha</td><td>souřadnice, nebo kliknutí do mapy či vyhledání adresy (jen když je telefon online). Sama se vybere nejbližší stanice ČHMI.</td></tr>
       <tr><td>Obrazovky</td><td>které se zobrazují a <b>v jakém pořadí</b> (přetažením za úchyt ☰, jde i prstem na mobilu); dosah radaru letadel 10–100 km; poloměr meteoradaru 25–200 km; <b>automatické přepínání</b> vypnuto/10–60 s (po stisku tlačítka minutu pauza); <b>podklad mapy</b> pro oba radary (žádný / hranice a města / hranice, řeky a města)</td></tr>
       <tr><td>Detail letadla</td><td>řádky jsou ve stejném pořadí jako na displeji; které údaje se ukazují (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí); <b>automatické přepínání letadel</b> v dosahu (vypnuto nebo každých 3–30 s); <b>jednotky rychlosti</b> km/h, kt, mph; <b>zobrazení trasy</b> IATA (PRG → LHR), ICAO (LKPR → EGLL), město nebo název letiště</td></tr>
+      <tr><td>Upozornění na zajímavá letadla</td><td>nouzový squawk 7500/7600/7700, vojenská letadla a <b>vlastní seznam</b> (registrace OK-NEP, typ A388, hex 49d3c1 nebo začátek volacího znaku CSA). U nového letadla se displej přepne na detail s červeným štítkem a blikajícím okrajem (15–300 s, nebo jen označit); na radaru bliká červeně. Krátký stisk upozornění potvrdí. Funguje s vlastním přijímačem i s internetem.</td></tr>
+      <tr><td>Noční restart</td><td>vypnuto / jen když dochází paměť / každou noc, v kolik hodin a od kolika kB volného bloku RAM. Pomáhá dlouhodobé stabilitě.</td></tr>
+      <tr><td>Přihlášení</td><td>volitelně uživatel a heslo pro webové rozhraní. Zapomenuté heslo: podrž BOOT 5 s, v hotspotu se přihlášení nevyžaduje.</td></tr>
       <tr><td>Zdroj dat o letadlech</td><td>Automaticky (vlastní přijímač → adsb.fi → adsb.lol), jen vlastní přijímač, jen adsb.fi nebo jen adsb.lol. Máš-li doma přijímač ADS-B (adsb-feeder/ADSB.im, readsb, tar1090, ultrafeeder), napiš jeho IP adresu – zařízení si doplní <code>:8080/data/aircraft.json</code>. Jiný port nebo cestu zadej celou, např. <code>http://192.168.1.50:8087/data/aircraft.json</code>. Vlastní přijímač se čte každých 5 s, bez limitů a bez šifrování (šetří RAM).</td></tr>
-      <tr><td>Spotová cena elektřiny</td><td>zdroj dat (spotovaelektrina.cz nebo spotovky.cz, druhý je záloha), přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena.</td></tr>
+      <tr><td>Spotová cena elektřiny</td><td>zdroj dat (spotovaelektrina.cz nebo spotovky.cz, druhý je záloha), přirážka v Kč/kWh (distribuce, poplatky, marže) a DPH v %. Při 0 a 0 je to holá burzovní cena. <b>Nejlevnější okna</b> (až 3) pro obrazovku Levná elektřina: název, délka a povolený čas od–do (i přes půlnoc).</td></tr>
       <tr><td>Meteostanice ČHMI</td><td>stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód)</td></tr>
       <tr><td>Jas displeje</td><td>den, večer a noc se začátkem a jasem; pin podsvícení, pokud ho modul má</td></tr>
       <tr><td>Čas (NTP)</td><td>hlavní a záložní NTP server (výchozí pool.ntp.org a time.google.com, třeba i tik.cesnet.cz nebo router)</td></tr>
@@ -579,7 +593,9 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <ul class="plain">
     <li>teplotu čipu, vytížení CPU, RAM a flash,</li>
     <li>WiFi, dobu běhu a důvod posledního restartu,</li>
-    <li>stav všech zdrojů dat: letadla, předpověď, meteoradar, loga, trasy, cena elektřiny, čas a aktualizace.</li>
+    <li>stav všech zdrojů dat: letadla, předpověď, meteoradar, loga, trasy, cena elektřiny, nejlevnější okna, zajímavá letadla, čas a aktualizace,</li>
+    <li>statistiky <b>vlastního přijímače</b>: letadla s polohou, nejvzdálenější letadlo, rekord dosahu dnes, zprávy/s a signál,</li>
+    <li><b>zálohu nastavení</b>: stažení do souboru (volitelně s hesly) a obnovení ze souboru.</li>
   </ul>
   <p>Když něco nefunguje, je tam vidět proč.</p>
 </section>

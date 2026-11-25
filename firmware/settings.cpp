@@ -49,6 +49,28 @@ void settingsLoad() {
   gCfg.priceSrc = prefs.getInt("psrc", d.priceSrc);
   gCfg.adsbUrl = prefs.getString("adsburl", "");
   gCfg.planeSrc = prefs.getInt("plsrc", d.planeSrc);
+  for (int i = 0; i < PRICE_WINS; i++) {
+    char k[8];
+    PriceWin& w = gCfg.priceWin[i];
+    snprintf(k, sizeof k, "pw%don", i);
+    w.on = prefs.getBool(k, false);
+    snprintf(k, sizeof k, "pw%dnm", i);
+    w.name = prefs.getString(k, "");
+    snprintf(k, sizeof k, "pw%ddu", i);
+    w.dur = prefs.getInt(k, 8);
+    snprintf(k, sizeof k, "pw%dfr", i);
+    w.from = prefs.getInt(k, 0);
+    snprintf(k, sizeof k, "pw%dto", i);
+    w.to = prefs.getInt(k, 24 * 60);
+  }
+  gCfg.rbMode = prefs.getInt("rbmode", d.rbMode);
+  gCfg.rbHour = prefs.getInt("rbhour", d.rbHour);
+  gCfg.rbMinKB = prefs.getInt("rbmin", d.rbMinKB);
+  gCfg.webUser = prefs.getString("wuser", d.webUser);
+  gCfg.webPass = prefs.getString("wpass", "");
+  gCfg.alertMask = prefs.getInt("almask", d.alertMask);
+  gCfg.watchList = prefs.getString("watch", "");
+  gCfg.alertSec = prefs.getInt("alsec", d.alertSec);
   prefs.end();
 }
 
@@ -88,6 +110,28 @@ void settingsSave() {
   prefs.putInt("psrc", gCfg.priceSrc);
   prefs.putString("adsburl", gCfg.adsbUrl);
   prefs.putInt("plsrc", gCfg.planeSrc);
+  for (int i = 0; i < PRICE_WINS; i++) {
+    char k[8];
+    const PriceWin& w = gCfg.priceWin[i];
+    snprintf(k, sizeof k, "pw%don", i);
+    prefs.putBool(k, w.on);
+    snprintf(k, sizeof k, "pw%dnm", i);
+    prefs.putString(k, w.name);
+    snprintf(k, sizeof k, "pw%ddu", i);
+    prefs.putInt(k, w.dur);
+    snprintf(k, sizeof k, "pw%dfr", i);
+    prefs.putInt(k, w.from);
+    snprintf(k, sizeof k, "pw%dto", i);
+    prefs.putInt(k, w.to);
+  }
+  prefs.putInt("rbmode", gCfg.rbMode);
+  prefs.putInt("rbhour", gCfg.rbHour);
+  prefs.putInt("rbmin", gCfg.rbMinKB);
+  prefs.putString("wuser", gCfg.webUser);
+  prefs.putString("wpass", gCfg.webPass);
+  prefs.putInt("almask", gCfg.alertMask);
+  prefs.putString("watch", gCfg.watchList);
+  prefs.putInt("alsec", gCfg.alertSec);
   prefs.end();
 }
 
@@ -150,4 +194,71 @@ String settingsTakeOtaUrl() {
   if (u.length()) prefs.remove("otaurl");
   prefs.end();
   return u;
+}
+
+// ---------------------------------------------------------------------------
+// Záloha a obnova. Klíče jsou čitelné názvy; obnova bere jen ty, které v souboru jsou,
+// takže jde nahrát i starší nebo ručně zkrácenou zálohu.
+#define FIELDS(X)                                                                                         \
+  X(lat, lat) X(lon, lon) X(wsi, wsi) X(name, name) X(elev, elev) X(range, rangeIdx) X(autoUpdate, autoUpdate) \
+  X(blPin, blPin) X(tDay, tDay) X(tEve, tEve) X(tNight, tNight) X(bDay, bDay) X(bEve, bEve) X(bNight, bNight)  \
+  X(screens, screens) X(screenOrder, screenOrder) X(note, note) X(noteFg, noteFg) X(noteBg, noteBg)            \
+  X(noteSize, noteSize) X(noteStyle, noteStyle) X(noteBlink, noteBlink) X(rainRadius, rainRadiusIdx)           \
+  X(rainMap, rainMap) X(planeMap, planeMap) X(cycleSec, cycleSec) X(ntp1, ntp1) X(ntp2, ntp2) X(lang, lang)    \
+  X(detailMask, detailMask) X(detailCycle, detailCycle) X(speedUnit, speedUnit) X(routeFmt, routeFmt)          \
+  X(priceFee, priceFee) X(priceVat, priceVat) X(adsbUrl, adsbUrl) X(planeSrc, planeSrc) X(priceSrc, priceSrc)  \
+  X(rbMode, rbMode) X(rbHour, rbHour) X(rbMinKB, rbMinKB) X(webUser, webUser) X(alertMask, alertMask)          \
+  X(watchList, watchList) X(alertSec, alertSec)
+
+template <typename T>
+static void getField(JsonObjectConst o, const char* k, T& v) {
+  if (o[k].is<T>()) v = o[k].as<T>();
+}
+static void getField(JsonObjectConst o, const char* k, String& v) {
+  if (o[k].is<const char*>()) v = o[k].as<const char*>();
+}
+static void getField(JsonObjectConst o, const char* k, float& v) {
+  if (o[k].is<float>()) v = o[k].as<float>();
+}
+
+void settingsToJson(JsonObject o, bool secrets) {
+  o["app"] = "esp32-stand-system";
+#define PUT(key, f) o[#key] = gCfg.f;
+  FIELDS(PUT)
+#undef PUT
+  JsonArray pw = o["priceWin"].to<JsonArray>();
+  for (const PriceWin& w : gCfg.priceWin) {
+    JsonObject x = pw.add<JsonObject>();
+    x["on"] = w.on;
+    x["name"] = w.name;
+    x["dur"] = w.dur;
+    x["from"] = w.from;
+    x["to"] = w.to;
+  }
+  if (secrets) {
+    o["ssid"] = gCfg.ssid;
+    o["pass"] = gCfg.pass;
+    o["webPass"] = gCfg.webPass;
+  }
+}
+
+void settingsFromJson(JsonObjectConst o) {
+#define GET(key, f) getField(o, #key, gCfg.f);
+  FIELDS(GET)
+#undef GET
+  JsonArrayConst pw = o["priceWin"];
+  for (int i = 0; i < PRICE_WINS && i < (int)pw.size(); i++) {
+    PriceWin& w = gCfg.priceWin[i];
+    JsonObjectConst x = pw[i];
+    getField(x, "on", w.on);
+    getField(x, "name", w.name);
+    getField(x, "dur", w.dur);
+    getField(x, "from", w.from);
+    getField(x, "to", w.to);
+  }
+  getField(o, "ssid", gCfg.ssid);
+  getField(o, "pass", gCfg.pass);
+  getField(o, "webPass", gCfg.webPass);
+  settingsSave();
+  settingsSaveNote();
 }
