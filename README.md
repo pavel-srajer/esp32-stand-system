@@ -52,18 +52,20 @@ Když se zařízení po zapnutí třikrát nepřipojí k uložené WiFi (asi 1 m
 |---|---|
 | **Jazyk** | čeština / English / Deutsch / Italiano / Português / Español / Tiếng Việt (displej i web). Jmeniny jsou jen česky, státní svátky se překládají |
 | **WiFi** | síť ze seznamu nalezených, heslo |
-| **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI |
+| **Poloha** | souřadnice, nebo kliknutí do mapy (OpenStreetMap) či vyhledání adresy. Mapa jde jen tehdy, když je telefon online (v domácí síti). Při kliknutí se sama vybere nejbližší stanice ČHMI. Tlačítko **📍 Moje poloha** dá na stránce `http://` (zařízení) jen přibližnou polohu podle IP adresy – zpřesni ji kliknutím do mapy nebo adresou. Podle této polohy se počítá radar letadel, meteoradar i předpověď Open-Meteo |
 | **Obrazovky** | které obrazovky se zobrazují a **v jakém pořadí** (přetažením za úchyt ☰), dosah radaru letadel (10–100 km), poloměr meteoradaru (25–200 km), automatické přepínání (vypnuto / 10–60 s; po stisku tlačítka minutu pauza), podklad mapy pro oba radary (žádný / hranice a města / hranice, řeky a města) |
 | **Detail letadla** | které údaje se zobrazí (logo, název společnosti, trasa, typ a registrace, výška v m, ft a FL, rychlost a kurz, vzdálenost a směr, pořadí), automatické přepínání letadel v dosahu (vypnuto / každých 3–30 s), jednotky rychlosti (km/h, kt, mph), zobrazení trasy (IATA PRG → LHR / ICAO LKPR → EGLL / město / název letiště) |
 | **Zdroj dat o letadlech** | Automaticky (vlastní přijímač → adsb.fi → adsb.lol), jen vlastní přijímač, jen adsb.fi nebo jen adsb.lol. Adresa vlastního přijímače (adsb-feeder/ADSB.im, readsb, tar1090, ultrafeeder): stačí IP, doplní se `:8080/data/aircraft.json`; jiný port nebo cestu zadej celou s `http://`. Vlastní přijímač se čte každých 5 s |
 | **Spotová cena elektřiny** | zdroj dat (spotovaelektrina.cz nebo spotovky.cz; když zvolený nejde, použije se automaticky druhý), přirážka v Kč/kWh (distribuce, poplatky) a DPH v %. Při 0 a 0 je to holá burzovní cena. **Nejlevnější okna** (až 3): název, délka 15 min – 8 h a povolený čas od–do (i přes půlnoc; 00:00–00:00 = kdykoli). Hledá se v dnešních a po 13:00 i zítřejších cenách, s přirážkou a DPH |
 | **Upozornění na zajímavá letadla** | nouzový squawk, vojenská letadla, vlastní seznam (registrace `OK-NEP`, typ `A388`, hex `49d3c1` nebo začátek volacího znaku `CSA`, oddělené čárkou) a co se stane u nového letadla (přepnout na detail a blikat 15–300 s, nebo jen označit). Funguje s vlastním přijímačem i s internetem; vojenská letadla z internetu se berou ze seznamu adsb.fi `/v2/mil` (každé 2 min). Stejné letadlo se ohlásí znovu nejdřív za 30 min |
 | **Noční restart** | vypnuto / jen když dochází paměť (největší volný blok RAM pod 8–32 kB) / každou noc, v kolik hodin. Proběhne v prvních minutách zvolené hodiny, nejdřív hodinu po zapnutí; na stránce Systém je pak v řádku Poslední restart „plánovaný noční restart“ |
-| **Přihlášení do webového rozhraní** | uživatel a heslo (HTTP Basic). Prázdné heslo = bez přihlášení. V hotspotu (BOOT 5 s) se přihlášení nevyžaduje, takže zapomenuté heslo jde zrušit |
+| **Přihlášení do webového rozhraní** | uživatel a heslo (HTTP Basic). Prázdné heslo = bez přihlášení. U jména nezáleží na velikosti písmen, heslo může mít diakritiku. Pole prohlížeč sám nevyplňuje. V hotspotu (BOOT 5 s) se přihlášení nevyžaduje, takže zapomenuté heslo jde zrušit zaškrtnutím „Zrušit heslo“ |
 | **Meteostanice ČHMI** | stanice pro obrazovku Měření (14 hlavních, nebo vlastní WSI kód) |
 | **Jas displeje** | den / večer / noc se začátkem a jasem v %, pin podsvícení. V noci pod 30 % první stisk tlačítka rozsvítí displej na 30 s |
 | **Čas (NTP)** | hlavní a záložní NTP server (výchozí `pool.ntp.org`, `time.google.com`) |
 | **Firmware** | verze, automatické aktualizace, tlačítko „Zkontrolovat a nainstalovat“ |
+
+Tlačítko **Uložit a restartovat** uloží nastavení a restartuje zařízení. Stránka počká, až zařízení znovu naběhne (pár sekund), a sama se vrátí do nastavení; při zapnutém hesle ukáže, pod jakým jménem se přihlásit. Při prvním nastavení přes hotspot se zařízení přesune do domácí sítě a stránku stačí zavřít.
 
 **Jas a pin podsvícení:**
 - **Modul s pinem BL/BLK:** připoj ho na volný GPIO (5, 6, 7, 20 nebo 21) a vyber ho v nastavení. Jas se pak řídí PWM podsvícením.
@@ -97,7 +99,9 @@ Změň číslo v souboru **`VERSION`** (např. `0.11.0`) a pushni do `main`. Jde
 | `firmware-full.bin` | kompletní obraz pro první nahrání přes USB (adresa `0x0`) |
 | `esp32-stand-system-arduino-vX.Y.Z.zip` | složka `firmware/` pro Arduino IDE s vloženým číslem verze a návodem |
 
-Ruční push tagu `vX.Y.Z` funguje taky. Každý push do `main` se automaticky zkusí přeložit.
+Ruční push tagu `vX.Y.Z` funguje taky. Každý push do `main` se automaticky zkusí přeložit. Před překladem běží kontroly, které při chybě vydání zastaví:
+- `tools/check_web_js.py` – syntaxe JavaScriptu webových stránek ve všech 7 jazycích (chybný znak v překladu by rozbil mapu a ovládání),
+- `tools/make_i18n.py --strict` – každý text má překlad do pt / es / vi se stejnými `%s`/`%d` a `firmware/i18n_extra.h` je aktuální.
 
 ## Zapojení
 
@@ -166,11 +170,13 @@ Všechny jsou zdarma a bez registrace.
 | `firmware/png_net.cpp` | dekódování PNG přímo ze sítě (sdílený statický dekodér) |
 | `firmware/http_body.h` | čtení HTTP/1.1 odpovědí včetně chunked |
 | `firmware/ota.cpp` | kontrola GitHub Releases a OTA |
-| `firmware/sysinfo.cpp` | data pro stránku Systém |
-| `firmware/settings.cpp` | nastavení v NVS |
+| `firmware/sysinfo.cpp` | data pro stránku Systém, plánovaný noční restart |
+| `firmware/settings.cpp` | nastavení v NVS, záloha a obnova (JSON) |
+| `firmware/i18n.cpp`, `i18n_extra.h` | překlady pt / es / vi (vyhledání podle anglického textu), generuje `tools/make_i18n.py` |
 | `firmware/i18n.h` | jazyky: `tr("česky", "English", "Deutsch", "Italiano")`; portugalština, španělština a vietnamština se hledají podle anglického textu v `i18n_extra.h` |
 | `tools/i18n_extra.json` | překlady pt / es / vi podle anglického textu; `python3 tools/make_i18n.py` z nich vygeneruje `firmware/i18n_extra.h` a vypíše, co chybí (kontroluje i `%s`/`%d`) |
-| `tools/make_fonts.py` | písmo pro displej z efontJA (LovyanGFX) + složená vietnamská písmena (`tools/viet_glyphs.py`), výstup `firmware/fonts_cz.h` |
+| `tools/make_fonts.py` | písmo pro displej z efontJA (LovyanGFX) + složená vietnamská písmena (`tools/viet_glyphs.py`, formát písma `tools/u8g2font.py`), výstup `firmware/fonts_cz.h` |
+| `tools/check_web_js.py` | kontrola JavaScriptu webu ve všech jazycích (běží v CI, potřebuje Node.js) |
 | `firmware/display.h` | piny a konfigurace displeje |
 | `firmware/fonts_cz.h` | písmo s diakritikou, generuje `tools/make_fonts.py` |
 | `firmware/mapdata.h` | obrysová mapa, generuje `tools/make_map.py` |
@@ -195,3 +201,5 @@ Na stránce Systém sleduj u RAM hodnotu **minimum**. Když zůstává nad ~15 k
 - **Sériová linka (115200)** vypisuje stav WiFi, OTA, počet letadel, snímky radaru, trasy a loga a všechny veličiny ČHMI (kód, čas, hodnota).
 - **Chybí hodnota z ČHMI stanice:** zkontroluj ve výpisu kód veličiny a případně ho uprav nahoře v `main.cpp` (`EL_TEMP`, `EL_HUM`, …).
 - **Barvy jsou obrácené:** přepni `cfg.invert` v `display.h`.
+- **Nejde se přihlásit do webu:** podrž BOOT 5 s, připoj se k hotspotu `Letadla-XXXX`, otevři http://192.168.4.1 (bez hesla), zaškrtni „Zrušit heslo“ a ulož. Tam uvidíš i uložené jméno.
+- **Záloha před přeflashováním:** stránka Systém → „Stáhnout zálohu“ (s hesly), po nahrání firmwaru „Obnovit ze souboru“.
