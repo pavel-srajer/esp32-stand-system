@@ -152,7 +152,7 @@ Všechny jsou zdarma a bez registrace.
 | Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |
 | Předpověď | [Open-Meteo](https://open-meteo.com): aktuální stav, srážky po 15 min na 2 h, hodinová a denní předpověď | 15 min |
-| Meteoradar | ČHMI, kompozit max. odrazivosti `maxz/png_masked`, posledních 6 snímků po 5 min | 5 min |
+| Meteoradar | ČHMI, kompozit max. odrazivosti `maxz/png_masked`, posledních 6 snímků po 5 min. Názvy se počítají z času (UTC), stahují se jen nové snímky; výpis adresáře (přes 300 kB) jen jako záloha | 5 min |
 | Měření ze stanice | ČHMI otevřená data, 10min měření `10m-<WSI>-<YYYYMMDD>.json` | 10 min |
 | Cena elektřiny | výsledky denního trhu [OTE](https://www.ote-cr.cz) v Kč po 15 min přes [spotovaelektrina.cz](https://spotovaelektrina.cz) nebo [spotovky.cz](https://spotovky.cz) (volba v nastavení, druhý zdroj je záloha). Zítřek je k dispozici kolem 13:00 | 30 min |
 | Mapa | [Natural Earth](https://www.naturalearthdata.com) (hranice, řeky; volné dílo), česká města z janpipek/cli-plotting-talk. Uložená ve firmwaru | – |

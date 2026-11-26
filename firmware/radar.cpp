@@ -202,7 +202,7 @@ static bool radarReady(PNG& png, void* user) {
   return true;
 }
 
-static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
+static bool decodeFrame(const char* ts, float radiusKm, Frame& f, int* httpCode = nullptr) {
   char url[160];
   snprintf(url, sizeof url, "%s%s%s.0.png", RADAR_DIR, NAME_PREFIX, ts);
 
@@ -212,9 +212,14 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
   c->radiusKm = radiusKm;
   int code = 0;
   bool ok = pngDecodeUrl(url, drawCb, radarReady, c, code);
+  if (httpCode) *httpCode = code;
   uint8_t* frame = c->frame;
   free(c->line);
   free(c);
+  if (!ok && code == 404) {  // snímek (zatím) neexistuje – není to chyba
+    Serial.printf("[Radar] %s ještě není\n", ts);
+    return false;
+  }
   if (!ok) {
     snprintf(sErr, sizeof sErr, "%s: %s", tr("snímek", "image", "Bild", "immagine"), pngNetError());
     Serial.printf("[Radar] %s\n", sErr);
@@ -263,7 +268,62 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f) {
   return true;
 }
 
+// Snímky jsou po 5 minutách a jmenují se podle času (UTC), takže názvy posledních
+// snímků jde spočítat. Výpis adresáře (týden snímků, přes 300 kB) se tak stahovat
+// nemusí – dřív se při přerušeném čtení vybraly hodiny až dny staré snímky.
+// Stahuje se jen to, co ještě nemáme (obvykle 1 snímek za 5 min).
+static bool updateByTime(float radiusKm, bool radiusChanged) {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return false;  // bez času nejde
+  Frame next[RADAR_FRAMES];
+  bool kept[RADAR_FRAMES] = {};
+  int nn = 0, fails = 0;
+  time_t t = now - now % 300;
+  // nejnovější slot ještě nemusí být zveřejněný, starší mohou výjimečně chybět
+  for (int k = 0; k < RADAR_FRAMES + 4 && nn < RADAR_FRAMES; k++, t -= 300) {
+    char ts[14];
+    struct tm g;
+    gmtime_r(&t, &g);
+    strftime(ts, sizeof ts, "%Y%m%d.%H%M", &g);
+    int have = -1;
+    lock();
+    if (!radiusChanged)
+      for (int i = 0; i < sCount; i++)
+        if (!strcmp(sFrames[i].ts, ts)) have = i;
+    if (have >= 0) {
+      next[nn++] = sFrames[have];
+      kept[have] = true;
+    }
+    unlock();
+    if (have >= 0) continue;
+    Frame f{};
+    int code = 0;
+    if (decodeFrame(ts, radiusKm, f, &code)) next[nn++] = f;
+    else if (code != 404 && ++fails >= 2) break;  // síť / paměť – nezkoušet další
+  }
+  if (!nn) return false;
+  // next je od nejnovějšího; animace chce od nejstaršího
+  for (int i = 0; i < nn / 2; i++) {
+    Frame x = next[i];
+    next[i] = next[nn - 1 - i];
+    next[nn - 1 - i] = x;
+  }
+  lock();
+  for (int k = 0; k < sCount; k++)
+    if (!kept[k]) free(sFrames[k].rle);
+  for (int k = 0; k < nn; k++) sFrames[k] = next[k];
+  sCount = nn;
+  sRadius = radiusKm;
+  sUpdatedMs = millis();
+  if (!fails) sErr[0] = 0;
+  unlock();
+  Serial.printf("[Radar] %d snímků, nejnovější %s\n", nn, next[nn - 1].ts);
+  return true;
+}
+
 bool radarUpdate(float radiusKm) {
+  if (updateByTime(radiusKm, fabsf(radiusKm - sRadius) > 0.1f)) return true;
+  // záloha: výpis adresáře (např. při delším výpadku snímků nebo bez času)
   static char want[RADAR_FRAMES][14];
   int n = scanIndex(want, RADAR_FRAMES);
   if (n <= 0) {
