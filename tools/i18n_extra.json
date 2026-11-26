@@ -1788,5 +1788,10 @@
   "reinício noturno programado",
   "reinicio nocturno programado",
   "khởi động lại ban đêm theo lịch"
+ ],
+ "Login user: ": [
+  "Utilizador para entrar: ",
+  "Usuario para entrar: ",
+  "Tên đăng nhập: "
  ]
 }

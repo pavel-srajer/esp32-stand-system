@@ -7,7 +7,7 @@ struct TrExtra {
   const char* t[3];  // pt, es, vi
 };
 
-static const TrExtra TR_EXTRA[358] = {
+static const TrExtra TR_EXTRA[359] = {
     {" (tomorrow)", {" (amanhã)", " (mañana)", " (ngày mai)"}},
     {" – downloading…", {" – a transferir…", " – descargando…", " – đang tải xuống…"}},
     {" – error: ", {" – erro: ", " – error: ", " – lỗi: "}},
@@ -124,6 +124,7 @@ static const TrExtra TR_EXTRA[358] = {
     {"Light rain", {"Chuva fraca", "Lluvia débil", "Mưa nhỏ"}},
     {"Location (radar centre)", {"Localização (centro do radar)", "Ubicación (centro del radar)", "Vị trí (tâm radar)"}},
     {"Location from phone", {"Localização do telemóvel", "Ubicación del móvil", "Vị trí từ điện thoại"}},
+    {"Login user: ", {"Utilizador para entrar: ", "Usuario para entrar: ", "Tên đăng nhập: "}},
     {"Longitude", {"Longitude", "Longitud", "Kinh độ"}},
     {"Low memory = largest block below", {"Pouca memória = maior bloco abaixo de", "Poca memoria = bloque mayor por debajo de", "Thiếu bộ nhớ = khối lớn nhất dưới"}},
     {"MILITARY", {"MILITAR", "MILITAR", "QUÂN SỰ"}},

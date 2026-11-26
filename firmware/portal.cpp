@@ -7,6 +7,7 @@
 #include "screens.h"
 #include <WiFi.h>
 #include <WebServer.h>
+#include "libb64/cdecode.h"
 #include <DNSServer.h>
 #include <vector>
 #include <algorithm>
@@ -477,9 +478,45 @@ static void localize(PageOut& out, const char* tpl) {
 
 // Volitelné přihlášení (HTTP Basic). V hotspotu (BOOT 5 s) se nevyžaduje, aby šlo
 // zapomenuté heslo obnovit – k tomu je potřeba fyzický přístup k zařízení.
+// Vlastní kontrola (místo server.authenticate): jméno bez ohledu na velikost písmen
+// a mezery okolo; heslo přesně, ale prohlížeč ho může poslat v UTF-8 i v Latin-1
+// (hesla s diakritikou), proto se zkusí obě podoby.
+static String latin1ToUtf8(const String& in) {
+  String o;
+  for (unsigned char c : in) {
+    if (c < 0x80) o += (char)c;
+    else {
+      o += (char)(0xC0 | (c >> 6));
+      o += (char)(0x80 | (c & 0x3F));
+    }
+  }
+  return o;
+}
+
+static bool credentialsOk() {
+  String h = server.header("Authorization");
+  if (!h.startsWith("Basic ")) return false;
+  h = h.substring(6);
+  h.trim();
+  if (h.length() > 200) return false;
+  char dec[160];
+  int n = base64_decode_chars(h.c_str(), h.length(), dec);
+  if (n <= 0 || n >= (int)sizeof dec) return false;
+  dec[n] = 0;
+  char* colon = strchr(dec, ':');
+  if (!colon) return false;
+  *colon = 0;
+  String user = dec, pass = colon + 1;
+  user.trim();
+  String want = gCfg.webUser;
+  want.trim();
+  if (!user.equalsIgnoreCase(want)) return false;
+  return pass == gCfg.webPass || latin1ToUtf8(pass) == gCfg.webPass;
+}
+
 static bool authOk() {
   if (gAp || !gCfg.webPass.length()) return true;
-  if (server.authenticate(gCfg.webUser.c_str(), gCfg.webPass.c_str())) return true;
+  if (credentialsOk()) return true;
   server.requestAuthentication(BASIC_AUTH, "esp32-stand-system");
   return false;
 }
@@ -1210,11 +1247,11 @@ static void handleRoot() {
     h += tr("Přihlášení do webového rozhraní", "Web interface login", "Anmeldung an der Weboberfläche", "Accesso all’interfaccia web");
     h += F("</legend><div class='row'><div><label>");
     h += tr("Uživatel", "User", "Benutzer", "Utente");
-    h += F("</label><input name='wuser' maxlength='32' autocomplete='off' value='");
+    h += F("</label><input name='wuser' maxlength='32' autocomplete='off' readonly onfocus=\"this.removeAttribute('readonly')\" value='");
     h += esc(gCfg.webUser);
     h += F("'></div><div><label>");
     h += tr("Heslo", "Password", "Passwort", "Password");
-    h += F("</label><input name='wpass' type='password' maxlength='64' autocomplete='new-password' placeholder='");
+    h += F("</label><input name='wpass' type='password' maxlength='64' autocomplete='new-password' readonly onfocus=\"this.removeAttribute('readonly')\" placeholder='");
     h += gCfg.webPass.length() ? tr("beze změny", "unchanged", "unverändert", "invariata") : tr("vypnuto", "off", "aus", "spento");
     h += F("'></div></div>");
     if (gCfg.webPass.length()) {
@@ -1419,6 +1456,10 @@ static void handleSave() {
              "Il dispositivo si riavvia e si connette al WiFi scelto. Puoi chiudere questa pagina.");
     pg += "</p></body>";
   } else {  // domácí síť: počkat, až zařízení znovu naběhne, a vrátit se do nastavení
+    if (gCfg.webPass.length()) {
+      pg += tr("Přihlašovací jméno: ", "Login user: ", "Benutzername: ", "Utente: ");
+      pg += "<b>" + esc(gCfg.webUser) + "</b><br>";
+    }
     pg += tr("Zařízení se restartuje, za chvíli se vrátíš do nastavení…", "The device is restarting, you will be back in the settings shortly…",
              "Das Gerät startet neu, gleich geht es zurück zu den Einstellungen…", "Il dispositivo si riavvia, a breve tornerai alle impostazioni…");
     pg += F("</p><p id='t' style='color:#8b949e'></p><script>var t0=Date.now(),"
