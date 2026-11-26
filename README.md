@@ -1,12 +1,14 @@
 # esp32-stand-system
 
+**Česky** · [English](README.en.md)
+
 Stolní displej na **ESP32-C3 Super Mini** s kulatým displejem **GC9A01 1,28"** (240×240):
 letadla v okolí (ADS-B) s logem a trasou, předpověď a upozornění na počasí, animovaný meteoradar ČHMI
 s vyhodnocením „kdy u tebe začne pršet“, spotová cena elektřiny a hodiny se jmeninami.
 Nastavuje se z telefonu přes WiFi hotspot a sám se aktualizuje z GitHub Releases (OTA).
 Rozhraní je **česky, anglicky, německy, italsky, portugalsky, španělsky a vietnamsky**.
 
-Podrobný návod s obrázky: [`docs/navod.html`](docs/navod.html)
+Podrobný návod s obrázky (7 jazyků, přepínač nahoře): [`docs/navod.html`](docs/navod.html)
 
 ## Obrazovky a ovládání
 
@@ -101,7 +103,8 @@ Změň číslo v souboru **`VERSION`** (např. `0.11.0`) a pushni do `main`. Jde
 
 Ruční push tagu `vX.Y.Z` funguje taky. Každý push do `main` se automaticky zkusí přeložit. Před překladem běží kontroly, které při chybě vydání zastaví:
 - `tools/check_web_js.py` – syntaxe JavaScriptu webových stránek ve všech 7 jazycích (chybný znak v překladu by rozbil mapu a ovládání),
-- `tools/make_i18n.py --strict` – každý text má překlad do pt / es / vi se stejnými `%s`/`%d` a `firmware/i18n_extra.h` je aktuální.
+- `tools/make_i18n.py --strict` – každý text má překlad do pt / es / vi se stejnými `%s`/`%d` a `firmware/i18n_extra.h` je aktuální,
+- `tools/make_docs.py --strict` – každý odstavec návodu má překlad do všech jazyků a `docs/navod.html` je aktuální.
 
 ## Zapojení
 
@@ -165,7 +168,7 @@ Všechny jsou zdarma a bez registrace.
 | `firmware/portal.cpp` | hotspot, captive portál, webové nastavení, stránka Systém, překlady webu |
 | `firmware/radar.cpp` | meteoradar ČHMI: stažení, ořez, komprese a vyhodnocení pohybu srážek |
 | `firmware/forecast.cpp` | předpověď Open-Meteo a upozornění |
-| `firmware/price.cpp` | spotová cena elektřiny |
+| `firmware/price.cpp` | spotová cena elektřiny, nejlevnější okna |
 | `firmware/logo.cpp`, `route.cpp` | loga společností, trasa letu |
 | `firmware/png_net.cpp` | dekódování PNG přímo ze sítě (sdílený statický dekodér) |
 | `firmware/http_body.h` | čtení HTTP/1.1 odpovědí včetně chunked |
@@ -177,6 +180,9 @@ Všechny jsou zdarma a bez registrace.
 | `tools/i18n_extra.json` | překlady pt / es / vi podle anglického textu; `python3 tools/make_i18n.py` z nich vygeneruje `firmware/i18n_extra.h` a vypíše, co chybí (kontroluje i `%s`/`%d`) |
 | `tools/make_fonts.py` | písmo pro displej z efontJA (LovyanGFX) + složená vietnamská písmena (`tools/viet_glyphs.py`, formát písma `tools/u8g2font.py`), výstup `firmware/fonts_cz.h` |
 | `tools/check_web_js.py` | kontrola JavaScriptu webu ve všech jazycích (běží v CI, potřebuje Node.js) |
+| `docs/src/navod.cs.html` | návod – **zdroj** v češtině (upravuje se tady) |
+| `docs/i18n/navod.<jazyk>.json` | překlady návodu (en, de, it, pt, es, vi) po odstavcích, klíčem je český text |
+| `tools/make_docs.py` | sestaví `docs/navod.html` (všechny jazyky + přepínač) a vypíše odstavce bez překladu; `--dump` vypíše české bloky |
 | `firmware/display.h` | piny a konfigurace displeje |
 | `firmware/fonts_cz.h` | písmo s diakritikou, generuje `tools/make_fonts.py` |
 | `firmware/mapdata.h` | obrysová mapa, generuje `tools/make_map.py` |
@@ -190,11 +196,12 @@ ESP32-C3 nemá PSRAM a každé šifrované spojení potřebuje asi 45 kB RAM. Pr
 - dekodér PNG je **jeden a statický** a PNG se dekóduje rovnou při stahování,
 - letadla i ceny elektřiny se z JSON čtou **po jedné položce**,
 - radar má **trvalý pracovní buffer**,
-- aktualizace se stahuje **hned po restartu** a vždy jen **jedním** šifrovaným spojením (přesměrování GitHubu se řeší zvlášť).
+- aktualizace se stahuje **hned po restartu** a vždy jen **jedním** šifrovaným spojením (přesměrování GitHubu se řeší zvlášť),
+- webové stránky se posílají **po malých kouscích**, takže nepotřebují velký volný blok RAM.
 
 Na stránce Systém sleduj u RAM hodnotu **minimum**. Když zůstává nad ~15 kB, je vše v pořádku.
 
-`fonts_cz.h` obsahuje z písma efont jen latinku (včetně němčiny a italštiny) a češtinu: 17 kB místo 1,7 MB. Jen díky tomu se firmware vejde do OTA oddílů.
+`fonts_cz.h` obsahuje z písma efont jen latinku (všechny jazyky rozhraní včetně češtiny) a složená vietnamská písmena: asi 100 kB pro 13 velikostí a řezů místo jednotek MB. Jen díky tomu se firmware vejde do OTA oddílů.
 
 ## Ladění
 

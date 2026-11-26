@@ -54,6 +54,11 @@ jobs:
       - name: Kontrola JavaScriptu webu (všechny jazyky)
         run: python3 tools/check_web_js.py
 
+      - name: Kontrola návodu (všechny jazyky)
+        run: |
+          python3 tools/make_docs.py --strict
+          git diff --exit-code docs/navod.html || { echo "docs/navod.html není aktuální – spusť tools/make_docs.py"; exit 1; }
+
       - name: Kontrola překladů (pt, es, vi)
         run: |
           python3 tools/make_i18n.py --strict
