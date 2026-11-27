@@ -50,7 +50,13 @@ static int32_t readCb(PNGFILE* f, uint8_t* buf, int32_t len) {
 }
 
 bool pngDecodeUrl(const char* url, PNG_DRAW_CALLBACK* draw, PngReadyFn ready, void* user, int& httpCode) {
+  return pngDecodeUrlEx(url, draw, ready, user, httpCode, nullptr, nullptr, 0);
+}
+
+bool pngDecodeUrlEx(const char* url, PNG_DRAW_CALLBACK* draw, PngReadyFn ready, void* user, int& httpCode,
+                    const char* ifNoneMatch, char* etagOut, size_t etagLen) {
   httpCode = 0;
+  if (etagOut && etagLen) etagOut[0] = 0;
   sErr[0] = 0;
   WiFiClientSecure client;
   client.setInsecure();
@@ -61,13 +67,17 @@ bool pngDecodeUrl(const char* url, PNG_DRAW_CALLBACK* draw, PngReadyFn ready, vo
   http.setUserAgent("esp32-stand-system/1.0");
   bool ok = false;
   if (http.begin(client, url)) {
+    static const char* hdrs[] = {"ETag"};
+    if (etagOut) http.collectHeaders(hdrs, 1);
+    if (ifNoneMatch && ifNoneMatch[0]) http.addHeader("If-None-Match", ifNoneMatch);
     httpCode = http.GET();
+    if (etagOut && httpCode == 200) strlcpy(etagOut, http.header("ETag").c_str(), etagLen);
     if (httpCode < 0) {  // spojení se nenavázalo – nejčastěji TLS a nedostatek paměti
       char tls[40] = "";
       client.lastError(tls, sizeof tls);
       snprintf(sErr, sizeof sErr, "spojení selhalo (%s), volný blok %u kB", tls[0] ? tls : "?",
                (unsigned)(ESP.getMaxAllocHeap() / 1024));
-    } else if (httpCode != 200) {
+    } else if (httpCode != 200 && httpCode != 304) {
       snprintf(sErr, sizeof sErr, "HTTP %d", httpCode);
     }
     uint8_t* hist = httpCode == 200 ? (uint8_t*)malloc(HIST) : nullptr;  // až po navázání spojení

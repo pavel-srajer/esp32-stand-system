@@ -16,3 +16,9 @@ typedef bool (*PngReadyFn)(PNG& png, void* user);
 const char* pngNetError();
 
 bool pngDecodeUrl(const char* url, PNG_DRAW_CALLBACK* draw, PngReadyFn ready, void* user, int& httpCode);
+
+// Totéž s podmíněným dotazem: ifNoneMatch = značka verze (ETag) uloženého obrázku;
+// když se na serveru nezměnil, vrátí false a httpCode 304 (nic se nestahuje).
+// etagOut dostane značku verze staženého obrázku.
+bool pngDecodeUrlEx(const char* url, PNG_DRAW_CALLBACK* draw, PngReadyFn ready, void* user, int& httpCode,
+                    const char* ifNoneMatch, char* etagOut, size_t etagLen);

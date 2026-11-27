@@ -148,7 +148,7 @@ Všechny jsou zdarma a bez registrace.
 | Data | Zdroj | Jak často |
 |---|---|---|
 | Letadla (ADS-B) | jen když je zapnutý Radar, Detail nebo upozornění (Hodiny pak ukazují i počet letadel; se samotnými Hodinami se letadla nestahují). Vlastní přijímač v domácí síti (`aircraft.json`, 5 s), jinak [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
-| Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení; v paměti komprimovaně ~8 log (podle velikosti 4–16) |
+| Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení; v RAM komprimovaně ~8 log a **trvale ve flash ~120 log** (přežijí restart, stahuje se jen nové logo). Jednou týdně jeden dotaz na GitHub, jestli se sbírka změnila; pokud ano, každé logo se při dalším zobrazení ověří podmíněným dotazem (nezměněné se nestahuje) |
 | Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |
 | Předpověď | [Open-Meteo](https://open-meteo.com): aktuální stav, srážky po 15 min na 2 h, hodinová a denní předpověď | 15 min |
@@ -170,6 +170,7 @@ Všechny jsou zdarma a bez registrace.
 | `firmware/forecast.cpp` | předpověď Open-Meteo a upozornění |
 | `firmware/price.cpp` | spotová cena elektřiny, nejlevnější okna |
 | `firmware/logo.cpp`, `route.cpp` | loga společností, trasa letu |
+| `firmware/logostore.cpp` | trvalé úložiště log ve flash (oddíl `spiffs`, 128 kB, dílky 512 B, CRC, týdenní kontrola změn) |
 | `firmware/png_net.cpp` | dekódování PNG přímo ze sítě (sdílený statický dekodér) |
 | `firmware/http_body.h` | čtení HTTP/1.1 odpovědí včetně chunked |
 | `firmware/ota.cpp` | kontrola GitHub Releases a OTA |

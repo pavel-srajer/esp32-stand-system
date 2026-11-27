@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include "png_net.h"
 #include "radar.h"
+#include "logostore.h"
 #include <LovyanGFX.hpp>
 
 static const char* LOGO_URL = "https://raw.githubusercontent.com/Jxck-S/airline-logos/main/flightaware_logos/%s.png";
@@ -108,52 +109,38 @@ static bool logoReady(PNG& png, void* user) {
 }
 
 // stáhne a dekóduje; vrací: 1 = OK, 0 = logo neexistuje, -1 = chyba (zkusit později)
-static int fetch(const char* icao, uint8_t* out) {
+// stáhne a dekóduje; vrací 1 = OK, 0 = logo neexistuje (404), 2 = nezměněno (304),
+// -1 = chyba (zkusit později)
+static int fetch(const char* icao, uint8_t* out, const char* ifNoneMatch, char* etag, size_t etagLen) {
   char url[128];
   snprintf(url, sizeof url, LOGO_URL, icao);
   Ctx c{};
   c.out = out;
   memset(out, 0, LOGO_SIZE * LOGO_SIZE);
   int code = 0;
-  bool ok = pngDecodeUrl(url, drawCb, logoReady, &c, code);
+  bool ok = pngDecodeUrlEx(url, drawCb, logoReady, &c, code, ifNoneMatch, etag, etagLen);
   free(c.line);
   if (ok) return 1;
+  if (code == 304) return 2;
   return code == 404 ? 0 : -1;
 }
 
-void logoService() {
-  char icao[4];
-  if ((int32_t)(sRetryAt - millis()) > 0) return;
-  lock();
-  strlcpy(icao, sPending, sizeof icao);
-  sPending[0] = 0;
-  unlock();
-  if (!icao[0]) return;
-
-  // Dekóduje se do pracovního bufferu radaru (14 kB). Logo i radar běží jen v síťové
-  // úloze jedno po druhém, takže kvůli logu nemusí existovat další 3 kB buffer.
-  uint8_t* px = radarScratch();
-  int r = fetch(icao, px);
-  if (r > 0) snprintf(sStatus, sizeof sStatus, "%s: OK", icao);
-  else if (r == 0) snprintf(sStatus, sizeof sStatus, "%s: logo neexistuje", icao);
-  else snprintf(sStatus, sizeof sStatus, "%s: %s", icao, pngNetError());
-  Serial.printf("[Logo] %s\n", sStatus);
-  if (r < 0) {  // síťová chyba: zkusí se znovu za 30 s
-    sRetryAt = millis() + 30000;
-    return;
-  }
-  // délka RLE
+static int rleEncode(const uint8_t* px, uint8_t* out, int maxLen) {
   const int N = LOGO_SIZE * LOGO_SIZE;
-  int len = 0;
-  if (r > 0)
-    for (int i = 0; i < N;) {
-      int n = 1;
-      while (i + n < N && px[i + n] == px[i] && n < 255) n++;
-      len += 2;
-      i += n;
-    }
-  if (len > POOL) len = 0, r = 0;  // nemůže nastat (max. 2 × 3136 by bylo víc), pro jistotu
+  int o = 0;
+  for (int i = 0; i < N && o + 2 <= maxLen;) {
+    int n = 1;
+    while (i + n < N && px[i + n] == px[i] && n < 255) n++;
+    out[o++] = n;
+    out[o++] = px[i];
+    i += n;
+  }
+  return o;
+}
 
+// Vloží logo (RLE) do RAM cache; nejdéle nepoužitá loga uvolní, zbylá setřese.
+static void cacheInsert(const char* icao, bool found, const uint8_t* rle, int len) {
+  if (len > POOL) len = 0, found = false;
   lock();
   auto usedBytes = [&]() {
     int u = 0;
@@ -166,7 +153,11 @@ void logoService() {
       if (!sCache[i].icao[0]) return i;
     return -1;
   };
-  // uvolňovat nejdéle nepoužitá loga, dokud není místo pro záznam i data
+  for (auto& e : sCache)  // stejné logo nahradit
+    if (e.icao[0] && !strcmp(e.icao, icao)) {
+      e.icao[0] = 0;
+      e.len = 0;
+    }
   while (freeSlot() < 0 || usedBytes() + len > POOL) {
     int lru = -1;
     for (int i = 0; i < CACHE; i++)
@@ -175,7 +166,6 @@ void logoService() {
     sCache[lru].icao[0] = 0;
     sCache[lru].len = 0;
   }
-  // setřást zbývající loga na začátek bloku (podle pozice, ať se nic nepřepíše)
   int order[CACHE], no = 0;
   for (int i = 0; i < CACHE; i++)
     if (sCache[i].icao[0] && sCache[i].len) order[no++] = i;
@@ -192,28 +182,76 @@ void logoService() {
     e.off = w;
     w += e.len;
   }
-  // zapsat nové logo za ně
   int slot = freeSlot();
   if (slot >= 0) {
     Entry& e = sCache[slot];
     strlcpy(e.icao, icao, sizeof e.icao);
-    e.found = r > 0;
+    e.found = found;
     e.used = millis();
     e.off = w;
     e.len = 0;
-    if (r > 0 && w + len <= POOL) {
-      for (int i = 0; i < N;) {
-        int n = 1;
-        while (i + n < N && px[i + n] == px[i] && n < 255) n++;
-        sPool[w + e.len] = n;
-        sPool[w + e.len + 1] = px[i];
-        e.len += 2;
-        i += n;
-      }
+    if (found && len && w + len <= POOL) {
+      memcpy(sPool + w, rle, len);
+      e.len = len;
     }
-    int cnt = 0;
-    for (auto& x : sCache) cnt += x.icao[0] && x.found;
-    Serial.printf("[Logo] %s: %d B, v paměti %d log, %d / %d B\n", icao, e.len, cnt, w + e.len, POOL);
   }
   unlock();
+}
+
+void logoService() {
+  char icao[4];
+  if ((int32_t)(sRetryAt - millis()) > 0) return;
+  lock();
+  strlcpy(icao, sPending, sizeof icao);
+  sPending[0] = 0;
+  unlock();
+  if (!icao[0]) {
+    logoStoreWeeklyCheck();  // v klidu: 1× týdně, jestli se sbírka log na GitHubu změnila
+    return;
+  }
+
+  // Pracovní buffer radaru (14 kB; logo i radar běží jen v síťové úloze po sobě):
+  // [0, 4096) dekódované logo / sestavení záznamu pro flash, [4096, …) RLE.
+  uint8_t* scratch = radarScratch();
+  uint8_t* px = scratch;
+  uint8_t* rle = scratch + 4096;
+  const int RLE_MAX = 2 * LOGO_SIZE * LOGO_SIZE;
+  uint32_t gen = logoStoreGen();
+
+  // 1) ve flash a ověřené v aktuální generaci -> žádné stahování
+  LogoRec rec{};
+  bool have = logoStoreFind(icao, rec, rle, RLE_MAX);
+  if (have && rec.gen == gen) {
+    cacheInsert(icao, rec.found, rle, rec.len);
+    snprintf(sStatus, sizeof sStatus, "%s: %s · %d", icao, rec.found ? "flash" : "-", logoStoreCount());
+    return;
+  }
+
+  // 2) stáhnout (u starší generace jen "změnilo se?" podle značky verze)
+  char etag[68] = "";
+  int r = fetch(icao, px, have && rec.found ? rec.etag : nullptr, etag, sizeof etag);
+  if (r == 2 && have) {  // nezměněno -> jen potvrdit generaci
+    rec.gen = gen;
+    logoStorePut(icao, rec, rle, scratch);
+    cacheInsert(icao, rec.found, rle, rec.len);
+    snprintf(sStatus, sizeof sStatus, "%s: OK (304) · %d", icao, logoStoreCount());
+    Serial.printf("[Logo] %s\n", sStatus);
+    return;
+  }
+  if (r < 0) {  // síťová chyba: případně ukázat uloženou (starší) verzi, zkusit za 30 s
+    if (have) cacheInsert(icao, rec.found, rle, rec.len);
+    snprintf(sStatus, sizeof sStatus, "%s: %s", icao, pngNetError());
+    Serial.printf("[Logo] %s\n", sStatus);
+    sRetryAt = millis() + 30000;
+    return;
+  }
+  LogoRec nr{};
+  nr.found = r == 1;
+  nr.gen = gen;
+  nr.len = nr.found ? rleEncode(px, rle, RLE_MAX) : 0;
+  strlcpy(nr.etag, etag, sizeof nr.etag);
+  bool saved = logoStorePut(icao, nr, rle, scratch);  // px už není potřeba – buffer na záznam
+  cacheInsert(icao, nr.found, rle, nr.len);
+  snprintf(sStatus, sizeof sStatus, "%s: %s · %d", icao, nr.found ? "OK" : "logo neexistuje", logoStoreCount());
+  Serial.printf("[Logo] %s (%d B%s)\n", sStatus, nr.len, saved ? ", uloženo do flash" : "");
 }
