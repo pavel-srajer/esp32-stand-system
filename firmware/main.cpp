@@ -2240,6 +2240,16 @@ const char* brightnessPeriod() {
 // ===================================================================
 static TaskHandle_t gNetTask = nullptr, gLoopTask = nullptr;
 
+// zámek poznámky: web (vlastní úloha) ji čte pro stránku Systém, hlavní smyčka ji mění
+static SemaphoreHandle_t sNoteMx = nullptr;
+static String sPendingNote;
+static volatile bool sNotePending = false;
+static void noteLock() {
+  if (!sNoteMx) sNoteMx = xSemaphoreCreateMutex();
+  xSemaphoreTake(sNoteMx, portMAX_DELAY);
+}
+static void noteUnlock() { xSemaphoreGive(sNoteMx); }
+
 void appStatusJson(JsonObject o) {
   float range = RANGES_KM[gRangeIdx];
   xSemaphoreTake(gMutex, portMAX_DELAY);
@@ -2326,7 +2336,9 @@ void appStatusJson(JsonObject o) {
   o["logo"] = logoStatus();
   o["route"] = routeStatus();
   o["screen"] = gPortalMode ? -1 : gScreen;
+  noteLock();
   o["note"] = gCfg.note;
+  noteUnlock();
   {
     char c[8];
     snprintf(c, sizeof c, "#%06lX", (unsigned long)(gCfg.noteFg & 0xFFFFFF));
@@ -2386,6 +2398,7 @@ void appStatusJson(JsonObject o) {
                         : String(tr("softwarové stmívání obrazu", "software dimming", "Software-Dimmung", "attenuazione software"));
   o["stack_net"] = gNetTask ? uxTaskGetStackHighWaterMark(gNetTask) : 0;
   o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
+  o["stack_web"] = webTaskStackFree();
 }
 
 static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
@@ -2516,14 +2529,38 @@ static String displayableText(const String& in) {
   return out;
 }
 
+// Poznámku posílá web (vlastní úloha). Text se jen předá a převezme ho hlavní smyčka,
+// aby se gCfg.note neměnila uprostřed kreslení.
+
 void noteSetAndShow(const String& text) {
   String t = displayableText(text);
   t.trim();
   if (t.length() > 300) t = t.substring(0, 300);
-  gCfg.note = t;
+  noteLock();
+  sPendingNote = t;
+  sNotePending = true;
+  noteUnlock();
+}
+
+static void notePendingApply() {  // hlavní smyčka
+  if (!sNotePending) return;
+  noteLock();
+  gCfg.note = sPendingNote;
+  sPendingNote = "";
+  sNotePending = false;
+  noteUnlock();
   settingsSaveNote();
   gNoteAck = false;  // nová poznámka -> bliká (je-li zapnuto), dokud ji nepotvrdíš
   screenSet(SCR_NOTE);
+}
+
+extern TaskHandle_t loopTaskHandle;
+void appPauseForRestart() {
+  if (gNetTask) vTaskSuspend(gNetTask);
+  if (loopTaskHandle && xTaskGetCurrentTaskHandle() != loopTaskHandle) {
+    disableLoopWDT();  // pozastavená smyčka by jinak spustila watchdog
+    vTaskSuspend(loopTaskHandle);
+  }
 }
 
 void screenSet(int i) {
@@ -2768,6 +2805,7 @@ void setup() {
     if (!portalFlag) showSplash(3000);  // první zapnutí (ne při ručním vyvolání nastavení)
     showBoot(tr("Spouštím hotspot…", "Starting hotspot…", "Starte Hotspot…", "Avvio hotspot…"), nullptr);
     webBegin(true);
+    webStartTask();
     return;
   }
 
@@ -2790,6 +2828,7 @@ void setup() {
   if (gCfg.ntp2.isEmpty()) configTzTime(TZ_INFO, gCfg.ntp1.c_str());
   else configTzTime(TZ_INFO, gCfg.ntp1.c_str(), gCfg.ntp2.c_str());
   webBegin(false);  // nastavení i v domácí síti na IP zařízení
+  webStartTask();   // web ve vlastní úloze – nezdržuje displej ani tlačítko
   xTaskCreate(netTask, "net", 16384, nullptr, 1, &gNetTask);
   if (!gOtaBootMode) showSplash(3000);  // WiFi se mezitím už připojuje
 }
@@ -2833,7 +2872,7 @@ void loop() {
   static uint32_t lastDraw = 0;
 
   pollButton();
-  webLoop();
+  notePendingApply();
   uint32_t now = millis();
 
   if (gPortalMode && settingsHasWifi() && now - webLastActivity() > PORTAL_IDLE_RESTART_MS &&

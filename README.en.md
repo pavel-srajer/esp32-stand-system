@@ -199,7 +199,8 @@ The ESP32-C3 has no PSRAM and every encrypted connection needs about 45 kB of RA
 - aircraft and electricity prices are read from JSON **one item at a time**,
 - the radar has a **permanent work buffer**, and its images as well as airline logos (compressed, ~8 in 6.3 kB) have a **fixed place** (images back to back in a 12 kB block; in heavy rain the oldest are left out). They used to be re-allocated every 5 minutes, which fragmented the heap so badly that no block was left for an encrypted connection (“SSL – Memory allocation failed”),
 - updates are downloaded **right after a restart** and always over **a single** encrypted connection (GitHub’s redirect is resolved separately),
-- web pages are sent **in small chunks**, so they do not need a large free block of RAM.
+- web pages are sent **in small chunks**, so they do not need a large free block of RAM,
+- the web interface runs in **its own task**: sending a page slowly over WiFi does not stall the display or the button. The main loop (display, button) is guarded by a watchdog – if it hangs for more than 5 s, the device restarts.
 
 On the System page watch the RAM **minimum**. If it stays above ~15 kB, everything is fine.
 
