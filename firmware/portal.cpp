@@ -278,7 +278,7 @@ function load(){if(busy)return;busy=true;clearTimeout(tmr);
   ['{{forecast}} Open-Meteo',age(a.fc_age)+(a.fc_age>=0?' · {{alerts}}: '+a.fc_alerts:'')+(a.fc_err?' · {{error}}: '+esc(a.fc_err):'')],
   ['{{rainradar}}',a.rain_frames+' {{frames}}, '+age(a.rain_age)+(a.rain_err?' · '+esc(a.rain_err):'')],['{{radarhere}}',esc(a.rain_info||'–')],['{{logos}}',esc(a.logo||'–')],['{{route}}',esc(a.route||'–')],['{{price}}',(a.price_src?esc(a.price_src)+' · ':'')+age(a.price_age)+(a.price_age>=0?' · {{tomorrow}}: '+(a.price_tom?'✔':'–'):'')+(a.price_err?' · '+esc(a.price_err):'')],['{{station}}',esc(a.station)],
   ['{{pwin}}',a.price_win&&a.price_win.length?a.price_win.map(esc).join('<br>'):'–'],['{{alerts_now}}',a.alerts_now?esc(a.alerts_now):'–'],
-  ['{{bright}}',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['{{time}}',esc(a.ntp)],['{{update}}',esc(a.ota)],['{{stack}}',a.stack_net+' B (net), '+a.stack_loop+' B (UI)'+(a.stack_web!=null?', '+a.stack_web+' B (web)':'')]]);
+  ['{{bright}}',a.bright+' % ('+esc(a.period)+'), '+esc(a.backlight)],['{{time}}',esc(a.ntp)],['{{update}}',esc(a.ota)],['{{stack}}',a.stack_net+' B (net), '+a.stack_loop+' B (UI)']]);
  var x=a.rx;g('rxs').className=x?'':'hide';
  if(x)rows('rx',[['{{rx_planes}}',x.pos+' / '+x.total],['{{rx_max}}',x.max+' km'+(x.max_cs?' ('+esc(x.max_cs)+')':'')],
   ['{{rx_today}}',x.max_today+' km'+(x.max_today_cs?' ('+esc(x.max_today_cs)+')':'')],['{{rx_rate}}',x.rate!=null?x.rate+' /s':'–'],
@@ -1555,14 +1555,3 @@ void webLoop() {
   server.handleClient();
 }
 
-static TaskHandle_t sWebTask = nullptr;
-static void webTask(void*) {
-  for (;;) {
-    webLoop();
-    vTaskDelay(pdMS_TO_TICKS(3));
-  }
-}
-void webStartTask() {
-  if (!sWebTask) xTaskCreate(webTask, "web", 6144, nullptr, 1, &sWebTask);
-}
-uint32_t webTaskStackFree() { return sWebTask ? uxTaskGetStackHighWaterMark(sWebTask) : 0; }

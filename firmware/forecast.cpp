@@ -1,4 +1,5 @@
 #include "forecast.h"
+#include <time.h>
 #include "settings.h"
 #include "i18n.h"
 #include "http_body.h"
@@ -159,7 +160,7 @@ bool forecastUpdate() {
            "&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_gusts_10m"
            "&forecast_hours=24"
            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=3"
-           "&timezone=Europe%%2FPrague&wind_speed_unit=kmh",
+           "&timezone=Europe%%2FPrague&wind_speed_unit=kmh&timeformat=unixtime",
            gCfg.lat, gCfg.lon);
 
   WiFiClientSecure client;
@@ -182,8 +183,16 @@ bool forecastUpdate() {
     return false;
   }
   BodyStream body(http.getStreamPtr(), BodyStream::isChunked(http));
+  // Jen potřebné údaje (bez jednotek a metadat) a časy jako čísla místo textů:
+  // dokument zabere v RAM zhruba polovinu (běží ještě během šifrovaného spojení).
+  JsonDocument filter;
+  for (const char* k : {"temperature_2m", "weather_code", "wind_speed_10m", "wind_gusts_10m", "is_day"}) filter["current"][k] = true;
+  for (const char* k : {"time", "temperature_2m", "precipitation", "precipitation_probability", "weather_code", "wind_gusts_10m"})
+    filter["hourly"][k] = true;
+  filter["minutely_15"]["precipitation"] = true;
+  for (const char* k : {"time", "weather_code", "temperature_2m_max", "temperature_2m_min", "precipitation_sum"}) filter["daily"][k] = true;
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, body);
+  DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
   http.end();
   if (err) {
     lock();
@@ -203,8 +212,10 @@ bool forecastUpdate() {
   JsonArray ht = h["time"];
   f.nh = min((int)ht.size(), (int)Forecast::H);
   for (int i = 0; i < f.nh; i++) {
-    const char* t = ht[i] | "";  // "2026-11-13T17:00"
-    f.hHour[i] = strlen(t) >= 13 ? atoi(t + 11) : 0;
+    time_t tt = (time_t)(ht[i] | 0L);  // unixtime (UTC) -> místní hodina
+    struct tm lt;
+    localtime_r(&tt, &lt);
+    f.hHour[i] = lt.tm_hour;
     f.hT[i] = h["temperature_2m"][i] | NAN;
     f.hPrec[i] = h["precipitation"][i] | 0.0f;
     f.hProb[i] = h["precipitation_probability"][i] | 0;

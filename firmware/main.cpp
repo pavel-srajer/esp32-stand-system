@@ -810,6 +810,10 @@ static void otaRetryAfterRestart() {
   ESP.restart();
 }
 
+// Web obsluhuje síťová úloha mezi jednotlivými stahováními: web a šifrované spojení
+// (~45 kB) tak nikdy nepotřebují paměť současně a displej/tlačítko pomalé posílání
+// stránky nebrzdí. (Vlastní úloha pro web by potřebovala další zásobník – na ten
+// už paměť nezbývala.)
 static void netTask(void*) {
   uint32_t lastPlanes = 0, lastWeather = 0;
   uint32_t weatherInterval = WEATHER_REFRESH_MS;
@@ -832,6 +836,7 @@ static void netTask(void*) {
         fetchPlanes();
         lastPlanes = millis();
       }
+      webLoop();
       // vojenská letadla pro internetové zdroje (vlastní přijímač posílá dbFlags sám)
       static uint32_t lastMil = 0;
       if ((gCfg.alertMask & ALERT_MIL) && !sLocalOk && (!lastMil || millis() - lastMil >= 120000)) {
@@ -843,6 +848,7 @@ static void netTask(void*) {
         bool ok = fetchWeather();
         weatherInterval = ok ? WEATHER_REFRESH_MS : 60000;  // při chybě zkus za minutu
         lastWeather = millis();
+        webLoop();
       }
       // spotová cena elektřiny (ceny se mění jednou denně; zítřek OTE zveřejní kolem 13:00)
       static uint32_t lastPrice = 0, priceInterval = 1800000;
@@ -855,8 +861,11 @@ static void netTask(void*) {
           lastPrice = millis();
         }
       }
+      webLoop();
       logoService();   // logo pro obrazovku Detail (jen když nějaké čeká)
+      webLoop();
       routeService();  // trasa letu pro obrazovku Detail
+      webLoop();
       // předpověď (Open-Meteo) – pro předpověď, meteoradar i hodiny
       static uint32_t lastFc = 0, fcInterval = FORECAST_REFRESH_MS;
       static bool fcDone = false;
@@ -866,6 +875,7 @@ static void netTask(void*) {
         fcDone = true;
         fcInterval = forecastUpdate() ? FORECAST_REFRESH_MS : 120000;
         lastFc = millis();
+        webLoop();
       }
       // meteoradar ČHMI
       static uint32_t lastRain = 0;
@@ -880,6 +890,7 @@ static void netTask(void*) {
           radarAnalyze(f.ok ? f.curT : NAN);  // kde prší, kam se to hýbe, kdy to dorazí
         }
         lastRain = millis();
+        webLoop();
       }
       // OTA: první kontrola minutu po startu, pak jednou denně; nebo na požádání z webu
       static uint32_t lastOta = 0;
@@ -897,7 +908,11 @@ static void netTask(void*) {
         otaRetryAfterRestart();
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(200));
+    // mezi koly hlavně web (odezva do ~20 ms)
+    for (int i = 0; i < 10; i++) {
+      webLoop();
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
   }
 }
 
@@ -2398,7 +2413,6 @@ void appStatusJson(JsonObject o) {
                         : String(tr("softwarové stmívání obrazu", "software dimming", "Software-Dimmung", "attenuazione software"));
   o["stack_net"] = gNetTask ? uxTaskGetStackHighWaterMark(gNetTask) : 0;
   o["stack_loop"] = gLoopTask ? uxTaskGetStackHighWaterMark(gLoopTask) : 0;
-  o["stack_web"] = webTaskStackFree();
 }
 
 static uint32_t gBtnHeldMs = 0;  // jak dlouho je tlačítko drženo (pro indikaci)
@@ -2556,7 +2570,8 @@ static void notePendingApply() {  // hlavní smyčka
 
 extern TaskHandle_t loopTaskHandle;
 void appPauseForRestart() {
-  if (gNetTask) vTaskSuspend(gNetTask);
+  // web běží v síťové úloze – tu (sebe) nepozastavovat
+  if (gNetTask && xTaskGetCurrentTaskHandle() != gNetTask) vTaskSuspend(gNetTask);
   if (loopTaskHandle && xTaskGetCurrentTaskHandle() != loopTaskHandle) {
     disableLoopWDT();  // pozastavená smyčka by jinak spustila watchdog
     vTaskSuspend(loopTaskHandle);
@@ -2804,8 +2819,7 @@ void setup() {
     gPortalMode = true;
     if (!portalFlag) showSplash(3000);  // první zapnutí (ne při ručním vyvolání nastavení)
     showBoot(tr("Spouštím hotspot…", "Starting hotspot…", "Starte Hotspot…", "Avvio hotspot…"), nullptr);
-    webBegin(true);
-    webStartTask();
+    webBegin(true);  // hotspot: web obsluhuje hlavní smyčka (síťová úloha neběží)
     return;
   }
 
@@ -2827,8 +2841,7 @@ void setup() {
   if (gCfg.ntp1.isEmpty()) gCfg.ntp1 = "pool.ntp.org";
   if (gCfg.ntp2.isEmpty()) configTzTime(TZ_INFO, gCfg.ntp1.c_str());
   else configTzTime(TZ_INFO, gCfg.ntp1.c_str(), gCfg.ntp2.c_str());
-  webBegin(false);  // nastavení i v domácí síti na IP zařízení
-  webStartTask();   // web ve vlastní úloze – nezdržuje displej ani tlačítko
+  webBegin(false);  // nastavení i v domácí síti na IP zařízení (obsluhuje ho síťová úloha)
   xTaskCreate(netTask, "net", 16384, nullptr, 1, &gNetTask);
   if (!gOtaBootMode) showSplash(3000);  // WiFi se mezitím už připojuje
 }
@@ -2872,6 +2885,7 @@ void loop() {
   static uint32_t lastDraw = 0;
 
   pollButton();
+  if (gPortalMode) webLoop();  // v hotspotu; jinak web obsluhuje síťová úloha
   notePendingApply();
   uint32_t now = millis();
 
