@@ -2742,6 +2742,9 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), buttonIsr, CHANGE);
+  // Pojistka: když se hlavní smyčka (displej, tlačítko, web) zasekne na víc než 5 s,
+  // watchdog zařízení restartuje (na stránce Systém je pak důvod "watchdog").
+  enableLoopWDT();
   Serial.printf("\nesp32-stand-system %s\n", FW_VERSION);
 
   tft.init();

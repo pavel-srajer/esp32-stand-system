@@ -255,7 +255,10 @@ function saveNote(){var v=g('note').value;if(v.normalize)v=v.normalize('NFC');va
 function scr(a){var e=document.getElementById('scr');if(!a||a.screen<0||!a.screens){e.innerHTML='';return}var j=a;
  e.innerHTML=j.screens.map(function(s,i){return s.on?'<button type="button" class="'+(i==j.screen?'cur':'')+'" onclick="setScr('+i+')">'+esc(s.name)+'</button>':''}).join('');
  var c=j.screens[j.screen];t('scrs',c?'{{onscreen}}: '+c.name:'')}
-function load(){fetch('/api/status').then(function(r){return r.json()}).then(function(j){
+var busy=false,tmr=0;
+function load(){if(busy)return;busy=true;clearTimeout(tmr);
+ var c=window.AbortController?new AbortController():null,to=setTimeout(function(){if(c)c.abort()},8000);
+ fetch('/api/status',c?{cache:'no-store',signal:c.signal}:{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
  scr(j.app);
  if(!noteInit&&j.app&&j.app.note!==undefined){var a=j.app;g('note').value=a.note;g('nfg').value=a.note_fg||'#ffffff';g('nbg').value=a.note_bg||'#000000';
   g('nsize').value=a.note_size||0;g('nb1').checked=a.note_style&1;g('nb2').checked=a.note_style&2;g('nb4').checked=a.note_style&4;g('nblink').value=a.note_blink||0;noteInit=true}
@@ -281,8 +284,8 @@ function load(){fetch('/api/status').then(function(r){return r.json()}).then(fun
   ['{{rx_today}}',x.max_today+' km'+(x.max_today_cs?' ('+esc(x.max_today_cs)+')':'')],['{{rx_rate}}',x.rate!=null?x.rate+' /s':'–'],
   ['{{rx_rssi}}',x.rssi!=null?x.rssi+' dBFS':'–'],['{{updated}}',age(x.age)]]);
  t('st','{{updated}} '+new Date().toLocaleTimeString('{{locale}}'));
-}).catch(function(){t('st','{{noresp}}')})}
-load();setInterval(load,2000);
+}).catch(function(){t('st','{{noresp}}')}).then(function(){clearTimeout(to);busy=false;tmr=setTimeout(load,3000)})}
+load();
 </script></body></html>)HTML";
 
 // Překlady pro {{klíče}} v šablonách stránek (cs, en, de, it). V JS řetězcích bez apostrofů.
@@ -561,10 +564,12 @@ static void handleStatus() {
   }
   JsonDocument doc;
   sysinfoJson(doc.to<JsonObject>());
-  String out;
-  serializeJson(doc, out);
+  // rovnou do sítě, bez skládání do textu v paměti
   server.sendHeader("Cache-Control", "no-store");
-  server.send(200, "application/json", out);
+  server.setContentLength(measureJson(doc));
+  server.send(200, "application/json", "");
+  WiFiClient cl = server.client();
+  serializeJson(doc, cl);
 }
 
 static void handleNote() {
