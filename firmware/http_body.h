@@ -2,6 +2,19 @@
 #include <Arduino.h>
 #include <Client.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+
+// Připíše k chybové hlášce důvod, proč se spojení nenavázalo (HTTP -1):
+// " (RAM: blok 9 kB)" při nedostatku paměti pro šifrování, jinak text chyby TLS.
+inline void appendConnReason(char* buf, size_t n, WiFiClientSecure& c, int code) {
+  if (code >= 0) return;
+  char e[64] = "";
+  c.lastError(e, sizeof e);
+  size_t l = strlen(buf);
+  if (l >= n - 1) return;
+  if (strstr(e, "emory")) snprintf(buf + l, n - l, " (RAM: blok %u kB)", (unsigned)(ESP.getMaxAllocHeap() / 1024));
+  else if (e[0]) snprintf(buf + l, n - l, " (%s)", e);
+}
 
 // Tělo HTTP/1.1 odpovědi jako Stream – umí "Transfer-Encoding: chunked".
 // (Některé servery, např. ADS-B API za Cloudflare, HTTP/1.0 odmítají s kódem 426,

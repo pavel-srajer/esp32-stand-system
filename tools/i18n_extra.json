@@ -1793,5 +1793,10 @@
   "O dispositivo reinicia e verifica o GitHub logo após arrancar, quando tem memória livre suficiente. Se houver uma nova versão, descarrega-a (progresso no ecrã) e reinicia de novo. Demora cerca de 1 min, depois esta página recarrega.",
   "El dispositivo se reinicia y comprueba GitHub justo después de arrancar, cuando tiene memoria libre suficiente. Si hay una versión nueva, la descarga (progreso en la pantalla) y se reinicia de nuevo. Tarda alrededor de 1 min; después esta página se recarga.",
   "Thiết bị khởi động lại và kiểm tra GitHub ngay sau khi khởi động, khi còn đủ bộ nhớ trống. Nếu có phiên bản mới, thiết bị sẽ tải xuống (tiến trình hiện trên màn hình) rồi khởi động lại lần nữa. Mất khoảng 1 phút, sau đó trang này tự tải lại."
+ ],
+ " (connection/RAM)": [
+  " (ligação/RAM)",
+  " (conexión/RAM)",
+  " (kết nối/RAM)"
  ]
 }

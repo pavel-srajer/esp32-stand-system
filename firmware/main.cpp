@@ -107,7 +107,7 @@ struct PlaneData {
   int count = 0;
   bool ok = false;
   uint32_t updatedMs = 0;
-  char err[32] = "";
+  char err[56] = "";
   char src[24] = "";  // odkud jsou data (vlastní přijímač / adsb.fi / adsb.lol)
 };
 
@@ -409,6 +409,7 @@ static bool fetchPlanesFrom(const char* url, const char* name, PlaneData& out, b
   if (code != 200) {
     Serial.printf("[ADSB] %s -> HTTP %d\n", url, code);
     snprintf(out.err, sizeof out.err, "%s HTTP %d", name, code);
+    if (secure) appendConnReason(out.err, sizeof out.err, sclient, code);
     http.end();
     return false;
   }
@@ -762,7 +763,7 @@ static bool fetchWeather() {
   }
   xSemaphoreTake(gMutex, portMAX_DELAY);
   if (ok) gWeather = w;
-  else snprintf(gWeather.err, sizeof gWeather.err, "ČHMI HTTP %d", code);
+  else snprintf(gWeather.err, sizeof gWeather.err, "ČHMI HTTP %d%s", code, code < 0 ? tr(" (spojení/RAM)", " (connection/RAM)", " (Verbindung/RAM)", " (connessione/RAM)") : "");
   xSemaphoreGive(gMutex);
   return ok;
 }
@@ -2105,10 +2106,12 @@ static void buildLut(int pct) {
 }
 
 // Obraz se kreslí po polovinách (240×120) do jednoho 28kB bufferu – celý snímek
-// 240×240 by zabral 57 kB, které chybí pro TLS spojení. Sprite si pro každou
-// polovinu "myslí", že má 240×240, ale ořez povolí kreslit jen do jeho poloviny.
-static const int HALF = 120;
-static uint8_t* gFb = nullptr;  // 240 × HALF, RGB332
+// 240×240 by zabral 57 kB, které chybí pro TLS spojení. Kreslí se po třetinách
+// (19 kB; po polovinách 29 kB už na šifrované spojení nezbývalo). Sprite si pro každou
+// část "myslí", že má 240×240, ale ořez povolí kreslit jen do jeho části.
+static const int PARTS = 3;
+static const int HALF = 240 / PARTS;  // výška jedné části (název zůstal z doby polovin)
+static uint8_t* gFb = nullptr;        // 240 × HALF, RGB332
 
 static void beginHalf(int half) {
   spr.setBuffer(gFb - half * 240 * HALF, 240, 240, 8);
@@ -2135,7 +2138,7 @@ static void pushHalf(int half) {
 template <typename F>
 static void renderFrame(F draw) {
   if (!gFb) return;
-  for (int half = 0; half < 2; half++) {
+  for (int half = 0; half < PARTS; half++) {
     beginHalf(half);
     spr.fillScreen(TFT_BLACK);
     draw();

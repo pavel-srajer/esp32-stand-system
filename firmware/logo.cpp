@@ -9,10 +9,10 @@
 static const char* LOGO_URL = "https://raw.githubusercontent.com/Jxck-S/airline-logos/main/flightaware_logos/%s.png";
 // Loga se drží komprimovaná (RLE: páry počet, barva) za sebou v pevném bloku.
 // Logo 56×56 má nekomprimované 3 136 B, komprimované typicky 0,2–1,5 kB (průměr
-// ~750 B), takže se do stejné paměti jako dřív 3 loga vejde zhruba 12 log.
+// ~750 B), takže se do 6 kB vejde zhruba 8 log (dřív 3 nekomprimovaná do 9,4 kB).
 // Pevný blok navíc nedrobí haldu (jinak by chyběl souvislý blok pro šifrování).
 static const int CACHE = 16;                       // max. počet log (i "logo neexistuje")
-static const int POOL = 3 * LOGO_SIZE * LOGO_SIZE;  // 9 408 B
+static const int POOL = 2 * LOGO_SIZE * LOGO_SIZE;  // 6 272 B ≈ 8 log
 
 struct Entry {
   char icao[4];    // "" = volné místo

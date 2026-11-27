@@ -35,7 +35,7 @@ struct Forecast {
   int nAlerts = 0;
   char nowcast[56] = "";  // krátká věta o srážkách (i pro obrazovku radaru)
   uint32_t updatedMs = 0;
-  char err[40] = "";
+  char err[64] = "";
 };
 
 bool forecastUpdate();

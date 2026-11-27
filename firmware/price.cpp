@@ -91,6 +91,7 @@ static void fetchSpotEl(float* today, float* tomorrow, int& nT, int& nZ, char* e
     }
   } else {
     snprintf(err, errLen, "HTTP %d", code);
+    appendConnReason(err, errLen, client, code);
   }
   http.end();
 }
@@ -135,7 +136,10 @@ static int fetchSpotovkyDay(const char* day, float* dst, char* err, size_t errLe
     }
   } else {
     n = code == 404 ? -404 : -1;
-    if (code != 404) snprintf(err, errLen, "HTTP %d", code);
+    if (code != 404) {
+      snprintf(err, errLen, "HTTP %d", code);
+      appendConnReason(err, errLen, client, code);
+    }
   }
   http.end();
   return n;

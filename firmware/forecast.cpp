@@ -176,6 +176,7 @@ bool forecastUpdate() {
     http.end();
     lock();
     snprintf(sFc.err, sizeof sFc.err, "Open-Meteo HTTP %d", code);
+    appendConnReason(sFc.err, sizeof sFc.err, client, code);
     xSemaphoreGive(sMutex);
     Serial.printf("[Forecast] HTTP %d\n", code);
     return false;

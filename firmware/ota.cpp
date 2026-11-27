@@ -38,6 +38,7 @@ void otaCheck(bool install) {
     http.end();
     gOta.state = OTA_FAILED;
     snprintf(gOta.msg, sizeof gOta.msg, "GitHub HTTP %d", code);
+    appendConnReason(gOta.msg, sizeof gOta.msg, client, code);
     Serial.printf("[OTA] %s\n", gOta.msg);
     return;
   }

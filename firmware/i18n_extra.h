@@ -7,7 +7,8 @@ struct TrExtra {
   const char* t[3];  // pt, es, vi
 };
 
-static const TrExtra TR_EXTRA[359] = {
+static const TrExtra TR_EXTRA[360] = {
+    {" (connection/RAM)", {" (ligação/RAM)", " (conexión/RAM)", " (kết nối/RAM)"}},
     {" (tomorrow)", {" (amanhã)", " (mañana)", " (ngày mai)"}},
     {" – downloading…", {" – a transferir…", " – descargando…", " – đang tải xuống…"}},
     {" – error: ", {" – erro: ", " – error: ", " – lỗi: "}},

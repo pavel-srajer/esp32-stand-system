@@ -30,7 +30,8 @@ struct Frame {
 // zvláštní alokace v haldě a každých 5 min se měnily – halda se rozdrobila a pro
 // šifrované spojení (2 × ~17 kB) pak nezbyl souvislý blok ("SSL memory allocation
 // failed"). Když se při silném dešti všechny snímky nevejdou, nejstarší se vynechají.
-#define RADAR_POOL 20480
+// (20 kB bylo zbytečně moc – každý kB tu chybí šifrovanému spojení.)
+#define RADAR_POOL 12288  // typicky 6 snímků po 1–3 kB; při silném dešti se jich vejde méně
 static uint8_t sPool[RADAR_POOL];
 static Frame sFrames[RADAR_FRAMES];
 static int sCount = 0;
