@@ -822,8 +822,11 @@ static void netTask(void*) {
     if (WiFi.status() == WL_CONNECTED) {
       uint32_t now = millis();
       // letadla jen když je něco potřebuje (radar, detail, hodiny s počtem letadel, upozornění)
-      bool planesNeeded = scrOn(SCR_RADAR) || scrOn(SCR_DETAIL) || scrOn(SCR_CLOCK) || gCfg.alertMask;
-      if (planesNeeded && (gForcePlanes || now - lastPlanes >= (sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS))) {
+      // plná frekvence jen pro radar, detail a upozornění; hodinám (počet letadel) stačí minuta
+      bool planesLive = scrOn(SCR_RADAR) || scrOn(SCR_DETAIL) || gCfg.alertMask;
+      bool planesNeeded = planesLive || scrOn(SCR_CLOCK);
+      uint32_t planesEvery = !planesLive ? 60000 : sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS;
+      if (planesNeeded && (gForcePlanes || now - lastPlanes >= planesEvery)) {
         gForcePlanes = false;
         fetchPlanes();
         lastPlanes = millis();

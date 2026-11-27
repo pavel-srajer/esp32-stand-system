@@ -147,7 +147,7 @@ Všechny jsou zdarma a bez registrace.
 
 | Data | Zdroj | Jak často |
 |---|---|---|
-| Letadla (ADS-B) | vlastní přijímač v domácí síti (`aircraft.json`, 5 s), jinak [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
+| Letadla (ADS-B) | jen když je zapnutý Radar, Detail, Hodiny nebo upozornění (pro samotné Hodiny jednou za minutu). Vlastní přijímač v domácí síti (`aircraft.json`, 5 s), jinak [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
 | Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení; v paměti komprimovaně ~10 log (podle velikosti 6–16) |
 | Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |
