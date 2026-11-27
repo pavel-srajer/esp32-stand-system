@@ -975,6 +975,8 @@ static void drawCenteredMsg(const char* a, const char* b = nullptr) {
 // ---------------- Obrysová mapa (pozadí radarů) ----------------
 // style: 0 nic, 1 hranice + města, 2 hranice + řeky + města.
 // R = kolik km odpovídá rPx pixelům od středu.
+static int gPartY0 = 0, gPartY1 = 239;  // řádky právě kreslené části displeje (viz beginHalf)
+
 static void drawMap(float R, float rPx, int style, uint16_t cityCol) {
   if (style <= 0) return;
   const float kpp = R / rPx;  // km na pixel
@@ -1000,7 +1002,8 @@ static void drawMap(float R, float rPx, int style, uint16_t cityCol) {
     for (int k = 1; k < l.n; k++) {
       px(l.start + k, x1, y1);
       // úsek celý mimo displej na jedné straně -> přeskočit
-      if (!((x0 < 0 && x1 < 0) || (y0 < 0 && y1 < 0) || (x0 > 239 && x1 > 239) || (y0 > 239 && y1 > 239)))
+      // úsek mimo displej nebo mimo právě kreslenou třetinu -> přeskočit
+      if (!((x0 < 0 && x1 < 0) || (y0 < gPartY0 && y1 < gPartY0) || (x0 > 239 && x1 > 239) || (y0 > gPartY1 && y1 > gPartY1)))
         spr.drawLine(x0, y0, x1, y1, col);
       x0 = x1;
       y0 = y1;
@@ -1039,8 +1042,19 @@ static void drawRadar(const PlaneData& pd, uint32_t now) {
 
   // otáčející se paprsek
   float sweep = fmodf(now * 0.09f, 360.0f);  // 1 otáčka / 4 s
-  spr.fillArc(CX, CY, R, 0, sweep - 90 - 45, sweep - 90, rgb(0, 40, 15));
-  spr.fillArc(CX, CY, R, 0, sweep - 90 - 15, sweep - 90, rgb(0, 70, 25));
+  {
+    // výseč paprsku jen v části displeje, do které zasahuje (fillArc je drahý)
+    int ymin = CY, ymax = CY;
+    for (int d = 0; d <= 45; d += 5) {
+      int y = CY - (int)(R * cosf((sweep - d) * DEG_TO_RAD));
+      ymin = min(ymin, y);
+      ymax = max(ymax, y);
+    }
+    if (ymax >= gPartY0 && ymin <= gPartY1) {
+      spr.fillArc(CX, CY, R, 0, sweep - 90 - 45, sweep - 90, rgb(0, 40, 15));
+      spr.fillArc(CX, CY, R, 0, sweep - 90 - 15, sweep - 90, rgb(0, 70, 25));
+    }
+  }
   drawMap(range, R, gCfg.planeMap, rgb(110, 110, 110));
 
   for (int i = 1; i <= 3; i++) spr.drawCircle(CX, CY, R * i / 3, ring);
@@ -2114,6 +2128,8 @@ static const int HALF = 240 / PARTS;  // výška jedné části (název zůstal 
 static uint8_t* gFb = nullptr;        // 240 × HALF, RGB332
 
 static void beginHalf(int half) {
+  gPartY0 = half * HALF;
+  gPartY1 = gPartY0 + HALF - 1;
   spr.setBuffer(gFb - half * 240 * HALF, 240, 240, 8);
   spr.setClipRect(0, half * HALF, 240, HALF);
 }
@@ -2519,11 +2535,52 @@ void screenSet(int i) {
   gLastSwitch = gLastPress = millis();  // automatické přepínání na minutu pauza
 }
 
+// Hrany tlačítka zachytává přerušení: když hlavní smyčka zrovna dlouho kreslí
+// (nebo se dělí o procesor se stahováním), krátký stisk by se jinak mezi dvěma
+// kontrolami úplně ztratil.
+static volatile bool sBtnDownEv = false, sBtnUpEv = false;
+static volatile uint32_t sBtnDownAt = 0, sBtnUpAt = 0;
+
+static void IRAM_ATTR buttonIsr() {
+  uint32_t t = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
+  bool low = !(REG_READ(GPIO_IN_REG) & BIT(PIN_BUTTON));
+  if (low) {
+    if (!sBtnDownEv && t - sBtnUpAt > 30) {  // nový stisk (odskoky do 30 ms ignorovat)
+      sBtnDownAt = t;
+      sBtnUpEv = false;
+      sBtnDownEv = true;
+    }
+  } else if (sBtnDownEv && !sBtnUpEv && t - sBtnDownAt > 30) {
+    sBtnUpAt = t;
+    sBtnUpEv = true;
+  }
+}
+
 static void pollButton() {
   static bool down = false, swallow = false;
   static uint32_t downAt = 0, lastChange = 0;
-  bool pressed = digitalRead(PIN_BUTTON) == LOW;
   uint32_t t = millis();
+  // zachycený stisk / uvolnění z přerušení (i když je smyčka mezitím nestihla)
+  if (!down && sBtnDownEv) {
+    down = true;
+    gLastPress = t;
+    downAt = lastChange = sBtnDownAt;
+    swallow = wakeOnPress();
+  }
+  if (down && sBtnUpEv) {
+    uint32_t held = sBtnUpAt - downAt;
+    noInterrupts();
+    sBtnDownEv = sBtnUpEv = false;
+    interrupts();
+    down = false;
+    gBtnHeldMs = 0;
+    lastChange = t;
+    if (swallow) return;
+    if (held < 700) onShortPress();
+    else if (held < PORTAL_HOLD_MS) onLongPress();
+    return;
+  }
+  bool pressed = digitalRead(PIN_BUTTON) == LOW;
   if (down) gBtnHeldMs = t - downAt;
   if (t - lastChange < 30) return;  // debounce
   if (pressed && !down) {
@@ -2534,6 +2591,9 @@ static void pollButton() {
   } else if (pressed && down && !gPortalMode && t - downAt >= PORTAL_HOLD_MS) {
     requestPortal();
   } else if (!pressed && down) {
+    noInterrupts();
+    sBtnDownEv = sBtnUpEv = false;
+    interrupts();
     down = false;
     gBtnHeldMs = 0;
     lastChange = t;
@@ -2681,6 +2741,7 @@ static void showSplash(uint32_t ms) {
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), buttonIsr, CHANGE);
   Serial.printf("\nesp32-stand-system %s\n", FW_VERSION);
 
   tft.init();
@@ -2835,4 +2896,9 @@ void loop() {
       drawHoldIndicator();
     }
   });
+  // po pomalém snímku nechat aspoň 40 ms na tlačítko, web a síťovou úlohu
+  {
+    uint32_t done = millis();
+    if (done + 40 > lastDraw + frame) lastDraw = done + 40 - frame;
+  }
 }
