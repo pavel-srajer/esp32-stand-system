@@ -960,9 +960,14 @@ static void drawMap(float R, float rPx, int style, uint16_t cityCol) {
   const float cl = cosf(gCfg.lat * DEG_TO_RAD);
   const float sx = MAP_Q * 111.32f * cl / kpp, sy = MAP_Q * 110.57f / kpp;
   const float ox = (MAP_LON0 - gCfg.lon) * 111.32f * cl / kpp, oy = (MAP_LAT0 - gCfg.lat) * 110.57f / kpp;
+  // ESP32-C3 nemá FPU: 4 860 bodů × 2 poloviny obrazu × několik snímků/s ve float
+  // vytížilo procesor skoro na 100 %. Přepočet v pevné řádové čárce (16.16) je
+  // pixelově stejný a mnohonásobně rychlejší.
+  const int64_t SX = llroundf(sx * 65536), SY = llroundf(sy * 65536);
+  const int64_t OX = llroundf(ox * 65536) + 32768, OY = llroundf(oy * 65536) + 32768;
   auto px = [&](int i, int& x, int& y) {
-    x = CX + (int)lroundf(ox + MAP_PTS[i][0] * sx);
-    y = CY - (int)lroundf(oy + MAP_PTS[i][1] * sy);
+    x = CX + (int)((OX + MAP_PTS[i][0] * SX) >> 16);
+    y = CY - (int)((OY + MAP_PTS[i][1] * SY) >> 16);
   };
   const uint16_t BORDER = rgb(85, 95, 120), RIVER = rgb(35, 75, 140), RIVER2 = rgb(28, 55, 100);
   for (const MapLine& l : MAP_LINES) {
@@ -989,7 +994,7 @@ static void drawMap(float R, float rPx, int style, uint16_t cityCol) {
   spr.setTextDatum(textdatum_t::top_center);
   for (const MapCity& c : MAP_CITIES) {
     if (c.pop < minPop) continue;
-    int x = CX + (int)lroundf(ox + c.x * sx), y = CY - (int)lroundf(oy + c.y * sy);
+    int x = CX + (int)((OX + c.x * SX) >> 16), y = CY - (int)((OY + c.y * SY) >> 16);
     int dx = x - CX, dy = y - CY;
     if (dx * dx + dy * dy > 108 * 108) continue;
     int w = spr.textWidth(c.name);
@@ -2762,7 +2767,10 @@ void loop() {
       (gLastPress == 0 || now - gLastPress >= CYCLE_PAUSE_MS))
     onShortPress();
 
-  uint32_t frame = (gScreen == SCR_RADAR || gBtnHeldMs || alertActive() || (gScreen == SCR_NOTE && noteBlinking())) ? 100 : 250;
+  // radar: ~7 snímků/s stačí na plynulý paprsek (10/s zbytečně vytěžovalo CPU)
+  uint32_t frame = (gBtnHeldMs || alertActive() || (gScreen == SCR_NOTE && noteBlinking())) ? 100
+                   : gScreen == SCR_RADAR                                                  ? 140
+                                                                                           : 250;
   if (now - lastDraw < frame) {
     delay(5);
     return;
