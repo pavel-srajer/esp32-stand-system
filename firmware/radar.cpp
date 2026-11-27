@@ -21,10 +21,17 @@ static const float LON_DATA_RIGHT = 19.624f, LAT_DATA_TOP = 51.458f;
 struct Frame {
   char ts[14];  // "YYYYMMDD.HHMM"
   time_t t;
-  uint8_t* rle;  // páry (počet, barva)
+  uint8_t* rle;  // páry (počet, barva) – v sPool, u právě staženého dočasně v haldě
   uint16_t len;
+  bool temp;     // rle je dočasná alokace (ještě nepřesunutá do sPool)
 };
 
+// Snímky leží v jednom pevném bloku za sebou bez mezer. Dřív byl každý snímek
+// zvláštní alokace v haldě a každých 5 min se měnily – halda se rozdrobila a pro
+// šifrované spojení (2 × ~17 kB) pak nezbyl souvislý blok ("SSL memory allocation
+// failed"). Když se při silném dešti všechny snímky nevejdou, nejstarší se vynechají.
+#define RADAR_POOL 20480
+static uint8_t sPool[RADAR_POOL];
 static Frame sFrames[RADAR_FRAMES];
 static int sCount = 0;
 static float sRadius = 0;
@@ -264,8 +271,51 @@ static bool decodeFrame(const char* ts, float radiusKm, Frame& f, int* httpCode 
   }
   strlcpy(f.ts, ts, sizeof f.ts);
   f.t = tsToUtc(ts);
+  f.temp = true;
   Serial.printf("[Radar] %s: %d B RLE, heap %u\n", ts, o, (unsigned)ESP.getFreeHeap());
   return true;
+}
+
+// Uloží nový seznam snímků (chronologicky). Ponechané snímky (temp=false) jsou v sPool,
+// nové (temp=true) v dočasné haldě. Volat pod zámkem.
+static void commitFrames(Frame* fr, int n) {
+  // když se nevejdou, vynechat nejstarší
+  int total = 0;
+  for (int i = 0; i < n; i++) total += fr[i].len;
+  int first = 0;
+  while (total > RADAR_POOL && first < n) {
+    total -= fr[first].len;
+    if (fr[first].temp) free(fr[first].rle);
+    first++;
+  }
+  // ponechané setřást na začátek bloku (podle současné pozice, ať se nic nepřepíše)
+  int idx[RADAR_FRAMES], nk = 0;
+  for (int i = first; i < n; i++)
+    if (!fr[i].temp) idx[nk++] = i;
+  for (int a = 1; a < nk; a++)
+    for (int b = a; b > 0 && fr[idx[b]].rle < fr[idx[b - 1]].rle; b--) {
+      int x = idx[b];
+      idx[b] = idx[b - 1];
+      idx[b - 1] = x;
+    }
+  int w = 0;
+  for (int k = 0; k < nk; k++) {
+    Frame& f = fr[idx[k]];
+    memmove(sPool + w, f.rle, f.len);
+    f.rle = sPool + w;
+    w += f.len;
+  }
+  // nové za ně
+  for (int i = first; i < n; i++)
+    if (fr[i].temp) {
+      memcpy(sPool + w, fr[i].rle, fr[i].len);
+      free(fr[i].rle);
+      fr[i].rle = sPool + w;
+      fr[i].temp = false;
+      w += fr[i].len;
+    }
+  sCount = n - first;
+  for (int i = 0; i < sCount; i++) sFrames[i] = fr[first + i];
 }
 
 // Snímky jsou po 5 minutách a jmenují se podle času (UTC), takže názvy posledních
@@ -276,7 +326,6 @@ static bool updateByTime(float radiusKm, bool radiusChanged) {
   time_t now = time(nullptr);
   if (now < 1700000000) return false;  // bez času nejde
   Frame next[RADAR_FRAMES];
-  bool kept[RADAR_FRAMES] = {};
   int nn = 0, fails = 0;
   time_t t = now - now % 300;
   // nejnovější slot ještě nemusí být zveřejněný, starší mohou výjimečně chybět
@@ -290,10 +339,7 @@ static bool updateByTime(float radiusKm, bool radiusChanged) {
     if (!radiusChanged)
       for (int i = 0; i < sCount; i++)
         if (!strcmp(sFrames[i].ts, ts)) have = i;
-    if (have >= 0) {
-      next[nn++] = sFrames[have];
-      kept[have] = true;
-    }
+    if (have >= 0) next[nn++] = sFrames[have];
     unlock();
     if (have >= 0) continue;
     Frame f{};
@@ -302,6 +348,8 @@ static bool updateByTime(float radiusKm, bool radiusChanged) {
     else if (code != 404 && ++fails >= 2) break;  // síť / paměť – nezkoušet další
   }
   if (!nn) return false;
+  bool anyNew = false;
+  for (int i = 0; i < nn; i++) anyNew |= next[i].temp;
   // next je od nejnovějšího; animace chce od nejstaršího
   for (int i = 0; i < nn / 2; i++) {
     Frame x = next[i];
@@ -309,15 +357,14 @@ static bool updateByTime(float radiusKm, bool radiusChanged) {
     next[nn - 1 - i] = x;
   }
   lock();
-  for (int k = 0; k < sCount; k++)
-    if (!kept[k]) free(sFrames[k].rle);
-  for (int k = 0; k < nn; k++) sFrames[k] = next[k];
-  sCount = nn;
+  commitFrames(next, nn);
   sRadius = radiusKm;
-  sUpdatedMs = millis();
+  if (anyNew) sUpdatedMs = millis();  // jen když přibyl nový snímek
   if (!fails) sErr[0] = 0;
+  int cnt = sCount;
+  const char* newest = cnt ? sFrames[cnt - 1].ts : "-";
+  Serial.printf("[Radar] %d snímků, nejnovější %s\n", cnt, newest);
   unlock();
-  Serial.printf("[Radar] %d snímků, nejnovější %s\n", nn, next[nn - 1].ts);
   return true;
 }
 
@@ -334,7 +381,6 @@ bool radarUpdate(float radiusKm) {
   bool radiusChanged = fabsf(radiusKm - sRadius) > 0.1f;
 
   Frame next[RADAR_FRAMES];
-  bool kept[RADAR_FRAMES] = {};
   int nn = 0;
   for (int i = 0; i < n; i++) {
     // už máme stažený?
@@ -343,28 +389,23 @@ bool radarUpdate(float radiusKm) {
     if (!radiusChanged)
       for (int k = 0; k < sCount; k++)
         if (!strcmp(sFrames[k].ts, want[i])) have = k;
-    if (have >= 0) {
-      next[nn++] = sFrames[have];  // snímek zůstává, jen se přesune
-      kept[have] = true;
-    }
+    if (have >= 0) next[nn++] = sFrames[have];  // snímek zůstává
     unlock();
     if (have >= 0) continue;
     Frame f{};
     if (decodeFrame(want[i], radiusKm, f)) next[nn++] = f;
   }
 
+  if (!nn) return false;
+  bool anyNew = false;
+  for (int i = 0; i < nn; i++) anyNew |= next[i].temp;
   lock();
-  for (int k = 0; k < sCount; k++)
-    if (!kept[k]) free(sFrames[k].rle);
-  for (int k = 0; k < nn; k++) sFrames[k] = next[k];
-  sCount = nn;
+  commitFrames(next, nn);
   sRadius = radiusKm;
-  if (nn) {
-    sUpdatedMs = millis();
-    if (nn == n) sErr[0] = 0;
-  }
+  if (anyNew) sUpdatedMs = millis();
+  if (nn == n) sErr[0] = 0;
   unlock();
-  return nn > 0;
+  return true;
 }
 
 // ===================================================================

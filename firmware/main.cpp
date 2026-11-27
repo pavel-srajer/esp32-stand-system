@@ -101,7 +101,7 @@ struct Plane {
   float brg;       // azimut od domova
 };
 
-static const int MAX_PLANES = 40;
+static const int MAX_PLANES = 30;  // nejbližší letadla (víc jich v dosahu radaru bývá zřídka)
 struct PlaneData {
   Plane p[MAX_PLANES];
   int count = 0;
@@ -2088,13 +2088,15 @@ static void beginHalf(int half) {
 static void pushHalf(int half) {
   int soft = gPwm ? 100 : gCurPct;
   if (soft != gLutPct) buildLut(soft);
-  static uint16_t line[240 * 12];
+  static const int LINES = 4;  // řádků najednou (dřív 12 = o 3,8 kB RAM víc)
+  static_assert(HALF % LINES == 0, "HALF musí být dělitelné LINES");
+  static uint16_t line[240 * LINES];
   tft.startWrite();
-  for (int y = 0; y < HALF; y += 12) {
+  for (int y = 0; y < HALF; y += LINES) {
     const uint8_t* row = gFb + y * 240;
-    for (int i = 0; i < 240 * 12; i++) line[i] = gLut[row[i]];
-    tft.setAddrWindow(0, half * HALF + y, 240, 12);
-    tft.writePixels(line, 240 * 12, true);
+    for (int i = 0; i < 240 * LINES; i++) line[i] = gLut[row[i]];
+    tft.setAddrWindow(0, half * HALF + y, 240, LINES);
+    tft.writePixels(line, 240 * LINES, true);
   }
   tft.endWrite();
 }
@@ -2267,7 +2269,10 @@ void appStatusJson(JsonObject o) {
     o["fc_alerts"] = f.nAlerts;
   }
   o["rain_frames"] = radarFrameCount();
-  o["rain_age"] = radarUpdatedMs() ? (long)((millis() - radarUpdatedMs()) / 1000) : -1;
+  {  // stáří nejnovějšího snímku (ne čas posledního pokusu) – staré snímky nejdou přehlédnout
+    int rn = radarFrameCount();
+    o["rain_age"] = (rn && timeValid()) ? (long)(time(nullptr) - radarFrameTime(rn - 1)) : -1;
+  }
   o["rain_err"] = radarError();
   o["logo"] = logoStatus();
   o["route"] = routeStatus();

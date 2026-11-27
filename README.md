@@ -195,7 +195,7 @@ ESP32-C3 nemá PSRAM a každé šifrované spojení potřebuje asi 45 kB RAM. Pr
 - se displej kreslí **po polovinách** do 28kB bufferu místo 57 kB,
 - dekodér PNG je **jeden a statický** a PNG se dekóduje rovnou při stahování,
 - letadla i ceny elektřiny se z JSON čtou **po jedné položce**,
-- radar má **trvalý pracovní buffer**,
+- radar má **trvalý pracovní buffer** a jeho snímky i loga společností mají **pevné místo** (snímky za sebou v bloku 20 kB, při silném dešti se vynechají nejstarší). Dřív se každých 5 minut alokovaly znovu a halda se rozdrobila tak, že pro šifrované spojení nezbyl blok („SSL – Memory allocation failed“),
 - aktualizace se stahuje **hned po restartu** a vždy jen **jedním** šifrovaným spojením (přesměrování GitHubu se řeší zvlášť),
 - webové stránky se posílají **po malých kouscích**, takže nepotřebují velký volný blok RAM.
 

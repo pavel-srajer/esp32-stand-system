@@ -12,9 +12,12 @@ struct Entry {
   char icao[4];
   bool found;      // false = logo neexistuje (404), nezkoušet znovu
   uint32_t used;   // pro LRU
-  uint8_t* px;     // LOGO_SIZE² RGB332
+  uint8_t* px;     // LOGO_SIZE² RGB332 (ukazuje do sPx)
 };
 static Entry sCache[CACHE];
+// Pevné místo pro loga: dřív se každé logo alokovalo zvlášť a halda se drobila
+// (pak chyběl souvislý blok pro šifrované spojení).
+static uint8_t sPx[CACHE][LOGO_SIZE * LOGO_SIZE];
 static char sPending[4] = "";
 static uint32_t sRetryAt = 0;  // po chybě sítě chvíli nezkoušet
 static char sStatus[96] = "zatím žádné";
@@ -118,27 +121,27 @@ void logoService() {
   unlock();
   if (!icao[0]) return;
 
-  uint8_t* px = (uint8_t*)malloc(LOGO_SIZE * LOGO_SIZE);
-  if (!px) return;
+  // nejdéle nepoužité místo uvolnit a stahovat rovnou do něj
+  lock();
+  int slot = 0;
+  for (int i = 1; i < CACHE; i++)
+    if (sCache[i].used < sCache[slot].used) slot = i;
+  sCache[slot].icao[0] = 0;
+  sCache[slot].found = false;
+  sCache[slot].px = nullptr;
+  unlock();
+  uint8_t* px = sPx[slot];
   int r = fetch(icao, px);
   if (r > 0) snprintf(sStatus, sizeof sStatus, "%s: OK", icao);
   else if (r == 0) snprintf(sStatus, sizeof sStatus, "%s: logo neexistuje", icao);
   else snprintf(sStatus, sizeof sStatus, "%s: %s", icao, pngNetError());
   Serial.printf("[Logo] %s\n", sStatus);
   if (r < 0) {  // síťová chyba: zkusí se znovu za 30 s
-    free(px);
     sRetryAt = millis() + 30000;
     return;
   }
-  if (r == 0) {
-    free(px);
-    px = nullptr;
-  }
+  if (r == 0) px = nullptr;
   lock();
-  int slot = 0;  // nejdéle nepoužité místo
-  for (int i = 1; i < CACHE; i++)
-    if (sCache[i].used < sCache[slot].used) slot = i;
-  free(sCache[slot].px);
   strlcpy(sCache[slot].icao, icao, sizeof sCache[slot].icao);
   sCache[slot].found = r > 0;
   sCache[slot].px = px;
