@@ -569,8 +569,31 @@ static void handleStatus() {
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(measureJson(doc));
   server.send(200, "application/json", "");
+  // ArduinoJson píše po znacích a server má vypnutý Nagle (setNoDelay) – bez bufferu
+  // by šel každý znak jako samostatný paket (tisíce paketů, odpověď trvala desítky s).
+  struct BufOut : public Print {
+    WiFiClient& c;
+    uint8_t b[512];
+    size_t n = 0;
+    explicit BufOut(WiFiClient& cl) : c(cl) {}
+    size_t write(uint8_t ch) override {
+      b[n++] = ch;
+      if (n == sizeof b) flush();
+      return 1;
+    }
+    size_t write(const uint8_t* p, size_t len) override {
+      for (size_t i = 0; i < len; i++) write(p[i]);
+      return len;
+    }
+    void flush() override {
+      if (n) c.write(b, n);
+      n = 0;
+    }
+  };
   WiFiClient cl = server.client();
-  serializeJson(doc, cl);
+  BufOut out(cl);
+  serializeJson(doc, out);
+  out.flush();
 }
 
 static void handleNote() {
