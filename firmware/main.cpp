@@ -134,6 +134,9 @@ static bool scrOn(int s) {
   return m & (1 << s);
 }
 
+// Stahují se letadla? Jen když je zapnutý radar, detail nebo upozornění na letadla.
+static bool planesWanted() { return scrOn(SCR_RADAR) || scrOn(SCR_DETAIL) || gCfg.alertMask; }
+
 // ===================================================================
 //  Pomocné funkce
 // ===================================================================
@@ -822,11 +825,8 @@ static void netTask(void*) {
     if (WiFi.status() == WL_CONNECTED) {
       uint32_t now = millis();
       // letadla jen když je něco potřebuje (radar, detail, hodiny s počtem letadel, upozornění)
-      // plná frekvence jen pro radar, detail a upozornění; hodinám (počet letadel) stačí minuta
-      bool planesLive = scrOn(SCR_RADAR) || scrOn(SCR_DETAIL) || gCfg.alertMask;
-      bool planesNeeded = planesLive || scrOn(SCR_CLOCK);
-      uint32_t planesEvery = !planesLive ? 60000 : sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS;
-      if (planesNeeded && (gForcePlanes || now - lastPlanes >= planesEvery)) {
+      // letadla jen pro radar, detail nebo upozornění (hodiny pak ukazují i jejich počet)
+      if (planesWanted() && (gForcePlanes || now - lastPlanes >= (sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS))) {
         gForcePlanes = false;
         fetchPlanes();
         lastPlanes = millis();
@@ -1553,20 +1553,25 @@ static void drawClock(const PlaneData& pd, const Weather& w, const Forecast& fc)
   int yInfo = max(y + 6, CY + 66);
 
   float temp = (w.ok && !isnan(w.t)) ? w.t : (fc.ok ? fc.curT : NAN);
+  // počet letadel jen když se letadla stahují (zapnutý radar, detail nebo upozornění);
+  // se samotnými hodinami se letadla nestahují a teplota je uprostřed
+  bool planes = planesWanted();
   if (!isnan(temp)) {
     char t[12];
     fmtDec(t, sizeof t, temp, 1);
     snprintf(b, sizeof b, "%s °C", t);
     spr.setTextColor(tempColor(temp));
-    spr.drawString(b, CX - 40, yInfo);
+    spr.drawString(b, planes ? CX - 40 : CX, yInfo);
   }
-  float range = RANGES_KM[gRangeIdx];
-  int n = 0;
-  while (n < pd.count && pd.p[n].distKm <= range) n++;
-  snprintf(b, sizeof b, "%d", n);
-  spr.setTextColor(rgb(0, 220, 100));
-  spr.drawString(b, CX + 32, yInfo);
-  drawPlaneIcon(CX + 32 + spr.textWidth(b) / 2 + 12, yInfo, 45, rgb(0, 220, 100), 7);
+  if (planes) {
+    float range = RANGES_KM[gRangeIdx];
+    int n = 0;
+    while (n < pd.count && pd.p[n].distKm <= range) n++;
+    snprintf(b, sizeof b, "%d", n);
+    spr.setTextColor(rgb(0, 220, 100));
+    spr.drawString(b, CX + 32, yInfo);
+    drawPlaneIcon(CX + 32 + spr.textWidth(b) / 2 + 12, yInfo, 45, rgb(0, 220, 100), 7);
+  }
   if (WiFi.status() == WL_CONNECTED) {  // adresa webového nastavení
     spr.setFont(&fontCZ_12);
     spr.setTextColor(rgb(90, 90, 90));

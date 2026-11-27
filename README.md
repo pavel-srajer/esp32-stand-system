@@ -25,7 +25,7 @@ Ovládá se jedním tlačítkem **BOOT** (GPIO 9):
 | **Předpověď** | aktuální počasí s ikonou a upozornění (začne pršet za X min, mráz, náledí, silný vítr, bouřky, sněžení, horko), výhled na 2–8 h | obnovit |
 | **Meteoradar ČHMI** | animace srážek za posledních 30 min na obrysové mapě. Dole je vyhodnocení, např. „Déšť 12 km Z, dorazí asi za 25 min“, a rychlost a směr postupu | poloměr 25 / 50 / 100 / 200 km |
 | **Měření ze stanice ČHMI** | teplota, vlhkost, tlak, vítr, srážky (ve výchozím stavu vypnuté) | obnovit |
-| **Hodiny** | čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel, IP adresa | obnovit |
+| **Hodiny** | čas, datum, kdo má svátek, státní svátky (i Velikonoce), teplota, počet letadel (jen když je zapnutý i Radar nebo Detail), IP adresa | obnovit |
 | **Spotová cena elektřiny** | aktuální čtvrthodina v Kč/kWh (na 3 desetinná místa), další čtvrthodina, graf dne po 15 min, nejlevnější a nejdražší čas (ve výchozím stavu vypnutá) | zítřek na 30 s |
 | **Levná elektřina** | až 3 nejlevnější okna podle nastavení (např. pračka 2 h mezi 8–22 h, auto 4 h přes noc): čas od–do, dnes/zítra, průměrná cena. Okno, které právě běží, svítí zeleně (ve výchozím stavu vypnutá) | – |
 | **Poznámka** | vlastní text ze stránky Systém s volitelnou barvou textu a pozadí, velikostí, tučným písmem, kurzívou, podtržením a blikáním. Text se zalomí do kruhu (ve výchozím stavu vypnutá) | ukončí blikání |
@@ -147,7 +147,7 @@ Všechny jsou zdarma a bez registrace.
 
 | Data | Zdroj | Jak často |
 |---|---|---|
-| Letadla (ADS-B) | jen když je zapnutý Radar, Detail, Hodiny nebo upozornění (pro samotné Hodiny jednou za minutu). Vlastní přijímač v domácí síti (`aircraft.json`, 5 s), jinak [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
+| Letadla (ADS-B) | jen když je zapnutý Radar, Detail nebo upozornění (Hodiny pak ukazují i počet letadel; se samotnými Hodinami se letadla nestahují). Vlastní přijímač v domácí síti (`aircraft.json`, 5 s), jinak [adsb.fi](https://adsb.fi) (open data, osobní nekomerční použití), záložně [adsb.lol](https://adsb.lol) (bez klíče max. 500 dotazů/den). Server, který odpoví 429 nebo 403, se na 1–10 min vynechá. airplanes.live od 11/2026 bez registrace odpovídá 403, proto se už nepoužívá | 15 s |
 | Loga společností | [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos), 90×90 PNG podle ICAO kódu z volacího znaku (CSA123 → CSA) | při zobrazení; v paměti komprimovaně ~10 log (podle velikosti 6–16) |
 | Názvy společností | [Virtual Radar Server standing data](https://github.com/vradarserver/standing-data) (CC0), 5 905 společností podle ICAO kódu. Uložené ve firmwaru, generuje `tools/make_airlines.py` | – |
 | Trasa letu | [adsb.lol routeset](https://api.adsb.lol) (ověří trasu proti poloze letadla, u nevěrohodné „?“), záložně [adsbdb.com](https://www.adsbdb.com) | při zobrazení, 6 v paměti |

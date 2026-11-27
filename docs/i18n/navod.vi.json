@@ -176,7 +176,6 @@
  "Teplota s barevným obloukem, vlhkost, tlak, vítr, srážky a čas měření. Ve výchozím stavu je vypnutá.": "Nhiệt độ với cung màu, độ ẩm, áp suất, gió, lượng mưa và thời điểm đo. Mặc định tắt.",
  "pátek 13. 11.": "Thứ Sáu 13/11",
  "Hodiny": "Đồng hồ",
- "Čas, datum, kdo má svátek, státní svátky, teplota, počet letadel a IP adresa pro webové nastavení.": "Giờ, ngày, lễ thánh trong ngày, ngày lễ, nhiệt độ, số máy bay và địa chỉ IP để vào cài đặt web.",
  "Předpověď": "Dự báo",
  "polojasno": "có mây rải rác",
  "Začne pršet asi za 30 min": "Khoảng 30 phút nữa bắt đầu mưa",
@@ -336,5 +335,6 @@
  "Obrazovka spotová cena elektřiny": "Màn hình giá điện giao ngay",
  "Obrazovka poznámka": "Màn hình ghi chú",
  "Obrazovka levná elektřina": "Màn hình điện giá rẻ",
- "Paměť se dvěma oddíly: nová verze se zapíše do neaktivního oddílu a po ověření se z něj nastartuje": "Bộ nhớ hai phân vùng: phiên bản mới được ghi vào phân vùng không hoạt động và khởi động từ đó sau khi kiểm tra"
+ "Paměť se dvěma oddíly: nová verze se zapíše do neaktivního oddílu a po ověření se z něj nastartuje": "Bộ nhớ hai phân vùng: phiên bản mới được ghi vào phân vùng không hoạt động và khởi động từ đó sau khi kiểm tra",
+ "Čas, datum, kdo má svátek, státní svátky, teplota a IP adresa pro webové nastavení. Je-li zapnutý i Radar nebo Detail letadla, ukazuje i počet letadel v okolí.": "Giờ, ngày, lễ thánh trong ngày, ngày lễ, nhiệt độ và địa chỉ IP để vào cài đặt web. Nếu cũng bật Radar hoặc Chi tiết máy bay, màn hình còn hiện số máy bay ở gần."
 }

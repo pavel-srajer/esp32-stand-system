@@ -176,7 +176,6 @@
  "Teplota s barevným obloukem, vlhkost, tlak, vítr, srážky a čas měření. Ve výchozím stavu je vypnutá.": "Temperatura con arco colorato, umidità, pressione, vento, precipitazioni e ora della misura. Disattivata di default.",
  "pátek 13. 11.": "venerdì 13/11",
  "Hodiny": "Orologio",
- "Čas, datum, kdo má svátek, státní svátky, teplota, počet letadel a IP adresa pro webové nastavení.": "Ora, data, di chi è l’onomastico, festività, temperatura, numero di aerei e l’indirizzo IP per le impostazioni web.",
  "Předpověď": "Previsioni",
  "polojasno": "parz. nuvoloso",
  "Začne pršet asi za 30 min": "Tra ~30 min inizia a piovere",
@@ -336,5 +335,6 @@
  "Obrazovka spotová cena elektřiny": "Schermata prezzo spot dell’elettricità",
  "Obrazovka poznámka": "Schermata nota",
  "Obrazovka levná elektřina": "Schermata elettricità economica",
- "Paměť se dvěma oddíly: nová verze se zapíše do neaktivního oddílu a po ověření se z něj nastartuje": "Memoria con due partizioni: la nuova versione viene scritta nella partizione inattiva e, dopo la verifica, si avvia da lì"
+ "Paměť se dvěma oddíly: nová verze se zapíše do neaktivního oddílu a po ověření se z něj nastartuje": "Memoria con due partizioni: la nuova versione viene scritta nella partizione inattiva e, dopo la verifica, si avvia da lì",
+ "Čas, datum, kdo má svátek, státní svátky, teplota a IP adresa pro webové nastavení. Je-li zapnutý i Radar nebo Detail letadla, ukazuje i počet letadel v okolí.": "Ora, data, di chi è l’onomastico, festività, temperatura e l’indirizzo IP per le impostazioni web. Se è attivo anche il Radar o il Dettaglio aereo, mostra anche il numero di aerei nei dintorni."
 }
