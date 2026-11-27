@@ -1039,11 +1039,6 @@
   "Buscando actualizaciones…",
   "Đang kiểm tra cập nhật…"
  ],
- "Progress is shown on the display. If there is a new version, the device restarts, downloads it and restarts again (about 1 min).": [
-  "O progresso aparece no ecrã. Se houver uma nova versão, o dispositivo reinicia, transfere-a e reinicia outra vez (cerca de 1 min).",
-  "El progreso se muestra en la pantalla. Si hay una versión nueva, el dispositivo se reinicia, la descarga y se reinicia de nuevo (aprox. 1 min).",
-  "Tiến trình hiển thị trên màn hình. Nếu có phiên bản mới, thiết bị sẽ khởi động lại, tải xuống rồi khởi động lại lần nữa (khoảng 1 phút)."
- ],
  "Settings – Planes": [
   "Definições – Aviões",
   "Configuración – Aviones",
@@ -1793,5 +1788,10 @@
   "Utilizador para entrar: ",
   "Usuario para entrar: ",
   "Tên đăng nhập: "
+ ],
+ "The device restarts and checks GitHub right after boot, when it has enough free memory. If there is a new version, it downloads it (progress on the display) and restarts again. It takes about 1 min, then this page reloads.": [
+  "O dispositivo reinicia e verifica o GitHub logo após arrancar, quando tem memória livre suficiente. Se houver uma nova versão, descarrega-a (progresso no ecrã) e reinicia de novo. Demora cerca de 1 min, depois esta página recarrega.",
+  "El dispositivo se reinicia y comprueba GitHub justo después de arrancar, cuando tiene memoria libre suficiente. Si hay una versión nueva, la descarga (progreso en la pantalla) y se reinicia de nuevo. Tarda alrededor de 1 min; después esta página se recarga.",
+  "Thiết bị khởi động lại và kiểm tra GitHub ngay sau khi khởi động, khi còn đủ bộ nhớ trống. Nếu có phiên bản mới, thiết bị sẽ tải xuống (tiến trình hiện trên màn hình) rồi khởi động lại lần nữa. Mất khoảng 1 phút, sau đó trang này tự tải lại."
  ]
 }

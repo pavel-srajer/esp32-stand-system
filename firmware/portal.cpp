@@ -1483,18 +1483,22 @@ static void handleSave() {
 
 static void handleUpdate() {
   gLastActivity = millis();
-  gOtaRequest = true;
+  // Kontrola i stažení až po restartu: za běhu bývá RAM rozdrobená a šifrované
+  // spojení na GitHub by se nemuselo navázat ("GitHub HTTP -1").
+  settingsSetOtaFlag(true);
   String pg = F("<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width'>"
-                "<meta http-equiv='refresh' content='20;url=/'>"
+                "<meta http-equiv='refresh' content='60;url=/'>"
                 "<body style='font-family:sans-serif;background:#0d1117;color:#e6edf3;padding:24px'><h2>");
   pg += tr("Kontroluji aktualizace…", "Checking for updates…", "Suche nach Updates…", "Verifica aggiornamenti…");
   pg += "</h2><p>";
-  pg += tr("Průběh je vidět na displeji. Pokud je nová verze, zařízení se restartuje, stáhne ji a znovu restartuje (asi 1 min).",
-           "Progress is shown on the display. If there is a new version, the device restarts, downloads it and restarts again (about 1 min).",
-           "Der Fortschritt wird am Display angezeigt. Gibt es eine neue Version, startet das Gerät neu, lädt sie und startet erneut (ca. 1 min).",
-           "L’avanzamento è sul display. Se c’è una nuova versione, il dispositivo si riavvia, la scarica e si riavvia di nuovo (circa 1 min).");
+  pg += tr("Zařízení se restartuje a hned po startu zkontroluje GitHub, protože tehdy má dost volné paměti. Pokud je nová verze, stáhne ji (průběh je na displeji) a znovu se restartuje. Trvá to asi 1 min, stránka se pak sama obnoví.",
+           "The device restarts and checks GitHub right after boot, when it has enough free memory. If there is a new version, it downloads it (progress on the display) and restarts again. It takes about 1 min, then this page reloads.",
+           "Das Gerät startet neu und prüft GitHub direkt nach dem Start, wenn genug Speicher frei ist. Gibt es eine neue Version, lädt es sie (Fortschritt am Display) und startet erneut. Das dauert ca. 1 min, danach lädt die Seite neu.",
+           "Il dispositivo si riavvia e controlla GitHub subito dopo l’avvio, quando ha abbastanza memoria libera. Se c’è una nuova versione la scarica (avanzamento sul display) e si riavvia di nuovo. Ci vuole circa 1 min, poi la pagina si ricarica.");
   pg += "</p></body>";
   server.send(200, "text/html; charset=utf-8", pg);
+  delay(1000);
+  ESP.restart();
 }
 
 static void handleNotFound() {

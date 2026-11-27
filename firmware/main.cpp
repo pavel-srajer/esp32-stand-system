@@ -793,6 +793,19 @@ static void ensureWiFi() {
   }
 }
 
+static bool sOtaBootTried = false;  // po restartu kvůli aktualizaci už znovu nerestartovat
+
+// Kontrola za běhu selhala na spojení (typicky málo souvislé RAM pro TLS)?
+// Pak restart a kontrola hned po startu, kdy je paměť volná – nejvýš jednou.
+static void otaRetryAfterRestart() {
+  if (sOtaBootTried || !gCfg.autoUpdate || FW_VERSION[0] != 'v') return;
+  if (gOta.state != OTA_FAILED || strncmp(gOta.msg, "GitHub HTTP -", 13) != 0) return;
+  Serial.println("[OTA] kontrola selhala na spojení – restart a kontrola po startu");
+  settingsSetOtaFlag(true);
+  delay(200);
+  ESP.restart();
+}
+
 static void netTask(void*) {
   uint32_t lastPlanes = 0, lastWeather = 0;
   uint32_t weatherInterval = WEATHER_REFRESH_MS;
@@ -804,6 +817,7 @@ static void netTask(void*) {
       if (url.length()) otaInstall(url);  // adresa uložená před restartem – bez dotazu na GitHub API
       else otaCheck(true);                // při úspěchu se zařízení restartuje
       gOtaBootMode = false;     // nepovedlo se -> normální provoz (zkusí se zase za den)
+      sOtaBootTried = true;
     }
     if (WiFi.status() == WL_CONNECTED) {
       uint32_t now = millis();
@@ -874,6 +888,7 @@ static void netTask(void*) {
         lastOta = millis();
         // vývojová verze ("dev") se automaticky nepřepisuje
         otaCheck(gCfg.autoUpdate && FW_VERSION[0] == 'v');
+        otaRetryAfterRestart();
       }
     }
     vTaskDelay(pdMS_TO_TICKS(200));
