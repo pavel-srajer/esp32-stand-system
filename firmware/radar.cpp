@@ -42,6 +42,7 @@ static SemaphoreHandle_t sMutex = nullptr;
 // souvislých 14 kB nemuselo najít. Používá ho dekódování snímku i vyhodnocení,
 // obojí běží jen v síťové úloze jedno po druhém.
 static uint8_t sWork[RADAR_N * RADAR_N];
+uint8_t* radarScratch() { return sWork; }
 
 static void lock() {
   if (!sMutex) sMutex = xSemaphoreCreateMutex();

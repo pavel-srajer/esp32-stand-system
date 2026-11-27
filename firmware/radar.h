@@ -16,6 +16,10 @@ time_t radarFrameTime(int i);  // UTC
 const char* radarError();
 uint32_t radarUpdatedMs();
 
+// Pracovní buffer RADAR_N² B. Smí ho používat jen síťová úloha (dekódování snímků
+// radaru, vyhodnocení a dekódování log – vše jedno po druhém).
+uint8_t* radarScratch();
+
 // Vyhodnocení radaru pro polohu domova (počítá se po každé aktualizaci snímků)
 struct RadarInfo {
   bool valid = false;

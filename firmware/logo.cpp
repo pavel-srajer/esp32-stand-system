@@ -3,21 +3,25 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include "png_net.h"
+#include "radar.h"
 #include <LovyanGFX.hpp>
 
 static const char* LOGO_URL = "https://raw.githubusercontent.com/Jxck-S/airline-logos/main/flightaware_logos/%s.png";
-static const int CACHE = 3;
+// Loga se drží komprimovaná (RLE: páry počet, barva) za sebou v pevném bloku.
+// Logo 56×56 má nekomprimované 3 136 B, komprimované typicky 0,2–1,5 kB (průměr
+// ~750 B), takže se do stejné paměti jako dřív 3 loga vejde zhruba 12 log.
+// Pevný blok navíc nedrobí haldu (jinak by chyběl souvislý blok pro šifrování).
+static const int CACHE = 16;                       // max. počet log (i "logo neexistuje")
+static const int POOL = 3 * LOGO_SIZE * LOGO_SIZE;  // 9 408 B
 
 struct Entry {
-  char icao[4];
+  char icao[4];    // "" = volné místo
   bool found;      // false = logo neexistuje (404), nezkoušet znovu
   uint32_t used;   // pro LRU
-  uint8_t* px;     // LOGO_SIZE² RGB332 (ukazuje do sPx)
+  uint16_t off, len;  // RLE v sPool
 };
 static Entry sCache[CACHE];
-// Pevné místo pro loga: dřív se každé logo alokovalo zvlášť a halda se drobila
-// (pak chyběl souvislý blok pro šifrované spojení).
-static uint8_t sPx[CACHE][LOGO_SIZE * LOGO_SIZE];
+static uint8_t sPool[POOL];
 static char sPending[4] = "";
 static uint32_t sRetryAt = 0;  // po chybě sítě chvíli nezkoušet
 static char sStatus[96] = "zatím žádné";
@@ -47,9 +51,14 @@ bool logoGet(const char* icao, uint8_t* out) {
     if (e.icao[0] && !strcmp(e.icao, icao)) {
       known = true;
       e.used = millis();
-      if (e.found && e.px) {
-        memcpy(out, e.px, LOGO_SIZE * LOGO_SIZE);
-        have = true;
+      if (e.found && e.len) {  // rozbalit RLE
+        int pos = 0;
+        for (int i = 0; i + 1 < e.len && pos < LOGO_SIZE * LOGO_SIZE; i += 2) {
+          int n = min((int)sPool[e.off + i], LOGO_SIZE * LOGO_SIZE - pos);
+          memset(out + pos, sPool[e.off + i + 1], n);
+          pos += n;
+        }
+        have = pos == LOGO_SIZE * LOGO_SIZE;
       }
     }
   if (!known) strlcpy(sPending, icao, sizeof sPending);
@@ -121,16 +130,9 @@ void logoService() {
   unlock();
   if (!icao[0]) return;
 
-  // nejdéle nepoužité místo uvolnit a stahovat rovnou do něj
-  lock();
-  int slot = 0;
-  for (int i = 1; i < CACHE; i++)
-    if (sCache[i].used < sCache[slot].used) slot = i;
-  sCache[slot].icao[0] = 0;
-  sCache[slot].found = false;
-  sCache[slot].px = nullptr;
-  unlock();
-  uint8_t* px = sPx[slot];
+  // Dekóduje se do pracovního bufferu radaru (14 kB). Logo i radar běží jen v síťové
+  // úloze jedno po druhém, takže kvůli logu nemusí existovat další 3 kB buffer.
+  uint8_t* px = radarScratch();
   int r = fetch(icao, px);
   if (r > 0) snprintf(sStatus, sizeof sStatus, "%s: OK", icao);
   else if (r == 0) snprintf(sStatus, sizeof sStatus, "%s: logo neexistuje", icao);
@@ -140,11 +142,78 @@ void logoService() {
     sRetryAt = millis() + 30000;
     return;
   }
-  if (r == 0) px = nullptr;
+  // délka RLE
+  const int N = LOGO_SIZE * LOGO_SIZE;
+  int len = 0;
+  if (r > 0)
+    for (int i = 0; i < N;) {
+      int n = 1;
+      while (i + n < N && px[i + n] == px[i] && n < 255) n++;
+      len += 2;
+      i += n;
+    }
+  if (len > POOL) len = 0, r = 0;  // nemůže nastat (max. 2 × 3136 by bylo víc), pro jistotu
+
   lock();
-  strlcpy(sCache[slot].icao, icao, sizeof sCache[slot].icao);
-  sCache[slot].found = r > 0;
-  sCache[slot].px = px;
-  sCache[slot].used = millis();
+  auto usedBytes = [&]() {
+    int u = 0;
+    for (auto& e : sCache)
+      if (e.icao[0]) u += e.len;
+    return u;
+  };
+  auto freeSlot = [&]() {
+    for (int i = 0; i < CACHE; i++)
+      if (!sCache[i].icao[0]) return i;
+    return -1;
+  };
+  // uvolňovat nejdéle nepoužitá loga, dokud není místo pro záznam i data
+  while (freeSlot() < 0 || usedBytes() + len > POOL) {
+    int lru = -1;
+    for (int i = 0; i < CACHE; i++)
+      if (sCache[i].icao[0] && (lru < 0 || sCache[i].used < sCache[lru].used)) lru = i;
+    if (lru < 0) break;
+    sCache[lru].icao[0] = 0;
+    sCache[lru].len = 0;
+  }
+  // setřást zbývající loga na začátek bloku (podle pozice, ať se nic nepřepíše)
+  int order[CACHE], no = 0;
+  for (int i = 0; i < CACHE; i++)
+    if (sCache[i].icao[0] && sCache[i].len) order[no++] = i;
+  for (int a2 = 1; a2 < no; a2++)
+    for (int b2 = a2; b2 > 0 && sCache[order[b2]].off < sCache[order[b2 - 1]].off; b2--) {
+      int x = order[b2];
+      order[b2] = order[b2 - 1];
+      order[b2 - 1] = x;
+    }
+  int w = 0;
+  for (int k = 0; k < no; k++) {
+    Entry& e = sCache[order[k]];
+    memmove(sPool + w, sPool + e.off, e.len);
+    e.off = w;
+    w += e.len;
+  }
+  // zapsat nové logo za ně
+  int slot = freeSlot();
+  if (slot >= 0) {
+    Entry& e = sCache[slot];
+    strlcpy(e.icao, icao, sizeof e.icao);
+    e.found = r > 0;
+    e.used = millis();
+    e.off = w;
+    e.len = 0;
+    if (r > 0 && w + len <= POOL) {
+      for (int i = 0; i < N;) {
+        int n = 1;
+        while (i + n < N && px[i + n] == px[i] && n < 255) n++;
+        sPool[w + e.len] = n;
+        sPool[w + e.len + 1] = px[i];
+        e.len += 2;
+        i += n;
+      }
+    }
+    int cnt = 0;
+    for (auto& x : sCache) cnt += x.icao[0] && x.found;
+    Serial.printf("[Logo] %s: %d B, v paměti %d log, %d / %d B\n", icao, e.len, cnt, w + e.len, POOL);
+  }
   unlock();
 }
