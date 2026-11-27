@@ -821,7 +821,9 @@ static void netTask(void*) {
     }
     if (WiFi.status() == WL_CONNECTED) {
       uint32_t now = millis();
-      if (gForcePlanes || now - lastPlanes >= (sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS)) {
+      // letadla jen když je něco potřebuje (radar, detail, hodiny s počtem letadel, upozornění)
+      bool planesNeeded = scrOn(SCR_RADAR) || scrOn(SCR_DETAIL) || scrOn(SCR_CLOCK) || gCfg.alertMask;
+      if (planesNeeded && (gForcePlanes || now - lastPlanes >= (sLocalOk ? PLANES_LOCAL_MS : PLANES_REFRESH_MS))) {
         gForcePlanes = false;
         fetchPlanes();
         lastPlanes = millis();
@@ -841,7 +843,7 @@ static void netTask(void*) {
       // spotová cena elektřiny (ceny se mění jednou denně; zítřek OTE zveřejní kolem 13:00)
       static uint32_t lastPrice = 0, priceInterval = 1800000;
       static bool priceDone = false;
-      if (scrOn(SCR_PRICE) && timeValid()) {
+      if ((scrOn(SCR_PRICE) || scrOn(SCR_PRICEWIN)) && timeValid()) {
         priceTick();
         if (!priceDone || millis() - lastPrice >= priceInterval) {
           priceDone = true;
